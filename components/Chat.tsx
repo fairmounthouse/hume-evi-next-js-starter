@@ -4,6 +4,7 @@ import { VoiceProvider } from "@humeai/voice-react";
 import Messages from "./Messages";
 import Controls from "./Controls";
 import StartCall from "./StartCall";
+import VideoInput from "./VideoInput";
 import { ComponentRef, useRef } from "react";
 import { toast } from "sonner";
 
@@ -21,7 +22,7 @@ export default function ClientComponent({
   return (
     <div
       className={
-        "relative grow flex flex-col mx-auto w-full overflow-hidden h-[0px]"
+        "relative grow flex flex-col mx-auto w-full overflow-hidden"
       }
     >
       <VoiceProvider
@@ -45,8 +46,15 @@ export default function ClientComponent({
           toast.error(error.message);
         }}
       >
-        <Messages ref={ref} />
-        <Controls />
+        <div className="grow flex flex-col md:flex-row gap-4 overflow-hidden relative">
+          <div className="grow flex flex-col overflow-hidden">
+            <Messages ref={ref} />
+            <Controls />
+          </div>
+          <div className="w-full md:w-80 flex-shrink-0 p-4 pt-4 md:pt-24">
+            <VideoInput />
+          </div>
+        </div>
         <StartCall configId={configId} accessToken={accessToken} />
       </VoiceProvider>
     </div>
