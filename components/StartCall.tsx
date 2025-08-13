@@ -4,7 +4,7 @@ import { Button } from "./ui/button";
 import { Phone } from "lucide-react";
 import { toast } from "sonner";
 
-export default function StartCall({ configId, accessToken }: { configId?: string, accessToken: string }) {
+export default function StartCall({ configId, accessToken, onCallStart }: { configId?: string, accessToken: string, onCallStart?: () => void }) {
   const { status, connect } = useVoice();
 
   return (
@@ -32,14 +32,25 @@ export default function StartCall({ configId, accessToken }: { configId?: string
               <Button
                 className={"z-50 flex items-center gap-1.5 rounded-full"}
                 onClick={() => {
+                  console.log("🟢 START CALL BUTTON CLICKED");
+                  
+                  // Start camera immediately
+                  if (onCallStart) {
+                    console.log("📹 TRIGGERING CAMERA START");
+                    onCallStart();
+                  }
+                  
                   connect({ 
                     auth: { type: "accessToken", value: accessToken },
                     configId, 
                     // additional options can be added here
                     // like resumedChatGroupId and sessionSettings
                   })
-                    .then(() => {})
-                    .catch(() => {
+                    .then(() => {
+                      console.log("✅ CALL CONNECTED SUCCESSFULLY");
+                    })
+                    .catch((err) => {
+                      console.error("❌ CALL FAILED:", err);
                       toast.error("Unable to start call");
                     })
                     .finally(() => {});

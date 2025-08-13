@@ -1,14 +1,16 @@
 "use client";
 import { useVoice } from "@humeai/voice-react";
 import { Button } from "./ui/button";
-import { Mic, MicOff, Phone } from "lucide-react";
+import { Mic, MicOff, Phone, Volume2, VolumeX } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { Toggle } from "./ui/toggle";
 import MicFFT from "./MicFFT";
 import { cn } from "@/utils";
 
 export default function Controls() {
-  const { disconnect, status, isMuted, unmute, mute, micFft } = useVoice();
+  const { disconnect, status, isMuted, unmute, mute, micFft, isAudioMuted, muteAudio, unmuteAudio } = useVoice();
+  
+  console.log("🎵 Audio status:", { isAudioMuted, isMuted });
 
   return (
     <div
@@ -56,14 +58,44 @@ export default function Controls() {
               )}
             </Toggle>
 
+            <Toggle
+              className={"rounded-full"}
+              pressed={!isAudioMuted}
+              onPressedChange={() => {
+                if (isAudioMuted) {
+                  unmuteAudio();
+                  console.log("🔊 Audio unmuted");
+                } else {
+                  muteAudio();
+                  console.log("🔇 Audio muted");
+                }
+              }}
+            >
+              {isAudioMuted ? (
+                <VolumeX className={"size-4"} />
+              ) : (
+                <Volume2 className={"size-4"} />
+              )}
+            </Toggle>
+
             <div className={"relative grid h-8 w-48 shrink grow-0"}>
               <MicFFT fft={micFft} className={"fill-current"} />
             </div>
 
             <Button
               className={"flex items-center gap-1 rounded-full"}
-              onClick={() => {
-                disconnect();
+              onClick={async () => {
+                console.log("🛑 END CALL BUTTON CLICKED - DISCONNECTING");
+                // Proactively signal any recorders to stop & upload
+                try {
+                  window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
+                } catch {}
+                // Disconnect (async per Hume SDK migration guide)
+                try {
+                  await disconnect();
+                } catch (e) {
+                  console.error("disconnect error", e);
+                }
               }}
               variant={"destructive"}
             >

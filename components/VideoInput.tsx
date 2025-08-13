@@ -1,12 +1,22 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { Button } from "./ui/button";
 import { Video, VideoOff } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { cn } from "@/utils";
 import { toast } from "sonner";
 
-export default function VideoInput() {
+export interface VideoInputRef {
+  getStream: () => MediaStream | null;
+  startVideo: () => Promise<void>;
+  stopVideo: () => void;
+}
+
+interface VideoInputProps {
+  autoStart?: boolean;
+}
+
+const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = false }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isVideoOn, setIsVideoOn] = useState(false);
@@ -68,6 +78,23 @@ export default function VideoInput() {
       startVideo();
     }
   };
+
+  // Expose stream and controls through ref
+  useImperativeHandle(ref, () => ({
+    getStream: () => streamRef.current,
+    startVideo,
+    stopVideo,
+  }));
+
+  // Auto-start video if requested
+  useEffect(() => {
+    console.log("🎥 VideoInput autoStart effect:", { autoStart, isVideoOn });
+    if (autoStart && !isVideoOn) {
+      console.log("🚀 AUTO-STARTING CAMERA NOW!");
+      toast.info("Starting camera...");
+      startVideo();
+    }
+  }, [autoStart]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -148,4 +175,8 @@ export default function VideoInput() {
       </AnimatePresence>
     </div>
   );
-}
+});
+
+VideoInput.displayName = "VideoInput";
+
+export default VideoInput;
