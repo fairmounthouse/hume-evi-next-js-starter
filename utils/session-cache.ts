@@ -4,7 +4,7 @@
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
-  ttl: number; // time to live in ms
+  ttl: number; // time to live in ms 1
 }
 
 class SessionCache {
