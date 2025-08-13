@@ -1,15 +1,28 @@
 export class AssistantAudioBus {
 	private audioContext: AudioContext;
+	/**
+	 * All assistant speech is routed through this MediaStreamDestination so that it can be
+	 * mixed with the microphone and captured by MediaRecorder.
+	 */
 	private destination: MediaStreamAudioDestinationNode;
 	private scheduleTime: number;
 	private sampleRateFallback = 48000;
 
-	constructor() {
-		this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+	/**
+	 * @param ctx A shared AudioContext owned by the chat UI.  Passing it in lets us ensure
+	 *            every audio node (mic, assistant, merger, recorder) lives in the SAME
+	 *            timeline – eliminating sync problems and silent tracks.
+	 */
+	constructor(ctx: AudioContext) {
+		this.audioContext = ctx;
 		this.destination = this.audioContext.createMediaStreamDestination();
 		this.scheduleTime = this.audioContext.currentTime;
 	}
 
+	/**
+	 * Returns a MediaStream that contains *every* decoded assistant audio buffer as a live audio track.
+	 * Pass this to RecordingControls so it can be merged with the mic.
+	 */
 	getStream(): MediaStream {
 		return this.destination.stream;
 	}
@@ -27,9 +40,12 @@ export class AssistantAudioBus {
 		try {
 			const ab = base64ToArrayBuffer(base64);
 			const buffer = await this.audioContext.decodeAudioData(ab);
+			console.log("🎵 Decoded WAV audio:", buffer.duration, "seconds,", buffer.sampleRate, "Hz");
 			this.playBuffer(buffer);
 			this.resume();
-		} catch {}
+		} catch (error) {
+			console.error("🎵 Error decoding WAV audio:", error);
+		}
 	}
 
 	pushPcm16(int16: Int16Array, sampleRate?: number, channels: number = 1) {
@@ -79,7 +95,6 @@ export class AssistantAudioBus {
 
 	close() {
 		try { this.destination.disconnect(); } catch {}
-		try { this.audioContext.close(); } catch {}
 	}
 }
 
