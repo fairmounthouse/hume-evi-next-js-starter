@@ -11,7 +11,8 @@ import { useVoice } from "@humeai/voice-react";
 
 interface RecordingControlsProps {
   videoStream: MediaStream | null;
-  audioStream?: MediaStream | null;
+  audioStream: MediaStream | null; // assistant stream
+  audioCtx: AudioContext;
   isCallActive?: boolean;
   autoStart?: boolean;
   onRecordingComplete?: (videoId: string) => void;
@@ -20,6 +21,7 @@ interface RecordingControlsProps {
 export default function RecordingControls({
   videoStream,
   audioStream,
+  audioCtx,
   isCallActive = false,
   autoStart = false,
   onRecordingComplete,
@@ -38,7 +40,7 @@ export default function RecordingControls({
   // Keep audio capture/mix alive for the session
   const tabCaptureRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioContextRef = useRef<AudioContext>(audioCtx);
   const mixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   
   console.log("🎥 RecordingControls rendered with props:", {
@@ -92,7 +94,7 @@ export default function RecordingControls({
         }
 
         if (assistant || mic) {
-          const audioContext = (audioContextRef.current ||= new (window.AudioContext || (window as any).webkitAudioContext)());
+          const audioContext = audioContextRef.current;
           try { await audioContext.resume(); } catch {}
           const destination = (mixDestinationRef.current ||= audioContext.createMediaStreamDestination());
           if (assistant) {
@@ -159,28 +161,55 @@ export default function RecordingControls({
       // Try to get audio
       try {
         // Mix assistant (prop) + mic
-        const assistant = audioStream && audioStream.getAudioTracks().length > 0 ? audioStream : null;
+        const assistantTracks = audioStream ? audioStream.getAudioTracks() : [];
+        console.log("🎤 Assistant audio stream:", {
+          hasStream: !!audioStream,
+          trackCount: assistantTracks.length,
+          tracks: assistantTracks.map(t => ({ label: t.label, readyState: t.readyState, enabled: t.enabled }))
+        });
+        
+        const assistant = assistantTracks.length > 0 ? audioStream : null;
         let mic: MediaStream | null = null;
-        try { mic = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch {}
+        try { 
+          mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          console.log("🎤 Got microphone stream");
+        } catch (err) {
+          console.log("🎤 Could not get microphone:", err);
+        }
 
         if (assistant || mic) {
-          const audioContext = (audioContextRef.current ||= new (window.AudioContext || (window as any).webkitAudioContext)());
+          const audioContext = audioContextRef.current;
           try { await audioContext.resume(); } catch {}
           const destination = (mixDestinationRef.current ||= audioContext.createMediaStreamDestination());
-          if (mic) audioContext.createMediaStreamSource(mic).connect(destination);
-          if (assistant) audioContext.createMediaStreamSource(assistant).connect(destination);
+          
+          if (mic) {
+            const micSource = audioContext.createMediaStreamSource(mic);
+            micSource.connect(destination);
+            console.log("🎤 Connected microphone to destination");
+          }
+          
+          if (assistant) {
+            const assistantSource = audioContext.createMediaStreamSource(assistant);
+            assistantSource.connect(destination);
+            console.log("🎤 Connected assistant audio to destination");
+          }
+          
           const mixedTrack = destination.stream.getAudioTracks()[0];
           if (mixedTrack) {
-            console.log("Adding mixed audio track (start):", mixedTrack.label);
+            console.log("✅ Adding mixed audio track (start):", {
+              label: mixedTrack.label,
+              readyState: mixedTrack.readyState,
+              enabled: mixedTrack.enabled
+            });
             tracks.push(mixedTrack);
           } else {
-            console.log("No mixed track available at start");
+            console.log("❌ No mixed track available at start");
           }
         } else {
-          console.log("Could not get audio, recording video only");
+          console.log("⚠️ Could not get audio, recording video only");
         }
       } catch (e) {
-        console.log("Audio mix failed, recording video only");
+        console.log("❌ Audio mix failed, recording video only:", e);
       }
       
       const newCombinedStream = new MediaStream(tracks);
