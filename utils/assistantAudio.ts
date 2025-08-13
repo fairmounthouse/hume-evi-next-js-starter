@@ -31,7 +31,7 @@ export class AssistantAudioBus {
 		try {
 			const src = this.audioContext.createMediaStreamSource(stream);
 			src.connect(this.destination);
-			src.connect(this.audioContext.destination);
+			// Removed direct speaker connection to avoid double playback – SDK already plays audio
 			this.resume();
 		} catch {}
 	}
@@ -81,7 +81,7 @@ export class AssistantAudioBus {
 		const src = this.audioContext.createBufferSource();
 		src.buffer = buffer;
 		src.connect(this.destination);
-		src.connect(this.audioContext.destination);
+		// Removed direct speaker connection; SDK output handles playback
 		const startAt = Math.max(this.scheduleTime, this.audioContext.currentTime);
 		src.start(startAt);
 		this.scheduleTime = startAt + buffer.duration;
