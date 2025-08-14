@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Interview Practice - Stop Memorizing, Start Conversing</title>
+    <link rel="stylesheet" href="../styles/landing-page.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="nav__container">
+            <div class="nav__logo">
+                <img src="/logo.svg" alt="AI Interview Coach" class="nav__logo-image">
+            </div>
+            <div class="nav__menu">
+                <a href="#features" class="nav__link">Features</a>
+                <a href="#results" class="nav__link">Success Stories</a>
+                <a href="#pricing" class="nav__link">Pricing</a>
+                <a href="/login" class="nav__link nav__link--login">Log In</a>
+                <button class="nav__cta button button--primary button--small">Start Free</button>
+            </div>
+            <button class="nav__mobile-toggle" aria-label="Toggle menu">
+                <span class="nav__mobile-toggle-line"></span>
+                <span class="nav__mobile-toggle-line"></span>
+                <span class="nav__mobile-toggle-line"></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero__container">
+            <div class="hero__content">
+                <h1 class="hero__headline">
+                    Stop Practicing Interview Answers. 
+                    <span class="hero__headline-emphasis">Start Having Real Conversations.</span>
+                </h1>
+                <p class="hero__subheadline">
+                    Our AI learned from 10,000+ hours of elite interviews. Now it interviews you 
+                    like a real hiring manager—adapting questions based on your answers, not following a script.
+                </p>
+                <div class="hero__cta-group">
+                    <button class="button button--primary button--large hero__cta-primary">
+                        Start Practicing Free
+                    </button>
+                    <button class="button button--secondary button--large hero__cta-secondary">
+                        <svg class="button__icon" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                            <path d="M4 5L16 10L4 15V5Z" fill="currentColor"/>
+                        </svg>
+                        Watch 90-Second Demo
+                    </button>
+                </div>
+                <p class="hero__trust-line">
+                    Join <strong>50,000+ professionals</strong> who landed offers at 
+                    <span class="hero__company-logos">
+                        <img src="/logos/google.svg" alt="Google" class="hero__company-logo">
+                        <img src="/logos/mckinsey.svg" alt="McKinsey" class="hero__company-logo">
+                        <img src="/logos/meta.svg" alt="Meta" class="hero__company-logo">
+                        <span class="hero__company-more">and 200+ top companies</span>
+                    </span>
+                </p>
+            </div>
+            <div class="hero__visual">
+                <div class="hero__video-wrapper">
+                    <video class="hero__video" autoplay muted loop playsinline>
+                        <source src="/demo-preview.mp4" type="video/mp4">
+                    </video>
+                    <div class="hero__video-overlay">
+                        <button class="hero__video-play" aria-label="Play full demo">
+                            <svg width="60" height="60" viewBox="0 0 60 60" fill="none">
+                                <circle cx="30" cy="30" r="30" fill="white" fill-opacity="0.9"/>
+                                <path d="M24 20L40 30L24 40V20Z" fill="#333"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Problem Section -->
+    <section class="problem">
+        <div class="problem__container">
+            <h2 class="problem__headline">Traditional Prep Creates Polished Robots</h2>
+            <div class="problem__grid">
+                <div class="problem__item">
+                    <div class="problem__icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <path d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.82 0-16-7.18-16-16S15.18 8 24 8s16 7.18 16 16-7.18 16-16 16z" fill="#FF6B6B"/>
+                            <path d="M15 17h6v14h-6V17zm12 0h6v14h-6V17z" fill="#FF6B6B"/>
+                        </svg>
+                    </div>
+                    <h3 class="problem__item-title">You memorize 50 STAR stories</h3>
+                    <p class="problem__item-text">
+                        Spending weeks crafting perfect responses that sound rehearsed and inauthentic
+                    </p>
+                </div>
+                <div class="problem__item">
+                    <div class="problem__icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <path d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.82 0-16-7.18-16-16S15.18 8 24 8s16 7.18 16 16-7.18 16-16 16z" fill="#FF6B6B"/>
+                            <path d="M24 28c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm-8 4h16v2c0 2.66-5.33 4-8 4s-8-1.34-8-4v-2z" fill="#FF6B6B"/>
+                        </svg>
+                    </div>
+                    <h3 class="problem__item-title">You freeze on follow-ups</h3>
+                    <p class="problem__item-text">
+                        When interviewers go off-script, your rehearsed answers fall apart
+                    </p>
+                </div>
+                <div class="problem__item">
+                    <div class="problem__icon">
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                            <path d="M24 4C12.95 4 4 12.95 4 24s8.95 20 20 20 20-8.95 20-20S35.05 4 24 4zm0 36c-8.82 0-16-7.18-16-16S15.18 8 24 8s16 7.18 16 16-7.18 16-16 16z" fill="#FF6B6B"/>
+                            <path d="M16 28h16v4H16v-4zm0-8h16v4H16v-4z" fill="#FF6B6B"/>
+                        </svg>
+                    </div>
+                    <h3 class="problem__item-title">Generic feedback wastes time</h3>
+                    <p class="problem__item-text">
+                        "Be more specific" doesn't help when you don't know what specific means
+                    </p>
+                </div>
+            </div>
+            <div class="problem__reality">
+                <p class="problem__reality-text">
+                    <strong>Reality check:</strong> Real interviews are dynamic conversations, 
+                    not Q&A sessions. When you sound scripted, interviewers tune out.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Solution Section -->
+    <section class="solution">
+        <div class="solution__container">
+            <h2 class="solution__headline">AI That Interviews Like Humans Do</h2>
+            
+            <div class="solution__features">
+                <!-- Dynamic Conversations -->
+                <div class="solution__feature">
+                    <div class="solution__feature-header">
+                        <div class="solution__feature-icon">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2zm0 25c-6.065 0-11-4.935-11-11S9.935 5 16 5s11 4.935 11 11-4.935 11-11 11z" fill="#4ECDC4"/>
+                                <path d="M16 8l2.39 4.84L24 13.6l-4 3.9.94 5.5L16 20.34 11.06 23l.94-5.5-4-3.9 5.61-.76L16 8z" fill="#4ECDC4"/>
+                            </svg>
+                        </div>
+                        <h3 class="solution__feature-title">Dynamic Conversations</h3>
+                    </div>
+                    <p class="solution__feature-description">
+                        No two interviews are the same. Our AI adapts its questions based on your 
+                        answers, just like a real interviewer.
+                    </p>
+                    <div class="solution__feature-example">
+                        <div class="solution__conversation">
+                            <div class="solution__conversation-message solution__conversation-message--ai">
+                                "Tell me about a time you led a difficult project."
+                            </div>
+                            <div class="solution__conversation-message solution__conversation-message--user">
+                                "I led a team of 5 engineers to rebuild our payment system..."
+                            </div>
+                            <div class="solution__conversation-message solution__conversation-message--ai">
+                                "Interesting. How did you handle the engineer who initially resisted the new architecture?"
+                            </div>
+                            <p class="solution__conversation-note">
+                                ↑ AI picked up on unstated tension and probed deeper
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feedback That Actually Helps -->
+                <div class="solution__feature">
+                    <div class="solution__feature-header">
+                        <div class="solution__feature-icon">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2zm0 25c-6.065 0-11-4.935-11-11S9.935 5 16 5s11 4.935 11 11-4.935 11-11 11z" fill="#9B59B6"/>
+                                <path d="M22 11l-8 8-4-4" stroke="#9B59B6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <h3 class="solution__feature-title">Feedback That Actually Helps</h3>
+                    </div>
+                    <p class="solution__feature-description">
+                        Get specific, actionable feedback on exactly what to improve—not generic advice.
+                    </p>
+                    <div class="solution__feature-feedback">
+                        <div class="solution__feedback-item solution__feedback-item--weak">
+                            <h4 class="solution__feedback-label">Instead of:</h4>
+                            <p class="solution__feedback-text">"Your answer needs more detail"</p>
+                        </div>
+                        <div class="solution__feedback-item solution__feedback-item--strong">
+                            <h4 class="solution__feedback-label">You get:</h4>
+                            <p class="solution__feedback-text">
+                                "You mentioned 'improving efficiency' 3 times but never quantified it. 
+                                Try: 'reduced processing time from 48 to 12 hours, saving $200K annually'"
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Intelligence from Real Interviews -->
+                <div class="solution__feature">
+                    <div class="solution__feature-header">
+                        <div class="solution__feature-icon">
+                            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                <path d="M16 2C8.268 2 2 8.268 2 16s6.268 14 14 14 14-6.268 14-14S23.732 2 16 2zm0 25c-6.065 0-11-4.935-11-11S9.935 5 16 5s11 4.935 11 11-4.935 11-11 11z" fill="#3498DB"/>
+                                <path d="M16 8v8l4 4" stroke="#3498DB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <h3 class="solution__feature-title">Intelligence from Real Interviews</h3>
+                    </div>
+                    <p class="solution__feature-description">
+                        Trained on actual interviews from top companies, our AI knows what hiring 
+                        managers really look for.
+                    </p>
+                    <div class="solution__feature-stats">
+                        <div class="solution__stat">
+                            <span class="solution__stat-number">10,000+</span>
+                            <span class="solution__stat-label">Hours of interviews analyzed</span>
+                        </div>
+                        <div class="solution__stat">
+                            <span class="solution__stat-number">500+</span>
+                            <span class="solution__stat-label">Companies represented</span>
+                        </div>
+                        <div class="solution__stat">
+                            <span class="solution__stat-number">95%</span>
+                            <span class="solution__stat-label">Accuracy in predicting success</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results">
+        <div class="results__container">
+            <h2 class="results__headline">From Nervous to Hired in Under 3 Weeks</h2>
+            
+            <div class="results__testimonials">
+                <div class="results__testimonial">
+                    <div class="results__testimonial-header">
+                        <img src="/testimonials/sarah-chen.jpg" alt="Sarah Chen" class="results__testimonial-avatar">
+                        <div class="results__testimonial-info">
+                            <h3 class="results__testimonial-name">Sarah Chen</h3>
+                            <p class="results__testimonial-role">Product Manager at Google</p>
+                        </div>
+                    </div>
+                    <blockquote class="results__testimonial-quote">
+                        "After bombing 3 interviews reading from my STAR notes, this changed everything. 
+                        The AI caught me using buzzwords and taught me to tell real stories. 
+                        Got offers from Google and Meta."
+                    </blockquote>
+                    <div class="results__testimonial-results">
+                        <span class="results__testimonial-stat">
+                            <strong>Before:</strong> 0/3 offers
+                        </span>
+                        <span class="results__testimonial-stat">
+                            <strong>After:</strong> 2/2 offers
+                        </span>
+                    </div>
+                </div>
+
+                <div class="results__testimonial">
+                    <div class="results__testimonial-header">
+                        <img src="/testimonials/james-park.jpg" alt="James Park" class="results__testimonial-avatar">
+                        <div class="results__testimonial-info">
+                            <h3 class="results__testimonial-name">James Park</h3>
+                            <p class="results__testimonial-role">Senior Consultant at McKinsey</p>
+                        </div>
+                    </div>
+                    <blockquote class="results__testimonial-quote">
+                        "The follow-up questions were brutal—exactly what I needed. It found every 
+                        weak spot in my stories and made me fix them. Felt like sparring with a 
+                        senior partner."
+                    </blockquote>
+                    <div class="results__testimonial-results">
+                        <span class="results__testimonial-stat">
+                            <strong>Prep time:</strong> 2 weeks
+                        </span>
+                        <span class="results__testimonial-stat">
+                            <strong>Result:</strong> Dream job
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="results__cta">
+                <button class="button button--primary button--xlarge results__cta-button">
+                    Start Your Transformation Today – Free for 7 Days
+                </button>
+                <p class="results__cta-note">
+                    No credit card required. Cancel anytime.
+                </p>
+            </div>
+
+            <p class="results__final-message">
+                Stop sounding like everyone else who read the same interview guides. 
+                <strong>Start sounding like yourself—but better.</strong>
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer__container">
+            <div class="footer__content">
+                <div class="footer__section">
+                    <h4 class="footer__title">Product</h4>
+                    <ul class="footer__links">
+                        <li><a href="#" class="footer__link">Features</a></li>
+                        <li><a href="#" class="footer__link">Pricing</a></li>
+                        <li><a href="#" class="footer__link">Success Stories</a></li>
+                        <li><a href="#" class="footer__link">FAQ</a></li>
+                    </ul>
+                </div>
+                <div class="footer__section">
+                    <h4 class="footer__title">Company</h4>
+                    <ul class="footer__links">
+                        <li><a href="#" class="footer__link">About</a></li>
+                        <li><a href="#" class="footer__link">Blog</a></li>
+                        <li><a href="#" class="footer__link">Careers</a></li>
+                        <li><a href="#" class="footer__link">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer__section">
+                    <h4 class="footer__title">Resources</h4>
+                    <ul class="footer__links">
+                        <li><a href="#" class="footer__link">Interview Guide</a></li>
+                        <li><a href="#" class="footer__link">Company Research</a></li>
+                        <li><a href="#" class="footer__link">Salary Data</a></li>
+                        <li><a href="#" class="footer__link">Community</a></li>
+                    </ul>
+                </div>
+                <div class="footer__section">
+                    <h4 class="footer__title">Legal</h4>
+                    <ul class="footer__links">
+                        <li><a href="#" class="footer__link">Privacy Policy</a></li>
+                        <li><a href="#" class="footer__link">Terms of Service</a></li>
+                        <li><a href="#" class="footer__link">Cookie Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer__bottom">
+                <p class="footer__copyright">© 2024 AI Interview Coach. All rights reserved.</p>
+                <div class="footer__social">
+                    <a href="#" class="footer__social-link" aria-label="Twitter">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                    <a href="#" class="footer__social-link" aria-label="LinkedIn">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="4" cy="4" r="2" stroke="currentColor" stroke-width="2"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="../scripts/landing-page.js"></script>
+</body>
+</html>

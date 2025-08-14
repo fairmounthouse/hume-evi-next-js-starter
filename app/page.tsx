@@ -1,20 +1,85 @@
-import { getHumeAccessToken } from "@/utils/getHumeAccessToken";
-import dynamic from "next/dynamic";
+"use client";
 
-const Chat = dynamic(() => import("@/components/Chat"), {
-  ssr: false,
-});
+import { Hero } from "@/components/landing/Hero";
+import { Problem } from "@/components/landing/Problem";
+import { Solution } from "@/components/landing/Solution";
+import { Results } from "@/components/landing/Results";
+import { Footer } from "@/components/landing/Footer";
+import { motion, useScroll, useSpring } from "framer-motion";
+import { useEffect } from "react";
 
-export default async function Page() {
-  const accessToken = await getHumeAccessToken();
+export default function LandingPage() {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
 
-  if (!accessToken) {
-    throw new Error('Unable to get access token');
-  }
+  // Smooth scroll behavior
+  useEffect(() => {
+    // Add smooth scroll to all anchor links
+    const handleSmoothScroll = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'A' && target.getAttribute('href')?.startsWith('#')) {
+        e.preventDefault();
+        const id = target.getAttribute('href')?.substring(1);
+        if (id) {
+          const element = document.getElementById(id);
+          element?.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    };
+
+    document.addEventListener('click', handleSmoothScroll);
+    return () => document.removeEventListener('click', handleSmoothScroll);
+  }, []);
 
   return (
-    <div className={"grow flex flex-col"}>
-      <Chat accessToken={accessToken} />
-    </div>
+    <>
+      {/* Progress Bar */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-purple-600 transform-origin-left z-50"
+        style={{ scaleX }}
+      />
+
+      {/* Main Content */}
+      <main className="relative">
+        {/* Hero Section */}
+        <Hero />
+
+        {/* Problem Section */}
+        <Problem />
+
+        {/* Solution Section */}
+        <Solution />
+
+        {/* Results Section */}
+        <Results />
+
+        {/* Footer */}
+        <Footer />
+
+        {/* Floating CTA Button - appears after scrolling */}
+        <motion.div
+          initial={{ opacity: 0, y: 100 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 2, duration: 0.5 }}
+          className="fixed bottom-8 right-8 z-40"
+        >
+          <motion.a
+            href="/interview"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Start Interview
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </motion.a>
+        </motion.div>
+      </main>
+    </>
   );
 }
