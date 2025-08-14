@@ -11,6 +11,9 @@ import { ComponentRef, useRef, useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
 import { Button } from "./ui/button";
+import { Toggle } from "./ui/toggle";
+import { GraduationCap } from "lucide-react";
+import { cn } from "@/utils";
 
 // Inner component that has access to useVoice hook
 function ChatInterface({
@@ -37,7 +40,78 @@ function ChatInterface({
   timeout,
   messagesRef,
 }: any) {
-  const { messages } = useVoice();
+  const { messages, sendSessionSettings, status } = useVoice();
+  const [coachingMode, setCoachingMode] = useState(false);
+  const [isUpdatingCoaching, setIsUpdatingCoaching] = useState(false);
+
+  // Load initial coaching mode state
+  useEffect(() => {
+    const loadCoachingMode = async () => {
+      try {
+        const { supabase } = await import("@/utils/supabase-client");
+        const { data, error } = await supabase
+          .from("interview_sessions")
+          .select("coach_mode_enabled")
+          .eq("session_id", sessionId)
+          .single();
+
+        if (!error && data) {
+          setCoachingMode(data.coach_mode_enabled || false);
+        }
+      } catch (error) {
+        console.error("Failed to load coaching mode:", error);
+      }
+    };
+
+    if (sessionId && isCallActive) {
+      loadCoachingMode();
+    }
+  }, [sessionId, isCallActive]);
+
+  const handleCoachingToggle = async (enabled: boolean) => {
+    if (isUpdatingCoaching) return;
+    
+    setIsUpdatingCoaching(true);
+    
+    try {
+      // Update database
+      const { supabase } = await import("@/utils/supabase-client");
+      const { error } = await supabase
+        .from("interview_sessions")
+        .update({ coach_mode_enabled: enabled })
+        .eq("session_id", sessionId);
+      
+      if (error) {
+        toast.error("Failed to update coaching mode");
+        return;
+      }
+
+      // Update local state
+      setCoachingMode(enabled);
+      
+      // Send updated session settings to Hume immediately
+      if (status.value === "connected") {
+        const { buildSessionSettings } = await import("@/utils/session-context");
+        const sessionSettings = await buildSessionSettings(
+          sessionId,
+          0, // elapsed time will be calculated properly
+          "active", // current phase
+          undefined, // no temporary context
+          enabled // pass the new coaching mode
+        );
+        
+        await sendSessionSettings(sessionSettings as any);
+        console.log("✅ Coaching mode updated in real-time");
+      }
+      
+      toast.success(enabled ? "Coaching mode enabled! 🎓" : "Coaching mode disabled");
+    } catch (error) {
+      console.error("Error updating coaching mode:", error);
+      toast.error("Failed to update coaching mode");
+    } finally {
+      setIsUpdatingCoaching(false);
+    }
+  };
 
   const handleEndInterview = async () => {
     try {
@@ -154,6 +228,43 @@ function ChatInterface({
           </div>
           <div className="w-full md:w-80 flex-shrink-0 p-4 pt-4 md:pt-24">
             <VideoInput ref={videoRef} autoStart={isCallActive} />
+            
+            {/* Simple Coaching Toggle - Only show during active call */}
+            {isCallActive && (
+              <div className="mt-2 flex items-center justify-center gap-2 text-sm">
+                <span className={cn(
+                  "font-medium transition-colors",
+                  coachingMode ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"
+                )}>
+                  Coaching
+                </span>
+                <Toggle
+                  size="sm"
+                  pressed={coachingMode}
+                  disabled={isUpdatingCoaching}
+                  onPressedChange={handleCoachingToggle}
+                  className={cn(
+                    "h-6 w-11 p-0 transition-all duration-200",
+                    coachingMode 
+                      ? "bg-blue-500 hover:bg-blue-600 data-[state=on]:bg-blue-500" 
+                      : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  )}
+                >
+                  <GraduationCap className={cn(
+                    "h-3 w-3 transition-colors",
+                    coachingMode ? "text-white" : "text-gray-500 dark:text-gray-400"
+                  )} />
+                </Toggle>
+                <span className={cn(
+                  "text-xs font-medium transition-colors",
+                  coachingMode 
+                    ? "text-blue-600 dark:text-blue-400" 
+                    : "text-muted-foreground"
+                )}>
+                  {coachingMode ? "ON" : "OFF"}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}

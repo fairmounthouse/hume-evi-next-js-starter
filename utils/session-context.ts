@@ -71,7 +71,8 @@ export async function buildSessionSettings(
   sessionId: string,
   elapsedMs: number = 0,
   phaseStatus: string = "intro",
-  temporaryContext?: string
+  temporaryContext?: string,
+  coachModeEnabled?: boolean
 ): Promise<SessionSettings> {
   const cacheKey = `session_settings_${sessionId}`;
   const staticData = sessionCache.get<Record<string, string>>(cacheKey);
@@ -80,9 +81,16 @@ export async function buildSessionSettings(
     throw new Error(`Session ${sessionId} not initialized. Call initializeSessionSettings first.`);
   }
 
+  // Update coaching prompt if mode is specified
+  let coachingPrompt = staticData.COACHING_PROMPT;
+  if (coachModeEnabled !== undefined) {
+    coachingPrompt = coachModeEnabled ? "Coaching mode ON" : "Coaching mode OFF";
+  }
+
   // Build settings with cached static data + current dynamic values
   const variables = {
     ...staticData, // All the static Supabase data
+    COACHING_PROMPT: coachingPrompt, // Dynamic coaching prompt
     TOTAL_ELAPSED_TIME: formatElapsedTime(elapsedMs), // Always fresh
     PHASE_STATUS: phaseStatus, // Current phase
     now: getCurrentTimeForSpeech(), // Current time
