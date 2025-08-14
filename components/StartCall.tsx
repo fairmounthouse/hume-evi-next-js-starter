@@ -9,11 +9,17 @@ export default function StartCall({
   configId,
   accessToken,
   sessionId,
+  selectedCaseId,
+  selectedInterviewerId,
+  selectedDifficultyId,
   onCallStart,
 }: {
   configId?: string;
   accessToken: string;
   sessionId: string;
+  selectedCaseId?: string | null;
+  selectedInterviewerId?: string | null;
+  selectedDifficultyId?: string | null;
   onCallStart?: () => void;
 }) {
   const { status, connect, sendSessionSettings } = useVoice();
@@ -107,6 +113,13 @@ export default function StartCall({
                 className={"z-50 flex items-center gap-1.5 rounded-full"}
                 onClick={async () => {
                   console.log("🟢 START CALL BUTTON CLICKED");
+                  
+                  // Check if user has selected all required options
+                  if (!selectedCaseId || !selectedInterviewerId || !selectedDifficultyId) {
+                    toast.error("Please complete interview setup first");
+                    window.location.href = "/interview/setup";
+                    return;
+                  }
 
                   // Start camera immediately
                   onCallStart?.();
@@ -115,18 +128,19 @@ export default function StartCall({
                 // start timer
                 startTimeRef.current = Date.now();
 
-                // First: Get cached default profiles and create session record
-                const { getCachedDefaultProfiles } = await import("@/utils/session-cache");
+                // First: Create session record with selected interview configuration
                 const { upsertInterviewSession } = await import("@/utils/supabase-client");
                 
-                const defaultProfiles = await getCachedDefaultProfiles();
                 await upsertInterviewSession({
                   session_id: sessionId,
                   started_at: new Date().toISOString(),
                   transcript_data: "",
                   coach_mode_enabled: false,
                   status: "in_progress",
-                  ...defaultProfiles, // Use cached default IDs
+                  // Use selected configuration from setup screen
+                  case_id: selectedCaseId || undefined,
+                  interviewer_profile_id: selectedInterviewerId || undefined,
+                  difficulty_profile_id: selectedDifficultyId || undefined,
                 });
 
                 console.log("✅ Session record created");
