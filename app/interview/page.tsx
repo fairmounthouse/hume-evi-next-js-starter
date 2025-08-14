@@ -1,20 +1,22 @@
-import { getHumeAccessToken } from "@/utils/getHumeAccessToken";
-import dynamic from "next/dynamic";
+"use client";
 
-const Chat = dynamic(() => import("@/components/Chat"), {
-  ssr: false,
-});
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default async function InterviewPage() {
-  const accessToken = await getHumeAccessToken();
+export default function InterviewPage() {
+  const router = useRouter();
 
-  if (!accessToken) {
-    throw new Error('Unable to get access token');
-  }
+  useEffect(() => {
+    // Redirect to setup page
+    router.replace("/interview/setup");
+  }, [router]);
 
   return (
-    <div className={"grow flex flex-col"}>
-      <Chat accessToken={accessToken} />
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <p className="text-gray-600">Redirecting to interview setup...</p>
+      </div>
     </div>
   );
 }

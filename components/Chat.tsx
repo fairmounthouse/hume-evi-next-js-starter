@@ -14,6 +14,7 @@ import { Button } from "./ui/button";
 import { Toggle } from "./ui/toggle";
 import { GraduationCap } from "lucide-react";
 import { cn } from "@/utils";
+import { useSearchParams } from "next/navigation";
 
 // Inner component that has access to useVoice hook
 function ChatInterface({
@@ -277,6 +278,7 @@ export default function ClientComponent({
 }: {
   accessToken: string;
 }) {
+  const searchParams = useSearchParams();
   const timeout = useRef<number | null>(null);
   const ref = useRef<ComponentRef<typeof Messages> | null>(null);
   const videoRef = useRef<VideoInputRef | null>(null);
@@ -287,6 +289,12 @@ export default function ClientComponent({
   const [showVideoReview, setShowVideoReview] = useState(false);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<any[]>([]);
+  
+  // Get interview configuration from URL params
+  const selectedCaseId = searchParams.get('case');
+  const selectedInterviewerId = searchParams.get('interviewer');
+  const selectedDifficultyId = searchParams.get('difficulty');
+  
   // Create ONE AudioContext for the entire chat session
   const audioCtx = useMemo(() => new (window.AudioContext || (window as any).webkitAudioContext)(), []);
   // AssistantAudioBus re-uses the shared AudioContext so its stream is recordable
@@ -436,6 +444,9 @@ export default function ClientComponent({
           configId={configId} 
           accessToken={accessToken}
           sessionId={sessionId}
+          selectedCaseId={selectedCaseId}
+          selectedInterviewerId={selectedInterviewerId}
+          selectedDifficultyId={selectedDifficultyId}
           onCallStart={() => {
             console.log("📱 onCallStart callback - starting camera AND recording panel");
             // Start camera immediately
