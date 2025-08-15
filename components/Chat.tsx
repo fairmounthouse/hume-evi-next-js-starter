@@ -182,15 +182,6 @@ function ChatInterface({
               )}
             </div>
           
-          {/* Debug Panel - Remove this in production */}
-          <div className="fixed bottom-4 right-4 z-50 bg-black/80 text-white p-2 rounded text-xs font-mono">
-            <div>Call Active: {isCallActive ? "YES ✅" : "NO ❌"}</div>
-            <div>Video Stream Ready: {videoStreamReady ? "YES ✅" : "NO ❌"}</div>
-            <div>Video Ref: {videoRef.current ? "YES ✅" : "NO ❌"}</div>
-            <div>Stream: {videoRef.current?.getStream() ? "YES ✅" : "NO ❌"}</div>
-            <div>Auto Record: {shouldAutoRecord ? "YES ✅" : "NO ❌"}</div>
-          </div>
-          
           {(isCallActive || forceShowRecording) && (
             <div className="fixed top-4 left-4 z-50 bg-red-100 dark:bg-red-900 backdrop-blur-sm rounded-lg p-4 border-2 border-red-500 shadow-xl">
               <div className="mb-2 text-sm font-bold text-red-600 dark:text-red-400">🔴 RECORDING SESSION</div>

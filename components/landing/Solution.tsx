@@ -4,72 +4,77 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
 import Link from "next/link";
 import { 
-  MessageSquare, 
+  Eye, 
   Target, 
   Brain, 
   Zap, 
   CheckCircle2,
   ArrowRight,
   TrendingUp,
-  Users,
-  Award
+  AlertCircle,
+  Shield
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const features = [
   {
-    id: "dynamic",
-    icon: MessageSquare,
-    title: "Dynamic Conversations",
-    shortDescription: "No two interviews are the same. Our AI adapts its questions based on your answers.",
-    fullDescription: "Experience real interview dynamics where your responses shape the conversation. Our AI picks up on subtle cues, asks relevant follow-ups, and challenges you just like a seasoned interviewer would.",
-    stats: { label: "Unique Paths", value: "∞" },
-    color: "from-blue-500 to-cyan-500",
-    example: {
-      ai: "Tell me about a time you led a difficult project.",
-      user: "I led a team of 5 engineers to rebuild our payment system...",
-      followUp: "Interesting. How did you handle the engineer who initially resisted the new architecture?",
-      insight: "AI picked up on unstated tension and probed deeper"
-    }
+    id: "visual",
+    icon: Eye,
+    title: "Live Visual Intelligence",
+    shortDescription: "We're the only platform with real-time video analysis. Not just voice. Not just words. Everything.",
+    fullDescription: "Our AI sees what no human coach can catch consistently - micro-expressions, posture shifts, eye movement patterns. Every tell that costs you offers.",
+    color: "from-blue-500 to-purple-500",
+    examples: [
+      {
+        trigger: "You're leaning back",
+        analysis: "Defensive posture",
+        perception: "Partners read as 'not coachable'"
+      },
+      {
+        trigger: "Eyes darting during math",
+        analysis: "Mental overload",
+        perception: "They think you're guessing"
+      },
+      {
+        trigger: "Touching face while explaining",
+        analysis: "Classic deception tell",
+        perception: "Trust destroyed"
+      }
+    ]
   },
   {
-    id: "feedback",
+    id: "pressure",
     icon: Target,
-    title: "Feedback That Actually Helps",
-    shortDescription: "Get specific, actionable feedback on exactly what to improve—not generic advice.",
-    fullDescription: "Receive detailed analysis of your responses with concrete examples of how to improve. Our AI identifies patterns in your answers and provides targeted coaching.",
-    stats: { label: "Improvement Rate", value: "94%" },
+    title: "Dynamic Pressure Testing",
+    shortDescription: "Your interview adapts in real-time to find and exploit your weaknesses.",
+    fullDescription: "Just like real partners, our AI pushes harder where you're weak. This isn't practice. It's preparation for war.",
     color: "from-purple-500 to-pink-500",
-    example: {
-      weak: "Your answer needs more detail",
-      strong: "You mentioned 'improving efficiency' 3 times but never quantified it. Try: 'reduced processing time from 48 to 12 hours, saving $200K annually'"
-    }
-  },
-  {
-    id: "intelligence",
-    icon: Brain,
-    title: "Intelligence from Real Interviews",
-    shortDescription: "Trained on actual interviews from top companies, our AI knows what hiring managers really look for.",
-    fullDescription: "Built on a foundation of thousands of real interview transcripts, our AI understands the nuances that separate good answers from great ones.",
-    stats: { label: "Hours Analyzed", value: "10K+" },
-    color: "from-green-500 to-emerald-500",
-    metrics: [
-      { value: "10,000+", label: "Hours of interviews analyzed" },
-      { value: "500+", label: "Companies represented" },
-      { value: "95%", label: "Accuracy in predicting success" }
+    tactics: [
+      {
+        condition: "Struggle with math?",
+        response: "Harder calculations coming"
+      },
+      {
+        condition: "Get defensive?",
+        response: "More aggressive pushback"
+      },
+      {
+        condition: "Freeze under pressure?",
+        response: "Interruption training activated"
+      }
     ]
   }
 ];
 
 export function Solution() {
-  const [activeFeature, setActiveFeature] = useState("dynamic");
+  const [activeFeature, setActiveFeature] = useState("visual");
   const selectedFeature = features.find(f => f.id === activeFeature)!;
 
   return (
     <section id="solution" className="relative py-24 bg-white overflow-hidden">
       {/* Background decoration */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[1000px] bg-gradient-to-br from-blue-50 via-transparent to-purple-50 rounded-full blur-3xl opacity-30" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#f8fafc_1px,transparent_1px),linear-gradient(to_bottom,#f8fafc_1px,transparent_1px)] bg-[size:4rem_4rem] opacity-40" />
       </div>
 
       <div className="container mx-auto px-6">
@@ -78,50 +83,41 @@ export function Solution() {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
-          className="text-center max-w-3xl mx-auto mb-16"
+          className="text-center max-w-4xl mx-auto mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 border border-green-200/50 text-green-700 text-sm font-medium mb-4">
-            <Zap className="w-4 h-4" />
-            <span>The Solution</span>
-          </div>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            AI That Interviews Like{" "}
-            <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Humans Do
+
+          
+          <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
+            What We Catch That
+            <span className="block mt-2 text-indigo-600">
+              No One Else Can
             </span>
           </h2>
-          <p className="text-xl text-gray-600">
-            Stop memorizing. Start conversing. Get hired.
+          
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+            Other platforms listen to your words. We analyze everything else that actually determines your offer.
           </p>
         </motion.div>
 
-        {/* Interactive Feature Showcase */}
+        {/* Feature Tabs */}
         <div className="max-w-6xl mx-auto">
-          {/* Feature Tabs */}
           <div className="flex flex-wrap justify-center gap-4 mb-12">
             {features.map((feature) => (
               <motion.button
                 key={feature.id}
                 onClick={() => setActiveFeature(feature.id)}
-                className={`group relative px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
+                className={`group relative px-6 py-4 rounded-xl font-medium transition-all duration-300 ${
                   activeFeature === feature.id
-                    ? "bg-gradient-to-r from-gray-900 to-gray-800 text-white shadow-lg"
-                    : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:shadow-md"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-white border border-gray-200 text-gray-600 hover:border-gray-300 hover:shadow-sm"
                 }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <feature.icon className="w-5 h-5" />
-                  <span>{feature.title}</span>
+                  <span className="font-semibold">{feature.title}</span>
                 </div>
-                {activeFeature === feature.id && (
-                  <motion.div
-                    layoutId="activeTab"
-                    className="absolute inset-0 bg-gradient-to-r from-gray-900 to-gray-800 rounded-xl -z-10"
-                    transition={{ type: "spring", duration: 0.5 }}
-                  />
-                )}
               </motion.button>
             ))}
           </div>
@@ -134,158 +130,196 @@ export function Solution() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
-              className="grid md:grid-cols-2 gap-12 items-center"
             >
-              {/* Left: Description and Stats */}
-              <div>
-                <div className={`inline-flex p-3 rounded-xl bg-gradient-to-br ${selectedFeature.color} mb-6`}>
-                  <selectedFeature.icon className="w-8 h-8 text-white" />
-                </div>
-                
-                <h3 className="text-3xl font-bold text-gray-900 mb-4">
-                  {selectedFeature.title}
-                </h3>
-                
-                <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-                  {selectedFeature.fullDescription}
-                </p>
-
-                {/* Stats or Metrics */}
-                {selectedFeature.metrics ? (
-                  <div className="grid grid-cols-3 gap-4 mb-8">
-                    {selectedFeature.metrics.map((metric, idx) => (
-                      <div key={idx} className="text-center p-4 rounded-lg bg-gray-50">
-                        <div className="text-2xl font-bold text-gray-900">{metric.value}</div>
-                        <div className="text-sm text-gray-600 mt-1">{metric.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                ) : selectedFeature.stats && (
-                  <div className="inline-flex items-center gap-4 p-4 rounded-lg bg-gray-50 mb-8">
-                    <div className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                      {selectedFeature.stats.value}
+              {selectedFeature.id === "visual" && (
+                <div className="grid md:grid-cols-2 gap-12 items-start">
+                  {/* Left: Description */}
+                  <div>
+                    <div className="inline-flex p-3 rounded-xl bg-indigo-600 mb-6">
+                      <selectedFeature.icon className="w-8 h-8 text-white" />
                     </div>
-                    <div className="text-gray-600">{selectedFeature.stats.label}</div>
+                    
+                    <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                      {selectedFeature.title}
+                    </h3>
+                    
+                    <p className="text-lg text-gray-600 mb-6 leading-relaxed">
+                      {selectedFeature.fullDescription}
+                    </p>
+
+                    <div className="p-6 rounded-xl bg-gray-50 border border-gray-200">
+                      <h4 className="font-semibold text-gray-900 mb-3">What We Catch That No One Else Can:</h4>
+                      <div className="space-y-4">
+                        {selectedFeature.examples?.map((example, idx) => (
+                          <div key={idx} className="flex items-start gap-3">
+                            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <AlertCircle className="w-4 h-4 text-red-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm">
+                                <span className="font-semibold text-gray-900">"{example.trigger}"</span>
+                                <span className="text-gray-600"> → </span>
+                                <span className="text-red-600 font-medium">{example.analysis}</span>
+                                <span className="text-gray-600"> → </span>
+                                <span className="text-gray-900 italic">{example.perception}</span>
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                <Link href="/interview">
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                    Try It Now
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </Link>
-              </div>
-
-              {/* Right: Example or Visual */}
-              <div>
-                {selectedFeature.example && (
-                  <div className="space-y-4">
-                    {selectedFeature.example.ai && (
-                      <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="p-4 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-50 border border-gray-200"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                            <Brain className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-sm font-medium text-gray-600">AI Interviewer</span>
+                  {/* Right: Visual Demo */}
+                  <div className="relative">
+                    <div className="rounded-2xl overflow-hidden bg-gray-900 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span className="text-gray-400 text-sm ml-2">Live Analysis</span>
+                      </div>
+                      
+                      {/* Mock video frame */}
+                      <div className="aspect-video bg-gray-800 rounded-lg mb-4 relative overflow-hidden">
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-32 h-32 rounded-full bg-gray-700"></div>
                         </div>
-                        <p className="text-gray-800">{selectedFeature.example.ai}</p>
-                      </motion.div>
-                    )}
-
-                    {selectedFeature.example.user && (
-                      <motion.div
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.2 }}
-                        className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200 ml-8"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-white border-2 border-blue-500 flex items-center justify-center">
-                            <Users className="w-4 h-4 text-blue-500" />
-                          </div>
-                          <span className="text-sm font-medium text-gray-600">You</span>
-                        </div>
-                        <p className="text-gray-800">{selectedFeature.example.user}</p>
-                      </motion.div>
-                    )}
-
-                    {selectedFeature.example.followUp && (
-                      <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.3 }}
-                        className="p-4 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-50 border border-purple-200"
-                      >
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-                            <Brain className="w-4 h-4 text-white" />
-                          </div>
-                          <span className="text-sm font-medium text-gray-600">AI Follow-up</span>
-                        </div>
-                        <p className="text-gray-800">{selectedFeature.example.followUp}</p>
-                      </motion.div>
-                    )}
-
-                    {selectedFeature.example.insight && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
-                        className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200"
-                      >
-                        <CheckCircle2 className="w-5 h-5 text-green-600" />
-                        <p className="text-sm text-green-800 font-medium">
-                          {selectedFeature.example.insight}
+                        
+                        {/* Analysis overlays */}
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.5 }}
+                          className="absolute top-4 left-4 px-3 py-1 bg-red-500/90 text-white text-xs rounded-full"
+                        >
+                          ⚠️ Posture: Defensive
+                        </motion.div>
+                        
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 1 }}
+                          className="absolute top-4 right-4 px-3 py-1 bg-orange-500/90 text-white text-xs rounded-full"
+                        >
+                          👀 Eye Contact: 43%
+                        </motion.div>
+                        
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 1.5 }}
+                          className="absolute bottom-4 left-4 px-3 py-1 bg-yellow-500/90 text-white text-xs rounded-full"
+                        >
+                          🎤 Voice: Rising Pitch
+                        </motion.div>
+                      </div>
+                      
+                      {/* Real-time feedback */}
+                      <div className="p-3 rounded-lg bg-gray-800 border border-gray-700">
+                        <p className="text-sm text-gray-300 font-mono">
+                          <span className="text-red-400">[ALERT]</span> Defensive body language detected. 
+                          <span className="text-yellow-400">Relax shoulders, lean slightly forward.</span>
                         </p>
-                      </motion.div>
-                    )}
-
-                    {selectedFeature.example.weak && (
-                      <>
-                        <div className="p-4 rounded-lg bg-red-50 border border-red-200">
-                          <p className="text-sm font-medium text-red-600 mb-1">Generic Feedback:</p>
-                          <p className="text-gray-700">{selectedFeature.example.weak}</p>
-                        </div>
-                        <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                          <p className="text-sm font-medium text-green-600 mb-1">Our Feedback:</p>
-                          <p className="text-gray-700">{selectedFeature.example.strong}</p>
-                        </div>
-                      </>
-                    )}
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {selectedFeature.id === "pressure" && (
+                <div className="grid md:grid-cols-2 gap-12 items-start">
+                  {/* Left: Description */}
+                  <div>
+                    <div className="inline-flex p-3 rounded-xl bg-indigo-600 mb-6">
+                      <selectedFeature.icon className="w-8 h-8 text-white" />
+                    </div>
+                    
+                    <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                      {selectedFeature.title}
+                    </h3>
+                    
+                    <p className="text-lg text-gray-600 mb-6 leading-relaxed">
+                      {selectedFeature.fullDescription}
+                    </p>
+
+                    <div className="space-y-4">
+                      {selectedFeature.tactics?.map((tactic, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          className="p-4 rounded-lg bg-red-50 border border-red-200"
+                        >
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-gray-900">{tactic.condition}</p>
+                            <ArrowRight className="w-4 h-4 text-red-600" />
+                            <p className="font-semibold text-red-600">{tactic.response}</p>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    <div className="mt-6 p-4 rounded-lg bg-gray-900 text-white">
+                      <p className="text-sm font-semibold mb-2">⚔️ This isn't practice.</p>
+                      <p className="text-lg font-bold">It's preparation for war.</p>
+                    </div>
+                  </div>
+
+                  {/* Right: Pressure Examples */}
+                  <div className="space-y-4">
+                    <div className="p-6 rounded-xl bg-gray-50 border border-gray-200">
+                      <h4 className="font-semibold text-gray-900 mb-4">Real-Time Adaptation Example:</h4>
+                      
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-lg bg-white border-l-4 border-blue-500">
+                          <p className="text-sm text-gray-600 mb-1">Round 1</p>
+                          <p className="text-sm font-medium">Basic market sizing: "How many coffee shops in NYC?"</p>
+                        </div>
+                        
+                        <div className="p-3 rounded-lg bg-white border-l-4 border-yellow-500">
+                          <p className="text-sm text-gray-600 mb-1">You struggle with the calculation...</p>
+                          <p className="text-sm font-medium text-yellow-600">AI detects hesitation</p>
+                        </div>
+                        
+                        <div className="p-3 rounded-lg bg-white border-l-4 border-red-500">
+                          <p className="text-sm text-gray-600 mb-1">Round 2 - Difficulty Increased</p>
+                          <p className="text-sm font-medium">"Now calculate the NPV with a 12% discount rate over 5 years with varying cash flows."</p>
+                        </div>
+                        
+                        <div className="p-3 rounded-lg bg-gray-900 text-white">
+                          <p className="text-sm font-semibold">
+                            The AI found your weakness and is training you exactly where partners will attack.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
-        </div>
 
-        {/* Bottom CTA */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          viewport={{ once: true }}
-          className="text-center mt-20"
-        >
-          <p className="text-lg text-gray-600 mb-6">
-            Ready to experience the difference?
-          </p>
-          <Link href="/interview">
-            <Button
-              size="lg"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200"
-            >
-              Start Your First Interview
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
-        </motion.div>
+          {/* Bottom CTA */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="text-center mt-16"
+          >
+            <Link href="/interview">
+              <Button
+                size="lg"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                Experience Real Pressure Testing
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+          </motion.div>
+        </div>
       </div>
     </section>
   );

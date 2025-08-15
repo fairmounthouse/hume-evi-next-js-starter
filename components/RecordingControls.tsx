@@ -40,7 +40,7 @@ export default function RecordingControls({
   // Keep audio capture/mix alive for the session
   const tabCaptureRef = useRef<MediaStream | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext>(audioCtx);
+  const audioContextRef = useRef<AudioContext | null>(audioCtx);
   const mixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   
   console.log("🎥 RecordingControls rendered with props:", {
@@ -95,6 +95,7 @@ export default function RecordingControls({
 
         if (assistant || mic) {
           const audioContext = audioContextRef.current;
+          if (!audioContext) return;
           try { await audioContext.resume(); } catch {}
           const destination = (mixDestinationRef.current ||= audioContext.createMediaStreamDestination());
           if (assistant) {
@@ -179,6 +180,7 @@ export default function RecordingControls({
 
         if (assistant || mic) {
           const audioContext = audioContextRef.current;
+          if (!audioContext) return;
           try { await audioContext.resume(); } catch {}
           const destination = (mixDestinationRef.current ||= audioContext.createMediaStreamDestination());
           
@@ -389,7 +391,7 @@ export default function RecordingControls({
     }
     
     // Check if call has ended using either isCallActive OR voice status
-    const callEnded = !isCallActive || voiceStatus.value === "idle" || voiceStatus.value === "error" || voiceStatus.value === "disconnected";
+    const callEnded = !isCallActive || voiceStatus.value === "error" || voiceStatus.value === "disconnected";
     
     // If call has ended and we were/are recording, stop it
     if (autoStart && callEnded && (isRecording || wasRecordingRef.current) && !isUploading) {
