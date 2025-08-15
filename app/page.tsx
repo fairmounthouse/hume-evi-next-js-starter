@@ -3,18 +3,25 @@
 import { Hero } from "@/components/landing/Hero";
 import { Problem } from "@/components/landing/Problem";
 import { Solution } from "@/components/landing/Solution";
+import { Transformation } from "@/components/landing/Transformation";
 import { Results } from "@/components/landing/Results";
 import { Footer } from "@/components/landing/Footer";
 import { motion, useScroll, useSpring } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function LandingPage() {
+  const [isClient, setIsClient] = useState(false);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
     damping: 30,
     restDelta: 0.001
   });
+
+  // Ensure we're on the client side to prevent hydration issues
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Smooth scroll behavior
   useEffect(() => {
@@ -35,6 +42,20 @@ export default function LandingPage() {
     return () => document.removeEventListener('click', handleSmoothScroll);
   }, []);
 
+  if (!isClient) {
+    // Server-side render without animations to prevent hydration issues
+    return (
+      <main className="relative">
+        <Hero />
+        <Problem />
+        <Solution />
+        <Transformation />
+        <Results />
+        <Footer />
+      </main>
+    );
+  }
+
   return (
     <>
       {/* Progress Bar */}
@@ -53,6 +74,9 @@ export default function LandingPage() {
 
         {/* Solution Section */}
         <Solution />
+
+        {/* Transformation Section */}
+        <Transformation />
 
         {/* Results Section */}
         <Results />
