@@ -13,7 +13,7 @@ export default async function InterviewSessionPage() {
   }
 
   return (
-    <div className={"grow flex flex-col"}>
+    <div className={"grow flex flex-col h-full min-h-screen max-h-screen overflow-hidden"}>
       <Chat accessToken={accessToken} />
     </div>
   );

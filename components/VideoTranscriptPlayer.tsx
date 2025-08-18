@@ -3,19 +3,11 @@
 import { useState, useRef, useEffect } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { Button } from "./ui/button";
-
-interface TranscriptSegment {
-  id: string;
-  speaker: "user" | "assistant";
-  text: string;
-  timestamp: number; // in seconds
-  emotions?: Record<string, number>;
-  confidence?: number;
-}
+import { TranscriptEntry } from "@/utils/feedbackTypes";
 
 interface VideoTranscriptPlayerProps {
   videoUrl: string;
-  transcript: TranscriptSegment[];
+  transcript: TranscriptEntry[];
   className?: string;
 }
 
@@ -256,14 +248,14 @@ export default function VideoTranscriptPlayer({
                   {segment.emotions && Object.keys(segment.emotions).length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {Object.entries(segment.emotions)
-                        .sort(([, a], [, b]) => b - a)
+                        .sort(([, a], [, b]) => (b as number) - (a as number))
                         .slice(0, 3)
                         .map(([emotion, score]) => (
                           <span
                             key={emotion}
                             className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full"
                           >
-                            {emotion}: {Math.round(score * 100)}%
+                            {emotion}: {Math.round((score as number) * 100)}%
                           </span>
                         ))}
                     </div>
