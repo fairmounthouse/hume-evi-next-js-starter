@@ -58,6 +58,16 @@ export default function VideoTranscriptPlayer({
 
     const handleLoadedMetadata = () => {
       setDuration(video.duration);
+      
+      // Check if there's a timestamp to jump to from sessionStorage
+      const jumpTimestamp = sessionStorage.getItem('jumpToTimestamp');
+      if (jumpTimestamp) {
+        const timestamp = parseFloat(jumpTimestamp);
+        video.currentTime = timestamp;
+        setCurrentTime(timestamp);
+        sessionStorage.removeItem('jumpToTimestamp'); // Clear after use
+        console.log(`🎬 Jumped to timestamp: ${timestamp}s`);
+      }
     };
 
     const handlePlay = () => setIsPlaying(true);
@@ -129,73 +139,115 @@ export default function VideoTranscriptPlayer({
     return emotionColors[maxEmotion[0]] || "text-gray-600";
   };
 
+  // Extract video ID from Cloudflare Stream URL
+  const getVideoIdFromUrl = (url: string): string | null => {
+    // Handle different Cloudflare Stream URL formats
+    // Format: https://customer-{code}.cloudflarestream.com/{videoId}/watch
+    const match = url.match(/cloudflarestream\.com\/([^\/]+)\/watch/);
+    return match ? match[1] : null;
+  };
+
+  const videoId = getVideoIdFromUrl(videoUrl);
+  const isCloudflareStream = !!videoId;
+
   return (
     <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 h-full ${className}`}>
       {/* Video Player */}
       <div className="space-y-4">
         <div className="relative bg-black rounded-lg overflow-hidden">
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            className="w-full aspect-video"
-            preload="metadata"
-          />
-          
-          {/* Video Controls Overlay */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={togglePlayPause}
-                className="text-white hover:text-white hover:bg-white/20"
-              >
-                {isPlaying ? (
-                  <Pause className="w-5 h-5" />
-                ) : (
-                  <Play className="w-5 h-5" />
-                )}
-              </Button>
+          {isCloudflareStream ? (
+            // Use Cloudflare Stream iframe for better performance and features
+            <div className="relative w-full aspect-video">
+              <iframe
+                src={`https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true`}
+                className="absolute inset-0 w-full h-full"
+                style={{ border: "none" }}
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                allowFullScreen
+                title="Interview Recording"
+                onLoad={() => {
+                  // Check for timestamp jump after iframe loads
+                  const jumpTimestamp = sessionStorage.getItem('jumpToTimestamp');
+                  if (jumpTimestamp) {
+                    const timestamp = parseFloat(jumpTimestamp);
+                    // For Cloudflare Stream iframe, we'll use URL parameter
+                    const iframe = document.querySelector('iframe[title="Interview Recording"]') as HTMLIFrameElement;
+                    if (iframe) {
+                      iframe.src = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&t=${Math.floor(timestamp)}s`;
+                    }
+                    sessionStorage.removeItem('jumpToTimestamp');
+                    console.log(`🎬 Cloudflare Stream: Jumped to timestamp: ${timestamp}s`);
+                  }
+                }}
+              />
+            </div>
+          ) : (
+            // Fallback to HTML5 video for non-Cloudflare URLs
+            <>
+              <video
+                ref={videoRef}
+                src={videoUrl}
+                className="w-full aspect-video"
+                preload="metadata"
+              />
+              
+              {/* Video Controls Overlay - only for HTML5 video */}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={togglePlayPause}
+                    className="text-white hover:text-white hover:bg-white/20"
+                  >
+                    {isPlaying ? (
+                      <Pause className="w-5 h-5" />
+                    ) : (
+                      <Play className="w-5 h-5" />
+                    )}
+                  </Button>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleMute}
-                className="text-white hover:text-white hover:bg-white/20"
-              >
-                {isMuted ? (
-                  <VolumeX className="w-5 h-5" />
-                ) : (
-                  <Volume2 className="w-5 h-5" />
-                )}
-              </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleMute}
+                    className="text-white hover:text-white hover:bg-white/20"
+                  >
+                    {isMuted ? (
+                      <VolumeX className="w-5 h-5" />
+                    ) : (
+                      <Volume2 className="w-5 h-5" />
+                    )}
+                  </Button>
 
-              <div className="flex-1 mx-3">
-                <div className="relative">
-                  <div className="w-full bg-white/30 rounded-full h-1">
-                    <div
-                      className="bg-white rounded-full h-1 transition-all"
-                      style={{
-                        width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%",
-                      }}
-                    />
+                  <div className="flex-1 mx-3">
+                    <div className="relative">
+                      <div className="w-full bg-white/30 rounded-full h-1">
+                        <div
+                          className="bg-white rounded-full h-1 transition-all"
+                          style={{
+                            width: duration > 0 ? `${(currentTime / duration) * 100}%` : "0%",
+                          }}
+                        />
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max={duration}
+                        value={currentTime}
+                        onChange={(e) => seekToTime(parseFloat(e.target.value))}
+                        className="absolute inset-0 w-full h-1 opacity-0 cursor-pointer"
+                      />
+                    </div>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max={duration}
-                    value={currentTime}
-                    onChange={(e) => seekToTime(parseFloat(e.target.value))}
-                    className="absolute inset-0 w-full h-1 opacity-0 cursor-pointer"
-                  />
+
+                  <span className="text-white text-sm font-mono">
+                    {formatTime(currentTime)} / {formatTime(duration)}
+                  </span>
                 </div>
               </div>
-
-              <span className="text-white text-sm font-mono">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-            </div>
-          </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -215,7 +267,19 @@ export default function VideoTranscriptPlayer({
                   ? "bg-blue-100 border-blue-300 shadow-sm"
                   : "bg-white border-gray-200 hover:border-gray-300"
               }`}
-              onClick={() => seekToTime(segment.timestamp)}
+              onClick={() => {
+                if (isCloudflareStream) {
+                  // For Cloudflare Stream, reload iframe with timestamp
+                  const iframe = document.querySelector('iframe[title="Interview Recording"]') as HTMLIFrameElement;
+                  if (iframe && videoId) {
+                    iframe.src = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&t=${Math.floor(segment.timestamp)}s`;
+                    console.log(`🎬 Cloudflare Stream: Seeking to ${segment.timestamp}s`);
+                  }
+                } else {
+                  // For HTML5 video, use normal seek
+                  seekToTime(segment.timestamp);
+                }
+              }}
             >
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0">

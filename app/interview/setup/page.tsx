@@ -11,11 +11,15 @@ export default function InterviewSetupPage() {
     interviewerId: string;
     difficultyId: string;
   }) => {
+    // Generate a unique session ID
+    const sessionId = Date.now().toString();
+
     // Store selections in sessionStorage or pass via URL params
     const params = new URLSearchParams({
-      case: selections.caseId,
-      interviewer: selections.interviewerId,
-      difficulty: selections.difficultyId,
+      sessionId: sessionId,
+      caseId: selections.caseId,
+      interviewerId: selections.interviewerId,
+      difficultyId: selections.difficultyId,
     });
     
     router.push(`/interview/session?${params.toString()}`);
