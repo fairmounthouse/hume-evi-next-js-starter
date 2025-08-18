@@ -30,13 +30,19 @@ export const getHumeAccessToken = async () => {
     // Check if it's a network/API error
     if (error instanceof Error) {
       if (error.message.includes('fetch')) {
-        throw new Error('Network error connecting to Hume API. Please check your internet connection.');
+        console.error("💡 If running locally, ensure your VPN is turned on");
+        throw new Error('Network error connecting to Hume API. Please check your internet connection and VPN status.');
       }
       if (error.message.includes('Unauthorized') || error.message.includes('401')) {
         throw new Error('Invalid Hume API credentials. Please check your HUME_API_KEY and HUME_SECRET_KEY.');
       }
+      if (error.message.includes('Unexpected token < in JSON')) {
+        console.error("💡 If running locally, ensure your VPN is turned on");
+        throw new Error('API returned HTML instead of JSON. Check your VPN connection and API keys.');
+      }
     }
     
+    console.error("💡 If running locally, ensure your VPN is turned on");
     throw new Error(`Failed to get Hume access token: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };

@@ -43,13 +43,7 @@ export default function RecordingControls({
   const audioContextRef = useRef<AudioContext | null>(audioCtx);
   const mixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   
-  console.log("🎥 RecordingControls rendered with props:", {
-    hasVideoStream: !!videoStream,
-    hasAudioStream: !!audioStream,
-    isCallActive,
-    autoStart,
-    voiceStatus: voiceStatus.value,
-  });
+  // Removed spammy log
   
   const {
     isRecording,
@@ -330,20 +324,7 @@ export default function RecordingControls({
 
   // Auto-start recording when call becomes active and stream is ready
   useEffect(() => {
-    console.log("🎬 AUTO-START CHECK:", {
-      autoStart,
-      isCallActive,
-      hasCombinedStream: !!combinedStream,
-      isRecording,
-      isUploading,
-      streamTracks: combinedStream?.getTracks().length || 0,
-      videoTracks: combinedStream?.getVideoTracks().map(t => ({ label: t.label, readyState: t.readyState })) || [],
-      audioTracks: combinedStream?.getAudioTracks().map(t => ({ label: t.label, readyState: t.readyState })) || [],
-      voiceStatus: voiceStatus.value,
-      hasPendingStartTimer: !!startTimeoutRef.current,
-      autoStartedOnce: autoStartedRef.current,
-      suppressAutoStart: suppressAutoStartRef.current,
-    });
+    // Auto-start check (removed spammy log)
     
     const canAutoStart = autoStart && isCallActive && voiceStatus.value === "connected" && !!combinedStream && !isRecording && !isUploading && !suppressAutoStartRef.current;
 
@@ -375,14 +356,7 @@ export default function RecordingControls({
 
   // Auto-stop recording when call ends
   useEffect(() => {
-    console.log("🛑 AUTO-STOP CHECK:", {
-      autoStart,
-      isCallActive,
-      isRecording,
-      wasRecording: wasRecordingRef.current,
-      isUploading,
-      shouldStop: autoStart && !isCallActive && (isRecording || wasRecordingRef.current) && !isUploading,
-    });
+    // Auto-stop check (removed spammy log)
     
     // Clear any existing timeout
     if (autoStopTimeoutRef.current) {

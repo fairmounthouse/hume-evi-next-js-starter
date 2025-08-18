@@ -10,7 +10,7 @@ import { cn } from "@/utils";
 export default function Controls() {
   const { disconnect, status, isMuted, unmute, mute, micFft, isAudioMuted, muteAudio, unmuteAudio } = useVoice();
   
-  console.log("🎵 Audio status:", { isAudioMuted, isMuted });
+  // Audio status (removed spammy log)
 
   return (
     <div

@@ -12,11 +12,14 @@ import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
 import { Button } from "./ui/button";
 import { Toggle } from "./ui/toggle";
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, FileText, Download } from "lucide-react";
 import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
+import TranscriptEvaluator from "@/utils/transcriptEvaluator";
+import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
+import FinalEvaluationReport from "./FinalEvaluationReport";
 
-// Inner component that has access to useVoice hook
+// Chat interface component with voice interaction capabilities
 function ChatInterface({
   sessionId,
   isCallActive,
@@ -34,7 +37,6 @@ function ChatInterface({
   transcript,
   setTranscript,
   handleVideoReady,
-  buildTranscriptFromMessages,
   videoRef,
   audioCtx,
   assistantBus,
@@ -44,6 +46,45 @@ function ChatInterface({
   const { messages, sendSessionSettings, status } = useVoice();
   const [coachingMode, setCoachingMode] = useState(false);
   const [isUpdatingCoaching, setIsUpdatingCoaching] = useState(false);
+  const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
+  const [showFinalReport, setShowFinalReport] = useState(false);
+  const [finalEvaluation, setFinalEvaluation] = useState<any>(null);
+  const [isGeneratingFinalReport, setIsGeneratingFinalReport] = useState(false);
+  const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
+  const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
+  const currentMessagesRef = useRef<any[]>([]);
+
+  // Build transcript from messages for evaluation
+  const buildTranscriptFromMessages = (messages: any[]): any[] => {
+    // Filter for actual conversation messages with content
+    const conversationMessages = messages.filter(msg => {
+      const hasContent = msg.message?.content && msg.message.content.trim().length > 0;
+      const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
+      
+      if (isConversation && hasContent) {
+        console.log("✅ [CHAT] Valid message:", msg.type, msg.message.content.substring(0, 50) + "...");
+      }
+      
+      return isConversation && hasContent;
+    });
+    
+    const transcript = conversationMessages.map((msg, index) => ({
+      id: `msg-${index}`,
+      speaker: msg.type === "user_message" ? "user" : "assistant",
+      text: msg.message?.content || "",
+      timestamp: Math.floor((msg.receivedAt?.getTime() || Date.now()) / 1000),
+      emotions: msg.models?.prosody?.scores || undefined,
+      confidence: msg.models?.language?.confidence || undefined,
+    }));
+    
+    console.log("📋 [CHAT] Built transcript from", messages.length, "total messages,", conversationMessages.length, "conversation messages,", transcript.length, "entries");
+    
+    if (transcript.length > 0) {
+      console.log("📋 [CHAT] Sample transcript entry:", transcript[0]);
+    }
+    
+    return transcript;
+  };
 
   // Load initial coaching mode state
   useEffect(() => {
@@ -68,6 +109,56 @@ function ChatInterface({
       loadCoachingMode();
     }
   }, [sessionId, isCallActive]);
+
+  // Update stored transcript whenever messages change
+  useEffect(() => {
+    // Always update the ref with current messages
+    currentMessagesRef.current = messages;
+    
+    if (isCallActive && messages.length > 0) {
+      const newTranscript = buildTranscriptFromMessages(messages);
+      setStoredTranscript(newTranscript);
+      console.log("💾 [CHAT] Updated stored transcript:", newTranscript.length, "entries");
+    }
+  }, [messages, isCallActive]);
+
+  // Setup transcript evaluation when call starts (only once per call)
+  useEffect(() => {
+    if (isCallActive && transcriptEvaluator) {
+      // Start the timer animation
+      feedbackDisplayRef.current?.startTimer();
+      
+      // Setup evaluation callback
+      transcriptEvaluator.onEvaluation((feedback) => {
+        feedbackDisplayRef.current?.updateFeedback(feedback);
+      });
+
+      // Start periodic evaluation - use a ref to get latest transcript
+      transcriptEvaluator.startPeriodicEvaluation(() => {
+        const currentMessages = currentMessagesRef.current;
+        const currentTranscript = buildTranscriptFromMessages(currentMessages);
+        console.log("📋 [CHAT] Evaluator requesting transcript, current messages:", currentMessages.length, "entries:", currentTranscript.length);
+        return currentTranscript;
+      });
+
+      return () => {
+        feedbackDisplayRef.current?.stopTimer();
+        transcriptEvaluator.stopPeriodicEvaluation();
+      };
+    } else {
+      // Stop timer when call is not active
+      feedbackDisplayRef.current?.stopTimer();
+    }
+  }, [isCallActive, transcriptEvaluator]); // Removed storedTranscript dependency
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (transcriptEvaluator) {
+        transcriptEvaluator.destroy();
+      }
+    };
+  }, [transcriptEvaluator]);
 
   const handleCoachingToggle = async (enabled: boolean) => {
     if (isUpdatingCoaching) return;
@@ -116,9 +207,12 @@ function ChatInterface({
 
   const handleEndInterview = async () => {
     try {
-      // Get messages and build transcript
-      const transcriptData = buildTranscriptFromMessages(messages);
+      // Use stored transcript (more complete) or build from current messages
+      const transcriptData = storedTranscript.length > 0 ? storedTranscript : buildTranscriptFromMessages(messages);
       setTranscript(transcriptData);
+
+      // Stop transcript evaluation
+      transcriptEvaluator.stopPeriodicEvaluation();
 
       // Save final session data to Supabase
       const { upsertInterviewSession } = await import("@/utils/supabase-client");
@@ -141,22 +235,84 @@ function ChatInterface({
     }
   };
 
+  const downloadTranscript = () => {
+    const transcriptData = storedTranscript.length > 0 ? storedTranscript : buildTranscriptFromMessages(messages);
+    const transcriptText = transcriptData.map(entry => {
+      const timeStr = new Date(entry.timestamp * 1000).toLocaleTimeString();
+      const speaker = entry.speaker === "user" ? "Candidate" : "Interviewer";
+      return `[${timeStr}] ${speaker}: ${entry.text}`;
+    }).join('\n');
+    
+    const blob = new Blob([transcriptText], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `interview-transcript-${sessionId}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast.success("Transcript downloaded!");
+  };
+
+  const testEvaluation = async () => {
+    console.log("🧪 [TEST] Manual evaluation triggered");
+    const currentTranscript = buildTranscriptFromMessages(messages);
+    if (currentTranscript.length > 0) {
+      feedbackDisplayRef.current?.updateFeedback({
+        status: "good",
+        feedback: "Test feedback - evaluation system is working!",
+        confidence: 0.85,
+        timestamp: Date.now()
+      });
+    } else {
+      toast.error("No transcript data available for evaluation");
+    }
+  };
+
+  const handleGenerateFinalReport = async () => {
+    try {
+      setIsGeneratingFinalReport(true);
+      const transcriptData = buildTranscriptFromMessages(messages);
+      
+      const evaluation = await transcriptEvaluator.getDetailedEvaluation(transcriptData);
+      setFinalEvaluation(evaluation);
+      setShowFinalReport(true);
+    } catch (error) {
+      console.error("Error generating final report:", error);
+      toast.error("Failed to generate final report");
+    } finally {
+      setIsGeneratingFinalReport(false);
+    }
+  };
+
   return (
     <>
       {showVideoReview && finalVideoUrl ? (
         <div className="grow flex flex-col overflow-hidden p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Interview Review</h2>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setShowVideoReview(false);
-                setFinalVideoUrl(null);
-                setTranscript([]);
-              }}
-            >
-              Start New Interview
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                onClick={handleGenerateFinalReport}
+                disabled={isGeneratingFinalReport}
+              >
+                <FileText className="w-4 h-4 mr-1" />
+                {isGeneratingFinalReport ? "Generating..." : "Final Report"}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowVideoReview(false);
+                  setFinalVideoUrl(null);
+                  setTranscript([]);
+                }}
+              >
+                Start New Interview
+              </Button>
+            </div>
           </div>
           <VideoTranscriptPlayer
             videoUrl={finalVideoUrl}
@@ -165,26 +321,56 @@ function ChatInterface({
           />
         </div>
       ) : (
-        <div className="grow flex flex-col md:flex-row gap-4 overflow-hidden relative">
-          <div className="grow flex flex-col overflow-hidden">
-            <Messages ref={messagesRef} />
-            <div className="flex gap-2 items-center">
+        <div className="grow flex flex-col md:flex-row gap-4 h-full min-h-0">
+          <div className="grow flex flex-col min-h-0 h-full">
+            <div className="grow overflow-y-auto min-h-0">
+              <Messages ref={messagesRef} />
+            </div>
+            <div className="flex-shrink-0 flex gap-2 items-center p-4 border-t">
               <Controls />
               {isCallActive && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleEndInterview}
-                  className="ml-2"
-                >
-                  End Interview
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={downloadTranscript}
+                    disabled={storedTranscript.length === 0}
+                    className="ml-2"
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    Download
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={testEvaluation}
+                    className="ml-2"
+                  >
+                    Test Feedback
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleEndInterview}
+                    className="ml-2"
+                  >
+                    End Interview
+                  </Button>
+                </>
               )}
             </div>
+          </div>
           
+          {/* Minimal Recording Indicator */}
           {(isCallActive || forceShowRecording) && (
-            <div className="fixed top-4 left-4 z-50 bg-red-100 dark:bg-red-900 backdrop-blur-sm rounded-lg p-4 border-2 border-red-500 shadow-xl">
-              <div className="mb-2 text-sm font-bold text-red-600 dark:text-red-400">🔴 RECORDING SESSION</div>
+            <div className="fixed top-4 left-4 z-40 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
+              🔴 REC
+            </div>
+          )}
+          
+          {/* Hidden Recording Controls - positioned off-screen but functional */}
+          {(isCallActive || forceShowRecording) && (
+            <div className="fixed -top-96 left-0 opacity-0 pointer-events-none">
               <RecordingControls
                 videoStream={videoRef.current?.getStream() || null}
                 audioCtx={audioCtx}
@@ -217,49 +403,73 @@ function ChatInterface({
               />
             </div>
           )}
-          </div>
-          <div className="w-full md:w-80 flex-shrink-0 p-4 pt-4 md:pt-24">
-            <VideoInput ref={videoRef} autoStart={isCallActive} />
-            
-            {/* Simple Coaching Toggle - Only show during active call */}
-            {isCallActive && (
-              <div className="mt-2 flex items-center justify-center gap-2 text-sm">
-                <span className={cn(
-                  "font-medium transition-colors",
-                  coachingMode ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"
-                )}>
-                  Coaching
-                </span>
-                <Toggle
-                  size="sm"
-                  pressed={coachingMode}
-                  disabled={isUpdatingCoaching}
-                  onPressedChange={handleCoachingToggle}
-                  className={cn(
-                    "h-6 w-11 p-0 transition-all duration-200",
-                    coachingMode 
-                      ? "bg-blue-500 hover:bg-blue-600 data-[state=on]:bg-blue-500" 
-                      : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-                  )}
-                >
-                  <GraduationCap className={cn(
-                    "h-3 w-3 transition-colors",
-                    coachingMode ? "text-white" : "text-gray-500 dark:text-gray-400"
-                  )} />
-                </Toggle>
-                <span className={cn(
-                  "text-xs font-medium transition-colors",
-                  coachingMode 
-                    ? "text-blue-600 dark:text-blue-400" 
-                    : "text-muted-foreground"
-                )}>
-                  {coachingMode ? "ON" : "OFF"}
-                </span>
+          
+          <div className="w-full md:w-80 flex-shrink-0 p-4 pt-16 space-y-4 flex flex-col max-h-full overflow-hidden">
+              {/* Video Input */}
+              <div className="flex-shrink-0">
+                <VideoInput ref={videoRef} autoStart={isCallActive} />
               </div>
-            )}
+            
+              {/* Simple Coaching Toggle - Only show during active call */}
+              {isCallActive && (
+                <div className="flex-shrink-0 space-y-2">
+                  <div className="flex items-center justify-center gap-2 text-sm">
+                    <span className={cn(
+                      "font-medium transition-colors",
+                      coachingMode ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"
+                    )}>
+                      Coaching
+                    </span>
+                    <Toggle
+                      size="sm"
+                      pressed={coachingMode}
+                      disabled={isUpdatingCoaching}
+                      onPressedChange={handleCoachingToggle}
+                      className={cn(
+                        "h-6 w-11 p-0 transition-all duration-200",
+                        coachingMode 
+                          ? "bg-blue-500 hover:bg-blue-600 data-[state=on]:bg-blue-500" 
+                          : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
+                      )}
+                    >
+                      <GraduationCap className={cn(
+                        "h-3 w-3 transition-colors",
+                        coachingMode ? "text-white" : "text-gray-500 dark:text-gray-400"
+                      )} />
+                    </Toggle>
+                    <span className={cn(
+                      "text-xs font-medium transition-colors",
+                      coachingMode 
+                        ? "text-blue-600 dark:text-blue-400" 
+                        : "text-muted-foreground"
+                    )}>
+                      {coachingMode ? "ON" : "OFF"}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Live Feedback Display - Integrated into sidebar */}
+              <div className="flex-shrink-0">
+                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                  Live Feedback
+                </div>
+                <FeedbackDisplay ref={feedbackDisplayRef} />
+              </div>
           </div>
         </div>
       )}
+      
+      {/* Final Evaluation Report */}
+      <FinalEvaluationReport
+        evaluation={finalEvaluation}
+        isLoading={isGeneratingFinalReport}
+        onClose={() => {
+          setShowFinalReport(false);
+          setFinalEvaluation(null);
+        }}
+      />
     </>
   );
 }
@@ -345,22 +555,10 @@ export default function ClientComponent({
     }
   };
 
-  // Build transcript from messages for video player
-  const buildTranscriptFromMessages = (messages: any[]): any[] => {
-    return messages.map((msg, index) => ({
-      id: `msg-${index}`,
-      speaker: msg.type === "user_message" ? "user" : "assistant",
-      text: msg.message?.content || "",
-      timestamp: Math.floor((msg.receivedAt || index * 5000) / 1000), // Convert to seconds
-      emotions: msg.models?.prosody?.scores || undefined,
-      confidence: msg.models?.language?.confidence || undefined,
-    }));
-  };
-
   return (
     <div
       className={
-        "relative grow flex flex-col mx-auto w-full overflow-hidden"
+        "relative grow flex flex-col mx-auto w-full h-screen overflow-hidden"
       }
     >
       <VoiceProvider
@@ -424,7 +622,7 @@ export default function ClientComponent({
           transcript={transcript}
           setTranscript={setTranscript}
           handleVideoReady={handleVideoReady}
-          buildTranscriptFromMessages={buildTranscriptFromMessages}
+
           videoRef={videoRef}
           audioCtx={audioCtx}
           assistantBus={assistantBus}
