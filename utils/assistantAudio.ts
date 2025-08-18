@@ -38,6 +38,12 @@ export class AssistantAudioBus {
 
 	async pushBase64Wav(base64: string) {
 		try {
+			// Check if audio context is still valid
+			if (this.audioContext.state === 'closed') {
+				console.log("🎵 AudioContext is closed, skipping audio");
+				return;
+			}
+			
 			const ab = base64ToArrayBuffer(base64);
 			const buffer = await this.audioContext.decodeAudioData(ab);
 			console.log("🎵 Decoded WAV audio:", buffer.duration, "seconds,", buffer.sampleRate, "Hz");
@@ -49,32 +55,52 @@ export class AssistantAudioBus {
 	}
 
 	pushPcm16(int16: Int16Array, sampleRate?: number, channels: number = 1) {
-		const sr = sampleRate || this.sampleRateFallback;
-		const numChannels = Math.max(1, Math.min(2, channels));
-		const frames = Math.floor(int16.length / numChannels);
-		const buffer = this.audioContext.createBuffer(numChannels, frames, sr);
-		for (let ch = 0; ch < numChannels; ch++) {
-			const channelData = buffer.getChannelData(ch);
-			for (let i = 0; i < frames; i++) {
-				const s16 = int16[i * numChannels + ch] || 0;
-				channelData[i] = Math.max(-1, Math.min(1, s16 / 32768));
+		try {
+			// Check if audio context is still valid
+			if (this.audioContext.state === 'closed') {
+				console.log("🎵 AudioContext is closed, skipping PCM audio");
+				return;
 			}
+			
+			const sr = sampleRate || this.sampleRateFallback;
+			const numChannels = Math.max(1, Math.min(2, channels));
+			const frames = Math.floor(int16.length / numChannels);
+			const buffer = this.audioContext.createBuffer(numChannels, frames, sr);
+			for (let ch = 0; ch < numChannels; ch++) {
+				const channelData = buffer.getChannelData(ch);
+				for (let i = 0; i < frames; i++) {
+					const s16 = int16[i * numChannels + ch] || 0;
+					channelData[i] = Math.max(-1, Math.min(1, s16 / 32768));
+				}
+			}
+			this.playBuffer(buffer);
+		} catch (error) {
+			console.error("🎵 Error processing PCM audio:", error);
 		}
-		this.playBuffer(buffer);
 	}
 
 	pushFloat32(float32: Float32Array, sampleRate?: number, channels: number = 1) {
-		const sr = sampleRate || this.sampleRateFallback;
-		const numChannels = Math.max(1, Math.min(2, channels));
-		const frames = Math.floor(float32.length / numChannels);
-		const buffer = this.audioContext.createBuffer(numChannels, frames, sr);
-		for (let ch = 0; ch < numChannels; ch++) {
-			const channelData = buffer.getChannelData(ch);
-			for (let i = 0; i < frames; i++) {
-				channelData[i] = float32[i * numChannels + ch] || 0;
+		try {
+			// Check if audio context is still valid
+			if (this.audioContext.state === 'closed') {
+				console.log("🎵 AudioContext is closed, skipping Float32 audio");
+				return;
 			}
+			
+			const sr = sampleRate || this.sampleRateFallback;
+			const numChannels = Math.max(1, Math.min(2, channels));
+			const frames = Math.floor(float32.length / numChannels);
+			const buffer = this.audioContext.createBuffer(numChannels, frames, sr);
+			for (let ch = 0; ch < numChannels; ch++) {
+				const channelData = buffer.getChannelData(ch);
+				for (let i = 0; i < frames; i++) {
+					channelData[i] = float32[i * numChannels + ch] || 0;
+				}
+			}
+			this.playBuffer(buffer);
+		} catch (error) {
+			console.error("🎵 Error processing Float32 audio:", error);
 		}
-		this.playBuffer(buffer);
 	}
 
 	private playBuffer(buffer: AudioBuffer) {
