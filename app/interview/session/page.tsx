@@ -30,10 +30,6 @@ export default async function InterviewSessionPage({
     <div className={"grow flex flex-col h-full min-h-screen max-h-screen overflow-hidden"}>
       <Chat 
         accessToken={accessToken}
-        sessionId={sessionId}
-        caseId={caseId}
-        interviewerId={interviewerId}
-        difficultyId={difficultyId}
       />
     </div>
   );
