@@ -1061,9 +1061,9 @@ function ChatInterface({
             </div>
           )}
           
-          {/* Hidden Recording Controls - positioned off-screen but functional */}
+          {/* Recording Controls */}
           {(isCallActive || forceShowRecording) && (
-            <div className="fixed -top-96 left-0 opacity-0 pointer-events-none">
+            <div className="fixed bottom-4 left-4 z-30 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
               <RecordingControls
                 videoStream={videoRef.current?.getStream() || null}
                 audioCtx={audioCtx}

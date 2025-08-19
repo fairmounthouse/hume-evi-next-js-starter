@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRecording } from "@/hooks/useRecording";
 import { uploadToCloudflare, formatDuration } from "@/utils/cloudflareUpload";
 import { Button } from "./ui/button";
-import { Circle, Square, Pause, Play, Upload, Loader2 } from "lucide-react";
+import { Circle, Square, Pause, Play, Upload, Loader2, Volume2 } from "lucide-react";
 import { cn } from "@/utils";
 import { toast } from "sonner";
 import { useVoice } from "@humeai/voice-react";
@@ -42,6 +42,17 @@ export default function RecordingControls({
   const micStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(audioCtx);
   const mixDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const micGainRef = useRef<GainNode | null>(null);
+  const micCompressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const [micGainValue, setMicGainValue] = useState(1);
+
+  // Update gain in real-time when slider changes
+  const handleGainChange = useCallback((newGain: number) => {
+    setMicGainValue(newGain);
+    if (micGainRef.current) {
+      micGainRef.current.gain.value = newGain;
+    }
+  }, []);
   
   // Removed spammy log
   
@@ -187,9 +198,30 @@ export default function RecordingControls({
           const destination = (mixDestinationRef.current ||= audioContext.createMediaStreamDestination());
           
           if (mic) {
+            // Create professional audio processing chain: Source -> Manual Gain -> Compressor -> Destination
+            // This puts manual gain AFTER WebRTC's autoGainControl but BEFORE final compression
             const micSource = audioContext.createMediaStreamSource(mic);
-            micSource.connect(destination);
-            console.log("🎤 Connected microphone to destination");
+            
+            // Add manual gain control after WebRTC's AGC processing
+            const micGain = audioContext.createGain();
+            micGain.gain.value = micGainValue; // controlled by slider
+            micGainRef.current = micGain;
+            
+            // Add DynamicsCompressor after manual gain for final polish
+            const micCompressor = audioContext.createDynamicsCompressor();
+            // MDN best practices for voice compression
+            micCompressor.threshold.setValueAtTime(-24, audioContext.currentTime); // Start compression at -24dB
+            micCompressor.knee.setValueAtTime(30, audioContext.currentTime);       // Smooth compression curve
+            micCompressor.ratio.setValueAtTime(12, audioContext.currentTime);      // 12:1 ratio for voice
+            micCompressor.attack.setValueAtTime(0.003, audioContext.currentTime);  // Fast attack (3ms)
+            micCompressor.release.setValueAtTime(0.25, audioContext.currentTime);  // Medium release (250ms)
+            micCompressorRef.current = micCompressor;
+            
+            // Connect the chain: WebRTC AGC → Manual Gain → Compressor → Destination
+            micSource.connect(micGain);
+            micGain.connect(micCompressor);
+            micCompressor.connect(destination);
+            console.log("🎤 Connected microphone via professional audio chain (gain after AGC, then compressor)");
           }
           
           if (assistant) {
@@ -421,6 +453,24 @@ export default function RecordingControls({
           {isRecording ? (isPaused ? "Recording Paused" : "Recording Active") : 
            isUploading ? "Uploading..." : 
            autoStart ? "Auto-Recording Enabled" : "Ready to Record"}
+        </span>
+      </div>
+      
+      {/* Mic Gain Control */}
+      <div className="flex items-center gap-3 p-2 bg-muted/30 rounded-md">
+        <Volume2 className="h-4 w-4 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground min-w-[60px]">Mic Gain:</span>
+        <input
+          type="range"
+          min="1"
+          max="50"
+          step="0.1"
+          value={micGainValue}
+          onChange={(e) => handleGainChange(parseFloat(e.target.value))}
+          className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+        />
+        <span className="text-xs font-mono min-w-[30px] text-right">
+          {micGainValue.toFixed(1)}x
         </span>
       </div>
       
