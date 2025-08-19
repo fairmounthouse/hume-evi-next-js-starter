@@ -19,6 +19,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script 
+          src="https://embed.cloudflarestream.com/embed/sdk.latest.js" 
+          async 
+        />
+      </head>
       <body
         suppressHydrationWarning
         className={cn(

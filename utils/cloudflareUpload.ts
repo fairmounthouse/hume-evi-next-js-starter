@@ -100,7 +100,13 @@ export async function uploadToCloudflare(
  * Get video details from Cloudflare Stream
  */
 export async function getVideoDetails(videoId: string) {
-  const response = await fetch(`/api/recording/video/${videoId}`);
+  const response = await fetch(`/api/recording/video/${videoId}?_t=${Date.now()}`, {
+    cache: 'no-store',
+    next: { 
+      revalidate: 0,
+      tags: [`video-${videoId}`] // Optional: for manual revalidation
+    }
+  });
   
   if (!response.ok) {
     throw new Error(`Failed to get video details: ${response.statusText}`);

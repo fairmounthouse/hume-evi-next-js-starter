@@ -94,6 +94,7 @@ Feedback: ${factor.feedback.join(', ')}
     const a = document.createElement('a');
     a.href = url;
     a.download = `interview-evaluation-${new Date().toISOString().split('T')[0]}.txt`;
+    a.target = '_blank'; // Ensure it doesn't affect current tab
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -6,8 +6,9 @@ import Controls from "./Controls";
 import StartCall from "./StartCall";
 import VideoInput, { VideoInputRef } from "./VideoInput";
 import RecordingControls from "./RecordingControls";
-import VideoTranscriptPlayer from "./VideoTranscriptPlayer";
-import { ComponentRef, useRef, useState, useEffect, useMemo } from "react";
+import VideoReviewInterface from "./VideoReviewInterface";
+import SessionSelector from "./SessionSelector";
+import { ComponentRef, useRef, useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
 import { Button } from "./ui/button";
@@ -19,11 +20,11 @@ import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
 import TranscriptEvaluator from "@/utils/transcriptEvaluator";
 import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
-import FinalEvaluationReport from "./FinalEvaluationReport";
 
 // Chat interface component with voice interaction capabilities
 function ChatInterface({
   sessionId,
+  urlSessionId,
   isCallActive,
   setIsCallActive,
   shouldAutoRecord,
@@ -51,13 +52,72 @@ function ChatInterface({
   const [coachingMode, setCoachingMode] = useState(false);
   const [isUpdatingCoaching, setIsUpdatingCoaching] = useState(false);
   const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
-  const [showFinalReport, setShowFinalReport] = useState(false);
+
   const [finalEvaluation, setFinalEvaluation] = useState<any>(null);
   const [isGeneratingFinalReport, setIsGeneratingFinalReport] = useState(false);
   const [evaluationCache, setEvaluationCache] = useState<Map<string, any>>(new Map());
   const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
   const currentMessagesRef = useRef<any[]>([]);
+  const finalScreenVideoRef = useRef<HTMLVideoElement>(null);
+  const [endScreenDataStored, setEndScreenDataStored] = useState(false);
+  const [isVideoProcessing, setIsVideoProcessing] = useState(false);
+  const [videoCheckInterval, setVideoCheckInterval] = useState<NodeJS.Timeout | null>(null);
+
+  // Function to load end screen data from cache
+  const loadEndScreenFromCache = useCallback(async (targetSessionId: string) => {
+    try {
+      console.log(`🔄 Loading end screen data from cache for session: ${targetSessionId}`);
+      const { getEndScreenData } = await import("@/utils/supabase-client");
+      
+      const cachedData = await getEndScreenData(targetSessionId);
+      
+      if (cachedData) {
+        // Set all the state to rebuild the end screen
+        setStoredTranscript(cachedData.transcript);
+        setTranscript(cachedData.transcript);
+        setFinalEvaluation(cachedData.finalEvaluation);
+        setFinalVideoUrl(cachedData.videoUrl);
+        setShowEndScreen(true);
+        setShowVideoReview(false);
+        setIsCallActive(false);
+        setEndScreenDataStored(true);
+        
+        // Check if the cached video URL needs processing check
+        const videoId = cachedData.videoUrl?.match(/cloudflarestream\.com\/([^\/]+)\/watch/)?.[1];
+        if (videoId) {
+          // Check if video is ready
+          fetch(`/api/recording/video/${videoId}?_t=${Date.now()}`, { 
+            cache: 'no-store',
+            next: { 
+              revalidate: 0,
+              tags: [`video-${videoId}`] 
+            } 
+          })
+            .then(res => res.json())
+            .then(videoDetails => {
+              // Video status is checked but no action needed here
+            })
+            .catch(err => console.error("Error checking cached video status:", err));
+        }
+        
+        console.log(`✅ End screen rebuilt from cache for session: ${targetSessionId}`);
+        toast.success(`Loaded interview session: ${targetSessionId}`);
+        
+        return true;
+      } else {
+        console.error(`❌ No cached data found for session: ${targetSessionId}`);
+        toast.error(`No data found for session: ${targetSessionId}`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error loading from cache:', error);
+      toast.error('Failed to load session data');
+      return false;
+    }
+  }, []);
+
+
 
   // Build transcript from messages for evaluation
   const buildTranscriptFromMessages = (messages: any[]): any[] => {
@@ -198,7 +258,146 @@ function ChatInterface({
     };
   }, [transcriptEvaluator]);
 
-  const handleCoachingToggle = async (enabled: boolean) => {
+  // Store complete end screen data when all components are ready
+  useEffect(() => {
+    const storeCompleteEndScreenData = async () => {
+      if (
+        showEndScreen && 
+        finalVideoUrl && 
+        finalEvaluation && 
+        storedTranscript.length > 0 && 
+        !endScreenDataStored
+      ) {
+        try {
+          console.log("💾 All end screen data ready, storing to Supabase...");
+          const { storeEndScreenData } = await import("@/utils/supabase-client");
+          
+          const success = await storeEndScreenData(
+            sessionId,
+            storedTranscript,
+            finalEvaluation,
+            finalVideoUrl
+          );
+          
+          if (success) {
+            setEndScreenDataStored(true);
+            toast.success("Session data cached for future access!");
+          }
+        } catch (error) {
+          console.error("Error storing complete end screen data:", error);
+        }
+      }
+    };
+
+          storeCompleteEndScreenData();
+    }, [showEndScreen, finalVideoUrl, finalEvaluation, storedTranscript, endScreenDataStored, sessionId]);
+
+  // Poll for video readiness when we have a processing video
+  useEffect(() => {
+    if (finalVideoUrl && isVideoProcessing) {
+      const videoId = finalVideoUrl.match(/cloudflarestream\.com\/([^\/]+)\/watch/)?.[1];
+      if (!videoId) {
+        setIsVideoProcessing(false);
+        return;
+      }
+
+      console.log("🔄 Starting video readiness polling for:", videoId);
+      
+      const checkVideoReady = async () => {
+        try {
+          const response = await fetch(
+            `/api/recording/video/${videoId}?_t=${Date.now()}`,
+            { 
+              cache: 'no-store',
+              next: { 
+                revalidate: 0,
+                tags: [`video-${videoId}`] 
+              } 
+            }
+          );
+          const videoDetails = await response.json();
+          
+          // Check both readyToStream and state for more reliable detection
+          if (videoDetails.ready && videoDetails.state === 'ready') {
+            console.log("✅ Video is now ready!");
+            setIsVideoProcessing(false);
+            
+            // Update with the proper playback URL
+            if (videoDetails.playbackUrl) {
+              setFinalVideoUrl(videoDetails.playbackUrl);
+              
+              // Also update in session_media
+              try {
+                const { supabase } = await import("@/utils/supabase-client");
+                await supabase
+                  .from("session_media")
+                  .update({ file_url: videoDetails.playbackUrl })
+                  .eq('session_id', sessionId)
+                  .eq('media_type', 'video');
+              } catch (e) {
+                console.error("Failed to update video URL:", e);
+              }
+            }
+            
+            toast.success("Video processing complete! Ready to play.");
+          } else if (videoDetails.state === 'error') {
+            console.error("❌ Video processing failed:", videoDetails.errorReasonText || 'Unknown error');
+            setIsVideoProcessing(false);
+            toast.error(`Video processing failed: ${videoDetails.errorReasonText || 'Unknown error'}`);
+          } else {
+            console.log(`⏳ Video processing: ${videoDetails.state} (${videoDetails.pctComplete}% complete)`);
+          }
+        } catch (error) {
+          console.error("Error checking video status:", error);
+        }
+      };
+
+      // Check immediately
+      checkVideoReady();
+      
+      // Then check every 3 seconds
+      const interval = setInterval(checkVideoReady, 3000);
+      setVideoCheckInterval(interval);
+      
+      // Cleanup on unmount or when processing is done
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+          setVideoCheckInterval(null);
+        }
+      };
+    } else {
+      // Clear any existing interval when not processing
+      if (videoCheckInterval) {
+        clearInterval(videoCheckInterval);
+        setVideoCheckInterval(null);
+      }
+    }
+  }, [finalVideoUrl, isVideoProcessing, sessionId]); // Removed videoCheckInterval from deps to prevent re-runs
+  
+    // Add auto-generation of final report when interview ends
+    useEffect(() => {
+      const autoGenerateFinalReport = async () => {
+        if (showEndScreen && storedTranscript.length > 0 && !finalEvaluation && !isGeneratingFinalReport) {
+          console.log("🤖 Auto-generating final report...");
+          try {
+            setIsGeneratingFinalReport(true);
+            const evaluation = await transcriptEvaluator.getDetailedEvaluation(storedTranscript);
+            setFinalEvaluation(evaluation);
+            toast.success("Analysis complete! Your session is fully cached.");
+          } catch (error) {
+            console.error("Error auto-generating final report:", error);
+            toast.error("Failed to generate analysis - you can retry manually");
+          } finally {
+            setIsGeneratingFinalReport(false);
+          }
+        }
+      };
+  
+      autoGenerateFinalReport();
+    }, [showEndScreen, storedTranscript, finalEvaluation, isGeneratingFinalReport, transcriptEvaluator]);
+  
+    const handleCoachingToggle = async (enabled: boolean) => {
     if (isUpdatingCoaching) return;
     
     setIsUpdatingCoaching(true);
@@ -271,7 +470,7 @@ function ChatInterface({
             status: "completed",
             ended_at: new Date().toISOString(),
             duration_seconds: Math.floor((Date.now() - (preservedTranscript[0]?.timestamp * 1000 || Date.now())) / 1000),
-            ...(transcriptPath ? { transcript_path: transcriptPath } : {}), // Only include when present
+            transcript_path: transcriptPath || undefined, // Store the storage path, handle null case
             transcript_data: "", // Required field - we store actual transcript in storage
           });
           console.log("✅ [END] Session data and transcript saved to Supabase");
@@ -295,7 +494,6 @@ function ChatInterface({
         if (cachedEvaluation) {
           console.log("🔚 [END] Using cached detailed analysis");
           setFinalEvaluation(cachedEvaluation);
-          setShowFinalReport(true);
         } else {
           console.log("🔚 [END] Auto-generating detailed analysis...");
           setIsGeneratingFinalReport(true);
@@ -309,7 +507,6 @@ function ChatInterface({
             setEvaluationCache(newCache);
             
             setFinalEvaluation(evaluation);
-            setShowFinalReport(true);
             console.log("✅ [END] Auto-generated detailed analysis complete and cached");
           } catch (error) {
             console.error("Error auto-generating final report:", error);
@@ -346,15 +543,29 @@ function ChatInterface({
       const downloadUrl = await getTranscriptDownloadUrl(sessionId, format);
       
       if (downloadUrl) {
-        // Download from Supabase Storage
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = `interview-transcript-${sessionId}.${format}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        toast.success("Transcript downloaded from cloud storage!");
-      } else {
+        // Download from Supabase Storage - ensure it doesn't redirect
+        try {
+          const response = await fetch(downloadUrl);
+          const blob = await response.blob();
+          
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `interview-transcript-${sessionId}.${format}`;
+          a.target = '_blank'; // Ensure it doesn't affect current tab
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          toast.success("Transcript downloaded from cloud storage!");
+        } catch (fetchError) {
+          console.error("Error fetching from storage, using fallback:", fetchError);
+          // Fall through to local download
+        }
+      }
+      
+      if (!downloadUrl) {
         // Fallback to local download
         const transcriptData = storedTranscript.length > 0 ? storedTranscript : buildTranscriptFromMessages(messages);
         
@@ -375,6 +586,7 @@ function ChatInterface({
           const a = document.createElement('a');
           a.href = url;
           a.download = `interview-transcript-${sessionId}.json`;
+          a.target = '_blank'; // Ensure it doesn't affect current tab
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -391,6 +603,7 @@ function ChatInterface({
           const a = document.createElement('a');
           a.href = url;
           a.download = `interview-transcript-${sessionId}.txt`;
+          a.target = '_blank'; // Ensure it doesn't affect current tab
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -414,7 +627,6 @@ function ChatInterface({
       
       const evaluation = await transcriptEvaluator.getDetailedEvaluation(transcriptData);
       setFinalEvaluation(evaluation);
-      setShowFinalReport(true);
     } catch (error) {
       console.error("Error generating final report:", error);
       toast.error("Failed to generate final report");
@@ -426,9 +638,14 @@ function ChatInterface({
   return (
     <>
       {showEndScreen ? (
-        <div className="grow flex flex-col overflow-hidden p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold">Interview Complete</h2>
+        <div className="grow flex flex-col overflow-hidden pt-14">
+          {/* Top Navigation Bar - Fixed Height, accounting for fixed nav */}
+          <div className="flex-shrink-0 bg-background border-b px-6 py-4">
+            <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Interview Complete</h2>
+              <p className="text-sm text-muted-foreground">Session ID: {sessionId}</p>
+            </div>
             <div className="flex gap-2">
               <div className="flex gap-1">
                 <Button 
@@ -468,8 +685,15 @@ function ChatInterface({
                 >
                   View Recording
                 </Button>
-              )}
-              <Button 
+                            )}
+               {/* Only show session selector on main interview page, not when viewing a specific session */}
+               {!urlSessionId && (
+                 <SessionSelector 
+                   onSelectSession={loadEndScreenFromCache}
+                   currentSessionId={sessionId}
+                 />
+               )}
+               <Button 
                 variant="outline" 
                 onClick={() => {
                   // Navigate to setup page for new interview
@@ -479,33 +703,77 @@ function ChatInterface({
                 Start New Interview
               </Button>
             </div>
+            </div>
           </div>
           
-          <div className="grow grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Video Preview */}
+          {/* Main Content Area - Scrollable */}
+          <div className="flex-grow overflow-hidden p-6">
+            <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Video Preview with Direct Seeking */}
             <Card className="p-6 flex flex-col">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <span>🎥</span>
                 Interview Recording
               </h3>
-              <div className="flex-grow flex items-center justify-center bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex-grow flex flex-col bg-gray-50 dark:bg-gray-800 rounded-lg">
                 {finalVideoUrl ? (
-                  <div className="w-full">
-                    {/* Use Cloudflare Stream iframe for proper playback */}
-                    <div className="relative w-full" style={{ paddingTop: '56.25%' }}>
-                      <iframe
-                        src={finalVideoUrl.replace('/watch', '/iframe')}
-                        className="absolute top-0 left-0 w-full h-full rounded-lg"
-                        style={{ border: 'none' }}
-                        allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                        allowFullScreen
-                        title="Interview Recording"
-                      />
+                  <div className="w-full flex-grow flex flex-col">
+                    {/* Video Player */}
+                    <div className="relative bg-black rounded-lg overflow-hidden mb-3">
+                      {isVideoProcessing ? (
+                        <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
+                          <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                            <p className="text-white text-sm">Processing video...</p>
+                            <p className="text-gray-400 text-xs mt-2">This usually takes 30-60 seconds</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <iframe
+                          src={finalVideoUrl.replace('/watch', '/iframe')}
+                          className="w-full aspect-video"
+                          style={{ border: "none" }}
+                          allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                          allowFullScreen
+                          title="Interview Recording"
+                        />
+                      )}
                     </div>
-                    <div className="mt-3 space-y-2">
+                    
+                    {/* Session Summary moved here */}
+                    <div className="bg-white dark:bg-gray-900 rounded-lg p-4 space-y-3">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        Session Summary
+                      </h4>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Duration:</span>
+                          <span className="font-medium">
+                            {Math.floor((Date.now() - (storedTranscript[0]?.timestamp * 1000 || Date.now())) / 60000)} minutes
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Messages:</span>
+                          <span className="font-medium">{storedTranscript.length} exchanges</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Recording:</span>
+                          <span className="font-medium">✅ Available</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-3">
                       <Button 
                         className="w-full" 
                         onClick={() => {
+                          console.log("🎥 View Full Video clicked", {
+                            finalVideoUrl: !!finalVideoUrl,
+                            finalEvaluation: !!finalEvaluation,
+                            transcript: storedTranscript.length
+                          });
+                          // Always go to video review - it will show loading if video not ready
                           setShowEndScreen(false);
                           setShowVideoReview(true);
                         }}
@@ -523,80 +791,146 @@ function ChatInterface({
               </div>
             </Card>
 
-            {/* Session Summary */}
+            {/* Detailed Analysis */}
             <Card className="p-6 flex flex-col">
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Session Summary
+                <FileText className="w-5 h-5" />
+                Detailed Analysis
               </h3>
-              <div className="space-y-3 flex-grow">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Duration:</span>
-                  <span className="text-sm font-medium">
-                    {Math.floor((Date.now() - (storedTranscript[0]?.timestamp * 1000 || Date.now())) / 60000)} minutes
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Messages:</span>
-                  <span className="text-sm font-medium">{storedTranscript.length} exchanges</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Recording:</span>
-                  <span className="text-sm font-medium">{finalVideoUrl ? "✅ Available" : "⏳ Processing"}</span>
-                </div>
-              </div>
               
-              {/* Quick Actions */}
-              <div className="mt-6 space-y-2">
-                {isGeneratingFinalReport && (
-                  <div className="w-full p-3 bg-blue-50 dark:bg-blue-950 rounded-lg text-center">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mx-auto mb-2"></div>
+              {isGeneratingFinalReport ? (
+                <div className="flex-grow flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                     <p className="text-sm text-blue-600 dark:text-blue-400">Generating detailed analysis...</p>
                   </div>
-                )}
-                <div className="flex gap-1">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1" 
-                    onClick={() => downloadTranscript('txt')}
-                    disabled={storedTranscript.length === 0}
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    TXT
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="flex-1" 
-                    onClick={() => downloadTranscript('json')}
-                    disabled={storedTranscript.length === 0}
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    JSON
-                  </Button>
                 </div>
-              </div>
+              ) : finalEvaluation ? (
+                <div className="flex-grow overflow-y-auto space-y-3 pr-1">
+                  {/* Overall Score */}
+                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                    <div className={cn("text-2xl font-bold mb-1", 
+                      finalEvaluation.summary.total_score >= 80 ? "text-green-600" :
+                      finalEvaluation.summary.total_score >= 60 ? "text-yellow-600" : "text-red-600"
+                    )}>
+                      {finalEvaluation.summary.total_score}/100
+                    </div>
+                    <p className="text-sm text-muted-foreground">Overall Score</p>
+                  </div>
+                  
+                  {/* Hiring Recommendation */}
+                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Hiring Recommendation</p>
+                    <p className="text-xs text-gray-700 dark:text-gray-300">{finalEvaluation.summary.hiring_recommendation}</p>
+                  </div>
+                  
+                  {/* Key Factors */}
+                  <div className="space-y-2">
+                    <h4 className="font-semibold text-sm">Key Evaluation Factors</h4>
+                    {finalEvaluation.factors.slice(0, 3).map((factor: any, index: number) => (
+                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        <span className="text-sm">{factor.factor_name}</span>
+                        <Badge className={cn(
+                          factor.score >= 8 ? "bg-green-100 text-green-800" :
+                          factor.score >= 6 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
+                        )}>
+                          {factor.score}/10
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Key Strengths & Weaknesses */}
+                  <div className="space-y-3 pt-3 border-t">
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2 text-green-600 dark:text-green-400">Key Strengths</h4>
+                      <ul className="space-y-1">
+                        {finalEvaluation.summary.key_strengths.slice(0, 2).map((strength: string, index: number) => (
+                          <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1">
+                            <span className="text-green-500 mt-0.5">•</span>
+                            {strength}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-semibold text-sm mb-2 text-red-600 dark:text-red-400">Areas for Improvement</h4>
+                      <ul className="space-y-1">
+                        {finalEvaluation.summary.critical_weaknesses.slice(0, 2).map((weakness: string, index: number) => (
+                          <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1">
+                            <span className="text-red-500 mt-0.5">•</span>
+                            {weakness}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                  
+                  {/* Quick Actions */}
+                  <div className="pt-4 border-t">
+                    <Button 
+                      className="w-full" 
+                      onClick={() => {
+                        console.log("🔍 View Full Analysis clicked", {
+                          finalVideoUrl: !!finalVideoUrl,
+                          finalEvaluation: !!finalEvaluation,
+                          transcript: storedTranscript.length
+                        });
+                        // Always go to video review - it will show loading if video not ready
+                        setShowEndScreen(false);
+                        setShowVideoReview(true);
+                      }}
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      View Full Analysis
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-grow flex items-center justify-center">
+                  <div className="text-center">
+                    <Button 
+                      onClick={handleGenerateFinalReport}
+                      disabled={storedTranscript.length === 0}
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      Generate Analysis
+                    </Button>
+                  </div>
+                </div>
+              )}
             </Card>
             
             {/* Transcript Preview */}
             <Card className="p-6 flex flex-col">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Transcript Preview</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setShowEndScreen(false);
-                    setShowVideoReview(true);
-                  }}
-                  disabled={!finalVideoUrl}
-                >
-                  View Full Video
-                </Button>
+                <div className="flex gap-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadTranscript('txt')}
+                    disabled={storedTranscript.length === 0}
+                  >
+                    <Download className="w-3 h-3 mr-1" />
+                    TXT
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => downloadTranscript('json')}
+                    disabled={storedTranscript.length === 0}
+                  >
+                    <Download className="w-3 h-3 mr-1" />
+                    JSON
+                  </Button>
+                </div>
               </div>
-              <div className="flex-grow bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-y-auto max-h-[400px]">
+              <div className="flex-grow bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-y-auto max-h-[600px]">
                 {storedTranscript.length > 0 ? (
                   <div className="space-y-3">
-                    {storedTranscript.slice(-5).map((entry, index) => (
+                    {storedTranscript.map((entry, index) => (
                       <div 
                         key={index} 
                         className={cn(
@@ -606,11 +940,10 @@ function ChatInterface({
                             : "cursor-default"
                         )}
                         onClick={() => {
-                          if (finalVideoUrl) {
-                            // Store the timestamp to jump to
-                            sessionStorage.setItem('jumpToTimestamp', entry.timestamp.toString());
-                            setShowEndScreen(false);
-                            setShowVideoReview(true);
+                          if (finalVideoUrl && finalScreenVideoRef.current) {
+                            // Direct seeking on the final screen
+                            finalScreenVideoRef.current.currentTime = entry.timestamp;
+                            console.log(`🎬 Seeking to ${entry.timestamp}s directly on final screen`);
                           }
                         }}
                         title={finalVideoUrl ? `Click to jump to ${new Date(entry.timestamp * 1000).toLocaleTimeString()} in video` : undefined}
@@ -633,34 +966,33 @@ function ChatInterface({
                         </p>
                       </div>
                     ))}
-                    {storedTranscript.length > 5 && (
-                      <div className="text-center pt-3 border-t border-gray-200 dark:border-gray-600">
-                        <p className="text-xs text-muted-foreground mb-2">
-                          ... and {storedTranscript.length - 5} more exchanges
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setShowEndScreen(false);
-                            setShowVideoReview(true);
-                          }}
-                          disabled={!finalVideoUrl}
-                        >
-                          View Complete Transcript
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center">No transcript data available</p>
                 )}
               </div>
+              
+              {/* View Full Video Button */}
+              {finalVideoUrl && (
+                <div className="mt-4">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => {
+                      setShowEndScreen(false);
+                      setShowVideoReview(true);
+                    }}
+                  >
+                    View Full Transcript with Video
+                  </Button>
+                </div>
+              )}
             </Card>
+            </div>
           </div>
         </div>
-      ) : showVideoReview && finalVideoUrl ? (
-        <div className="grow flex flex-col overflow-hidden p-6">
+      ) : showVideoReview ? (
+        <div className="grow flex flex-col overflow-hidden pt-14 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Interview Recording</h2>
             <div className="flex gap-2">
@@ -687,14 +1019,28 @@ function ChatInterface({
               </Button>
             </div>
           </div>
-          <VideoTranscriptPlayer
-            videoUrl={finalVideoUrl}
-            transcript={transcript}
-            className="grow"
-          />
+          
+          {finalVideoUrl ? (
+            <VideoReviewInterface
+              videoUrl={finalVideoUrl}
+              transcript={transcript}
+              evaluation={finalEvaluation}
+              className="grow"
+            />
+          ) : (
+            <div className="grow flex items-center justify-center">
+              <Card className="p-8 text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <h3 className="text-lg font-semibold mb-2">Processing Video</h3>
+                <p className="text-sm text-muted-foreground">
+                  Your interview recording is being processed. This usually takes 30-60 seconds.
+                </p>
+              </Card>
+            </div>
+          )}
         </div>
       ) : (
-        <div className="grow flex flex-col md:flex-row gap-4 h-full min-h-0">
+        <div className="grow flex flex-col md:flex-row gap-4 h-full min-h-0 pt-14">
           <div className="grow flex flex-col min-h-0 h-full">
             <div className="grow overflow-y-auto min-h-0">
               <Messages ref={messagesRef} />
@@ -703,28 +1049,37 @@ function ChatInterface({
             {/* Bottom Controls */}
             <div className="flex-shrink-0 flex gap-2 items-center p-4 border-t bg-white dark:bg-gray-900">
               <Controls />
-              {isCallActive && storedTranscript.length > 0 && (
-                <div className="ml-auto flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadTranscript('txt')}
-                    className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    TXT
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadTranscript('json')}
-                    className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                  >
-                    <Download className="w-4 h-4 mr-1" />
-                    JSON
-                  </Button>
-                </div>
-              )}
+              <div className="ml-auto flex gap-2 items-center">
+                                {/* Session Selector for debugging - hide when viewing a specific session */}
+                 {!urlSessionId && (
+                   <SessionSelector 
+                     onSelectSession={loadEndScreenFromCache}
+                     currentSessionId={sessionId}
+                   />
+                 )}
+                 {isCallActive && storedTranscript.length > 0 && (
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadTranscript('txt')}
+                      className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      TXT
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadTranscript('json')}
+                      className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    >
+                      <Download className="w-4 h-4 mr-1" />
+                      JSON
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
@@ -751,31 +1106,32 @@ function ChatInterface({
                   // Check video status after a short delay
                   setTimeout(async () => {
                     try {
-                      const response = await fetch(`/api/recording/video/${videoId}`);
+                      const response = await fetch(
+                        `/api/recording/video/${videoId}?_t=${Date.now()}`,
+                        { 
+                          cache: 'no-store',
+                          next: { 
+                            revalidate: 0,
+                            tags: [`video-${videoId}`] 
+                          } 
+                        }
+                      );
                       const videoDetails = await response.json();
                       console.log("Video details from Cloudflare:", videoDetails);
                       
-                      if (videoDetails.ready) {
+                      if (videoDetails.ready && videoDetails.state === 'ready') {
                         toast.success("Video is ready to stream!");
                         console.log("Video playback URL:", videoDetails.playbackUrl);
                         handleVideoReady(videoId, videoDetails.playbackUrl);
+                      } else if (videoDetails.state === 'error') {
+                        toast.error(`Video processing failed: ${videoDetails.errorReasonText || 'Unknown error'}`);
+                        console.error("Video processing error:", videoDetails);
                       } else {
-                        toast.info("Video is processing...");
+                        toast.info(`Video is processing (${videoDetails.pctComplete}% complete)...`);
                         // Set a temporary URL so the button shows up
                         setFinalVideoUrl(`https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/watch`);
-                        console.log("Video still processing, set temporary URL");
-                        // Poll for video readiness
-                        setTimeout(async () => {
-                          try {
-                            const retryResponse = await fetch(`/api/recording/video/${videoId}`);
-                            const retryDetails = await retryResponse.json();
-                            if (retryDetails.ready && retryDetails.playbackUrl) {
-                              handleVideoReady(videoId, retryDetails.playbackUrl);
-                            }
-                          } catch (error) {
-                            console.error("Failed to retry video details:", error);
-                          }
-                        }, 10000); // Check again after 10 seconds
+                        setIsVideoProcessing(true); // This will trigger the polling effect
+                        console.log(`Video still processing: ${videoDetails.state}, started polling`);
                       }
                     } catch (error) {
                       console.error("Failed to fetch video details:", error);
@@ -842,16 +1198,7 @@ function ChatInterface({
           </div>
         </div>
       )}
-      
-      {/* Final Evaluation Report */}
-      <FinalEvaluationReport
-        evaluation={finalEvaluation}
-        isLoading={isGeneratingFinalReport}
-        onClose={() => {
-          setShowFinalReport(false);
-          setFinalEvaluation(null);
-        }}
-      />
+
     </>
   );
 }
@@ -923,10 +1270,12 @@ export default function ClientComponent({
   }, [assistantBus]);
   
   // Get sessionId from URL params or generate one as fallback
+  const urlSessionId = searchParams.get('sessionId');
   const [sessionId] = useState(() => {
-    const urlSessionId = searchParams.get('sessionId');
     return urlSessionId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   });
+
+
 
   // store playbackUrl when ready
   const handleVideoReady = async (videoId: string, playbackUrl?: string) => {
@@ -1004,6 +1353,7 @@ export default function ClientComponent({
       >
         <ChatInterface
           sessionId={sessionId}
+          urlSessionId={urlSessionId}
           isCallActive={isCallActive}
           setIsCallActive={setIsCallActive}
           shouldAutoRecord={shouldAutoRecord}

@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
+import SessionSelector from "./SessionSelector";
+import { useRouter } from "next/navigation";
 
 interface InterviewCase {
   id: string;
@@ -49,6 +51,7 @@ interface InterviewSetupProps {
 }
 
 export default function InterviewSetup({ onStartInterview }: InterviewSetupProps) {
+  const router = useRouter();
   const [cases, setCases] = useState<InterviewCase[]>([]);
   const [interviewers, setInterviewers] = useState<InterviewerProfile[]>([]);
   const [difficulties, setDifficulties] = useState<DifficultyProfile[]>([]);
@@ -64,6 +67,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
+  
+  // Handle session selection from SessionSelector
+  const handleSessionSelect = (sessionId: string) => {
+    router.push(`/interview/session?sessionId=${sessionId}`);
+  };
 
   // Fetch all data on component mount
   useEffect(() => {
@@ -153,19 +161,34 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            Set Up Your Interview
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Choose your interview case, interviewer, and difficulty level for a personalized experience
-          </p>
-        </motion.div>
+        {/* Header with Session Selector */}
+        <div className="flex justify-between items-start mb-8">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex-1 text-center"
+          >
+            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Set Up Your Interview
+            </h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+              Choose your interview case, interviewer, and difficulty level for a personalized experience
+            </p>
+          </motion.div>
+          
+          {/* Session Selector in top right */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.2 }}
+            className="ml-4"
+          >
+            <SessionSelector 
+              onSelectSession={handleSessionSelect}
+              currentSessionId=""
+            />
+          </motion.div>
+        </div>
 
         {/* Progress Steps */}
         <motion.div 
