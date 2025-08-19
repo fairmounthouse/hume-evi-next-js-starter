@@ -131,17 +131,18 @@ export interface InterviewSession {
 
 export async function upsertInterviewSession(sessionData: Partial<InterviewSession>): Promise<boolean> {
   try {
-    const jsonFields = [
-      'emotion_summary', 
-      'detailed_analysis', 
+    const jsonFields: Array<keyof Pick<InterviewSession, 'emotion_summary' | 'detailed_analysis' | 'speech_rate_data' | 'engagement_metrics'>> = [
+      'emotion_summary',
+      'detailed_analysis',
       'speech_rate_data',
-      'engagement_metrics'
+      'engagement_metrics',
     ];
 
     // Convert objects to JSON strings for specific fields (excluding evi_transcript_data)
     for (const field of jsonFields) {
-      if (sessionData[field] !== undefined && typeof sessionData[field] === 'object') {
-        sessionData[field] = JSON.stringify(sessionData[field]);
+      const value = sessionData[field];
+      if (value !== undefined && typeof value === 'object') {
+        (sessionData as Record<string, unknown>)[field as string] = JSON.stringify(value);
       }
     }
 
