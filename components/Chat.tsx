@@ -271,7 +271,7 @@ function ChatInterface({
             status: "completed",
             ended_at: new Date().toISOString(),
             duration_seconds: Math.floor((Date.now() - (preservedTranscript[0]?.timestamp * 1000 || Date.now())) / 1000),
-            transcript_path: transcriptPath, // Store the storage path
+            ...(transcriptPath ? { transcript_path: transcriptPath } : {}), // Only include when present
             transcript_data: "", // Required field - we store actual transcript in storage
           });
           console.log("✅ [END] Session data and transcript saved to Supabase");
