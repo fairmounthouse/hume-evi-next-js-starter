@@ -82,7 +82,11 @@ export default function RecordingControls({
         const assistant = audioStream && audioStream.getAudioTracks().length > 0 ? audioStream : null;
         let mic: MediaStream | null = null;
         try {
-          mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mic = await navigator.mediaDevices.getUserMedia({        audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+        },});
         } catch (e) {
           console.log("Mic capture not granted");
         }
@@ -166,7 +170,11 @@ export default function RecordingControls({
         const assistant = assistantTracks.length > 0 ? audioStream : null;
         let mic: MediaStream | null = null;
         try { 
-          mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mic = await navigator.mediaDevices.getUserMedia({audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+        },});
           console.log("🎤 Got microphone stream");
         } catch (err) {
           console.log("🎤 Could not get microphone:", err);
