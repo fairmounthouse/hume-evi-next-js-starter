@@ -31,7 +31,11 @@ export async function POST(request: NextRequest) {
           maxDurationSeconds: 3600, // 1 hour max
           requireSignedURLs: false,
           allowedOrigins: process.env.NODE_ENV === "production" 
-            ? [process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || ""] 
+            ? [
+                process.env.NEXT_PUBLIC_APP_URL?.replace(/^https?:\/\//, '') || "",
+                "hume-evi-next-js-starter-gamma.vercel.app",
+                "localhost:3000"
+              ].filter(Boolean)
             : ["localhost:3000"],
           creator: request.headers.get("x-user-id") || undefined,
           meta: {

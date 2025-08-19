@@ -59,7 +59,7 @@ function ChatInterface({
   const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
   const currentMessagesRef = useRef<any[]>([]);
-  const finalScreenVideoRef = useRef<HTMLVideoElement>(null);
+
   const [endScreenDataStored, setEndScreenDataStored] = useState(false);
   const [isVideoProcessing, setIsVideoProcessing] = useState(false);
   const [videoCheckInterval, setVideoCheckInterval] = useState<NodeJS.Timeout | null>(null);
@@ -764,23 +764,7 @@ function ChatInterface({
                       </div>
                     </div>
                     
-                    <div className="mt-3">
-                      <Button 
-                        className="w-full" 
-                        onClick={() => {
-                          console.log("🎥 View Full Video clicked", {
-                            finalVideoUrl: !!finalVideoUrl,
-                            finalEvaluation: !!finalEvaluation,
-                            transcript: storedTranscript.length
-                          });
-                          // Always go to video review - it will show loading if video not ready
-                          setShowEndScreen(false);
-                          setShowVideoReview(true);
-                        }}
-                      >
-                        View Full Video
-                      </Button>
-                    </div>
+
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -940,13 +924,14 @@ function ChatInterface({
                             : "cursor-default"
                         )}
                         onClick={() => {
-                          if (finalVideoUrl && finalScreenVideoRef.current) {
-                            // Direct seeking on the final screen
-                            finalScreenVideoRef.current.currentTime = entry.timestamp;
-                            console.log(`🎬 Seeking to ${entry.timestamp}s directly on final screen`);
+                          if (finalVideoUrl) {
+                            // Go to video review page for seeking functionality
+                            setShowEndScreen(false);
+                            setShowVideoReview(true);
+                            console.log(`🎬 Redirecting to video review for timestamp: ${entry.timestamp}s`);
                           }
                         }}
-                        title={finalVideoUrl ? `Click to jump to ${new Date(entry.timestamp * 1000).toLocaleTimeString()} in video` : undefined}
+                        title={finalVideoUrl ? `Click to view video at ${new Date(entry.timestamp * 1000).toLocaleTimeString()}` : undefined}
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant={entry.speaker === "user" ? "default" : "secondary"} className="text-xs">
@@ -957,7 +942,7 @@ function ChatInterface({
                           </span>
                           {finalVideoUrl && (
                             <span className="text-xs text-blue-500">
-                              📹 Click to jump
+                              📹 Click to view
                             </span>
                           )}
                         </div>
@@ -972,21 +957,7 @@ function ChatInterface({
                 )}
               </div>
               
-              {/* View Full Video Button */}
-              {finalVideoUrl && (
-                <div className="mt-4">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => {
-                      setShowEndScreen(false);
-                      setShowVideoReview(true);
-                    }}
-                  >
-                    View Full Transcript with Video
-                  </Button>
-                </div>
-              )}
+
             </Card>
             </div>
           </div>
