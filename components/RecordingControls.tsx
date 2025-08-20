@@ -64,10 +64,11 @@ export default function RecordingControls({
     stopRecording,
     pauseRecording,
     resumeRecording,
+    switchStream,
     error,
   } = useRecording();
 
-  // Combine video and audio streams when available
+  // Combine video and audio streams when available - handles camera on/off switching
   useEffect(() => {
     const combineStreams = async () => {
       console.log("RecordingControls: Checking streams", {
@@ -76,15 +77,20 @@ export default function RecordingControls({
         audioTracks: videoStream?.getAudioTracks().length || 0,
         hasAssistantStream: !!audioStream,
         assistantTracks: audioStream?.getAudioTracks().length || 0,
+        isCurrentlyRecording: isRecording,
       });
       
-      if (!videoStream) return;
+      if (!videoStream) {
+        console.log("⚠️ No video stream available - clearing combined stream");
+        setCombinedStream(null);
+        return;
+      }
 
       const tracks: MediaStreamTrack[] = [];
       
-      // Add video tracks
+      // Add video tracks (handles both real camera and fallback canvas streams)
       videoStream.getVideoTracks().forEach(track => {
-        console.log("Adding video track:", track.label, track.readyState);
+        console.log("Adding video track:", track.label, track.readyState, "enabled:", track.enabled);
         tracks.push(track);
       });
       
@@ -136,13 +142,25 @@ export default function RecordingControls({
       
       if (tracks.length > 0) {
         const combined = new MediaStream(tracks);
-        console.log("Created combined stream with", tracks.length, "tracks");
+        console.log("✅ Created combined stream with", tracks.length, "tracks", 
+          isRecording ? "(during recording - will update MediaRecorder)" : "(ready for recording)");
+        
+        // If we're currently recording and the stream changed, switch to the new stream
+        if (isRecording && combinedStream) {
+          console.log("🔄 Video stream changed during recording - switching stream seamlessly");
+          switchStream(combined);
+          toast.info("Camera switched - recording updated instantly!");
+        }
+        
         setCombinedStream(combined);
+      } else {
+        console.log("⚠️ No tracks available - clearing combined stream");
+        setCombinedStream(null);
       }
     };
 
     combineStreams();
-  }, [videoStream, audioStream]);
+  }, [videoStream, audioStream, isRecording]);
 
   const handleStartRecording = useCallback(async () => {
     console.log("🎬 handleStartRecording called", {

@@ -675,17 +675,7 @@ function ChatInterface({
                 <FileText className="w-4 h-4 mr-1" />
                 {isGeneratingFinalReport ? "Generating..." : "Detailed Report"}
               </Button>
-              {finalVideoUrl && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowEndScreen(false);
-                    setShowVideoReview(true);
-                  }}
-                >
-                  View Recording
-                </Button>
-                            )}
+
                {/* Only show session selector on main interview page, not when viewing a specific session */}
                {!urlSessionId && (
                  <SessionSelector 
@@ -850,26 +840,6 @@ function ChatInterface({
                       </ul>
                     </div>
                   </div>
-                  
-                  {/* Quick Actions */}
-                  <div className="pt-4 border-t">
-                    <Button 
-                      className="w-full" 
-                      onClick={() => {
-                        console.log("🔍 View Full Analysis clicked", {
-                          finalVideoUrl: !!finalVideoUrl,
-                          finalEvaluation: !!finalEvaluation,
-                          transcript: storedTranscript.length
-                        });
-                        // Always go to video review - it will show loading if video not ready
-                        setShowEndScreen(false);
-                        setShowVideoReview(true);
-                      }}
-                    >
-                      <FileText className="w-4 h-4 mr-1" />
-                      View Full Analysis
-                    </Button>
-                  </div>
                 </div>
               ) : (
                 <div className="flex-grow flex items-center justify-center">
@@ -917,21 +887,7 @@ function ChatInterface({
                     {storedTranscript.map((entry, index) => (
                       <div 
                         key={index} 
-                        className={cn(
-                          "text-sm p-3 rounded-lg transition-all",
-                          finalVideoUrl 
-                            ? "cursor-pointer hover:bg-white dark:hover:bg-gray-700 border border-transparent hover:border-gray-200 dark:hover:border-gray-600" 
-                            : "cursor-default"
-                        )}
-                        onClick={() => {
-                          if (finalVideoUrl) {
-                            // Go to video review page for seeking functionality
-                            setShowEndScreen(false);
-                            setShowVideoReview(true);
-                            console.log(`🎬 Redirecting to video review for timestamp: ${entry.timestamp}s`);
-                          }
-                        }}
-                        title={finalVideoUrl ? `Click to view video at ${new Date(entry.timestamp * 1000).toLocaleTimeString()}` : undefined}
+                        className="text-sm p-3 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
                       >
                         <div className="flex items-center gap-2 mb-1">
                           <Badge variant={entry.speaker === "user" ? "default" : "secondary"} className="text-xs">
@@ -940,11 +896,6 @@ function ChatInterface({
                           <span className="text-xs text-muted-foreground font-mono">
                             {new Date(entry.timestamp * 1000).toLocaleTimeString()}
                           </span>
-                          {finalVideoUrl && (
-                            <span className="text-xs text-blue-500">
-                              📹 Click to view
-                            </span>
-                          )}
                         </div>
                         <p className="text-muted-foreground pl-2 border-l-2 border-gray-200 dark:border-gray-600">
                           {entry.text}
@@ -1205,7 +1156,7 @@ export default function ClientComponent({
   // optional: use configId from environment variable
   const configId = process.env['NEXT_PUBLIC_HUME_CONFIG_ID'];
   
-  // Monitor video stream availability
+  // Monitor video stream availability (less frequently to reduce spam)
   useEffect(() => {
     const checkVideoStream = () => {
       const stream = videoRef.current?.getStream();
@@ -1223,8 +1174,8 @@ export default function ClientComponent({
       }
     };
     
-    // Check frequently
-    const interval = setInterval(checkVideoStream, 250);
+    // Check less frequently to reduce log spam
+    const interval = setInterval(checkVideoStream, 2000); // Every 2 seconds instead of 250ms
     checkVideoStream(); // Check immediately
     
     return () => clearInterval(interval);
