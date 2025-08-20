@@ -302,11 +302,17 @@ export async function buildSessionSettings(
   let caseContent = staticData.INTERVIEW_CASE_TEMPLATE || "Conduct a general interview appropriate for the selected difficulty level.";
   const hasCaseData = !!staticData.INTERVIEW_CASE_TEMPLATE;
   
-  // Check if we have document analysis to append
+  // Check if we have document analysis to append (SESSION-SPECIFIC - never cached)
   let documentAnalysis = "";
   try {
     const { supabase } = await import("./supabase-client");
     const analysisPath = `${sessionId}/document_analysis.txt`;
+    
+    console.log("📋 Looking for FRESH document analysis (no caching):", {
+      sessionId,
+      analysisPath,
+      note: "Each session gets its own analysis file"
+    });
     
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('documents')
@@ -318,7 +324,14 @@ export async function buildSessionSettings(
       const analysis = analysisData.analysis;
       
       if (analysis) {
-        console.log("📋 Found document analysis - appending to case prompt");
+        console.log("📋 Found FRESH document analysis for this session - appending to case prompt:", {
+          sessionId,
+          hasResume: !!analysis.resume_markdown,
+          hasJobDesc: !!analysis.job_description_markdown,
+          questionsCount: analysis.interview_questions?.length || 0,
+          processedAt: analysisData.processed_at
+        });
+        
         documentAnalysis = "\n\nDOCUMENT ANALYSIS:\n";
         
         if (analysis.resume_markdown) {
@@ -336,9 +349,15 @@ export async function buildSessionSettings(
           });
         }
       }
+    } else {
+      console.log("📋 No document analysis file found for this session:", {
+        sessionId,
+        analysisPath,
+        error: downloadError?.message || "File not found"
+      });
     }
   } catch (error) {
-    console.log("📋 No document analysis available for this session");
+    console.log("📋 No document analysis available for this session:", error);
   }
   
   // Append document analysis to case content if available
