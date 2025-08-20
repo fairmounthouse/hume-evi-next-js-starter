@@ -117,6 +117,9 @@ export const sessionProcessors: VariableProcessor[] = [
   }
 ];
 
+// Document-based processors (REMOVED - now handled directly in case prompt)
+export const documentProcessors: VariableProcessor[] = [];
+
 // Dynamic content processors
 export const contentProcessors: VariableProcessor[] = [
   {
@@ -212,11 +215,12 @@ export const patternProcessors: VariableProcessor[] = [
 export function initializeStandardProcessors(): void {
   const { variableRegistry } = require("./variable-substitution");
   
-  const allProcessors = [...timeProcessors, ...sessionProcessors, ...contentProcessors, ...patternProcessors];
+  const allProcessors = [...timeProcessors, ...sessionProcessors, ...documentProcessors, ...contentProcessors, ...patternProcessors];
   
   console.log("🚀 Initializing standard variable processors:", {
     timeProcessors: timeProcessors.length,
     sessionProcessors: sessionProcessors.length,
+    documentProcessors: documentProcessors.length,
     contentProcessors: contentProcessors.length,
     patternProcessors: patternProcessors.length,
     totalProcessors: allProcessors.length
