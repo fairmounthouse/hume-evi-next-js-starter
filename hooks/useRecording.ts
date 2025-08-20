@@ -16,13 +16,14 @@ export interface UseRecordingReturn {
   stopRecording: () => Promise<Blob | null>;
   pauseRecording: () => void;
   resumeRecording: () => void;
+  switchStream: (newStream: MediaStream) => void;
   error: string | null;
 }
 
 const DEFAULT_OPTIONS: RecordingOptions = {
   mimeType: "video/webm;codecs=vp8,opus",
-  videoBitsPerSecond: 2500000,
-  audioBitsPerSecond: 128000,
+  videoBitsPerSecond: 380000,  // 380kbps - optimized for 30min interviews under 100MB
+  audioBitsPerSecond: 64000,   // 64kbps - sufficient for voice interviews
 };
 
 export function useRecording(options: RecordingOptions = {}): UseRecordingReturn {
@@ -203,6 +204,49 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
     }
   }, []);
 
+  // Switch to a new stream while recording (seamless transition)
+  const switchStream = useCallback((newStream: MediaStream) => {
+    console.log("🔄 Switching recording stream:", {
+      isRecording,
+      oldStreamId: mediaRecorderRef.current?.stream?.id,
+      newStreamId: newStream.id
+    });
+    
+    if (!isRecording) {
+      console.log("⚠️ Not recording, no need to switch");
+      return;
+    }
+
+    const currentRecorder = mediaRecorderRef.current;
+    if (!currentRecorder) {
+      console.log("⚠️ No active recorder to switch");
+      return;
+    }
+
+    // Store current recording state
+    const currentDuration = duration;
+    const wasRecording = isRecording;
+    const wasPaused = isPaused;
+    
+    console.log("🔄 Stopping current recorder to switch streams...");
+    
+    // Stop current recording and immediately start new one
+    currentRecorder.onstop = () => {
+      console.log("🔄 Old recorder stopped, starting new one with different stream");
+      
+      // Start new recording with new stream
+      if (wasRecording && !wasPaused) {
+        // Preserve the duration from before the switch
+        const preservedStartTime = Date.now() - (currentDuration * 1000);
+        startTimeRef.current = preservedStartTime;
+        
+        startRecording(newStream);
+      }
+    };
+    
+    currentRecorder.stop();
+  }, [isRecording, duration, isPaused, startRecording]);
+
   return {
     isRecording,
     isPaused,
@@ -211,6 +255,7 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
     stopRecording,
     pauseRecording,
     resumeRecording,
+    switchStream,
     error,
   };
 }
