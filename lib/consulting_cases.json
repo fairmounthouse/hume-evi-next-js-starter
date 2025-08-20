@@ -1,0 +1,172 @@
+Current Time (UTC): {{now}}
+Total Elapsed Time: {{TOTAL_ELAPSED_TIME}}
+<case_overview>
+<title>Case 7: Race to the Bottom</title>
+<format>Interviewee-led case</format>
+<type>Profitability</type>
+<difficulty>Medium</difficulty>
+<industry>Airlines</industry>
+<stretch_area>Case Math</stretch_area>
+<total_time>30-35 minutes</total_time>
+</case_overview>
+
+## PHASE 1: BACKGROUND AND SETUP
+<phase_1>
+<estimated_time>5-7 minutes</estimated_time>
+
+<interviewer_says>
+"We have been hired by Bernard, the CEO of Gamma Airlines, a regional carrier in Germany. Their profitability has been declining since the past year and they want our support in thinking of next steps."
+</interviewer_says>
+
+<information_to_provide_only_if_candidate_asks>
+<if_asks_about_objective>
+"The objective is to understand why the profitability is declining and how the situation can be turned around."
+</if_asks_about_objective>
+
+<if_asks_about_geography_or_routes>
+"The client is a small regional airline carrier and operates only one route between Stuttgart, a smaller city with manufacturing hubs and Berlin, the capital of Germany. The flight is a non-stop flight with a duration of 1 hr 15 mins."
+</if_asks_about_geography_or_routes>
+
+<if_asks_about_competition>
+"Our competitors have also experienced a decline in their profitability in the last year but our decline in profitability has been more than them."
+</if_asks_about_competition>
+</information_to_provide_only_if_candidate_asks>
+
+<what_candidate_should_do>
+1. Restate the prompt briefly
+2. Optionally add context like "Airlines is traditionally a very low margin business..."
+3. Ask 2-3 clarifying questions about geography, objective, business model
+4. Ask for a moment to structure their approach
+</what_candidate_should_do>
+</phase_1>
+
+## PHASE 2: FRAMEWORK DEVELOPMENT
+<phase_2>
+<estimated_time>5-7 minutes</estimated_time>
+
+<what_candidate_should_do>
+Candidate should present a framework covering:
+1. Market (industry trends, competition, regulations)
+2. Revenue (price, volume, product mix)
+3. Cost (fixed and variable)
+4. Recommendations
+
+Candidate should provide a hypothesis to dig depper into the stiuation at the end
+</what_candidate_should_do>
+
+<this_is_the_candidate_model_answer>
+"As discussed before, we want to understand why the profitability has been declining in the past year. Since the other players in the industry have also been experiencing declines, my hypothesis would be that there could have been some regulatory change or a new entrant or an alternative travel option that could have started in the past year. Do we have any data that indicates any of these factors could have changed?"
+</this_is_the_candidate_model_answer>
+</phase_2>
+
+## PHASE 3: COMPETITIVE BENCHMARKING
+<phase_3>
+<estimated_time>5 minutes</estimated_time>
+
+<interviewer_says>
+"We performed a competitive benchmarking exercise with our competitors and have some information from the same. What are your observations here?"
+
+[Show Exhibit A - Operating Profit chart]
+</interviewer_says>
+
+<exhibit_a_data>
+Operating Profit in USD '000 (Regional Airlines; STR – BER)
+
+2023:
+- Gamma: 300
+- AirGer: 1000  
+- Beta: 200
+
+2024:
+- Gamma: 220
+- AirGer: 910
+- Beta: 178
+
+Note: The costs of operation of all three airlines have not changed significantly in the past year
+</exhibit_a_data>
+
+<what_candidate_should_observe>
+1. Three major players on the route; Gamma is second largest by profits
+2. All three airlines experienced declining profits
+3. Gamma's decline (~27%) is much worse than competitors (9% and 11%)
+4. Since costs haven't changed, revenues must be declining
+</what_candidate_should_observe>
+</phase_3>
+
+## PHASE 4: BRAINSTORMING
+<phase_4>
+<estimated_time>5-7 minutes</estimated_time>
+
+<interviewer_says>
+"Why do you think the revenues could have declined for all the players?"
+</interviewer_says>
+
+<what_candidate_should_do>
+1. Take 30-40 seconds to think
+2. Provide at least 4 ideas (interviewer should push if only 3)
+3. Structure ideas into external factors (regulations, alternative travel) and internal factors (new routes, airport issues)
+</what_candidate_should_do>
+
+<this_is_the_model_answer_for_the_candidate>
+"In the past year, there have been no significant changes in the regulations around the airline industry or changes in infrastructure or weather closures. However, there has been a new high-speed train that has been introduced between the two cities which takes only 2.5 hrs for commuters. The train station in Berlin is also located very close to the business center."
+</this_is_the_model_answer_for_the_candidate>
+</phase_4>
+
+## PHASE 5: REVENUE ANALYSIS
+<phase_5>
+<estimated_time>7-8 minutes</estimated_time>
+
+<interviewer_says>
+"Can you help us estimate Gamma's average revenue per flight in 2023 and 2024?"
+
+[Show Exhibit B - Parameters table]
+
+"After the calculations, what do you think are the reasons for higher revenue declines for us and what could we do to overturn this?"
+</interviewer_says>
+
+<exhibit_b_data>
+[Table with passenger types, occupied seats, and prices for all three airlines]
+</exhibit_b_data>
+
+<what_candidate_should_calculate>
+Gamma 2023: (0.3 × 200 × $300) + (0.7 × 200 × $80) = $29,200
+Gamma 2024: (0.1 × 180 × $250) + (0.9 × 180 × $80) = $17,460
+</what_candidate_should_calculate>
+
+<interviewer_provides_after_calculation>
+"Here are the other airlines' revenues:
+- AirGer 2023: $24,480 and 2024: $21,340
+- Beta 2023: $10,800 and 2024: $9,600"
+</interviewer_provides_after_calculation>
+
+<what_candidate_should_analyze>
+1. Gamma lost more business passengers to the train than competitors
+2. Business passengers prefer train for time savings and proximity to business district
+3. AirGer retained business passengers better (possibly loyalty programs)
+4. Business class prices declined due to train competition
+5. Solutions: priority check-ins, WiFi, cab rides, better meals
+</what_candidate_should_analyze>
+</phase_5>
+
+## PHASE 6: RECOMMENDATION
+<phase_6>
+<estimated_time>3-5 minutes</estimated_time>
+
+<interviewer_says>
+"The CEO is about to walk into the room, what are your recommendations for him?"
+
+[If candidate asks for time to structure: "You can take 30 seconds if you need."]
+</interviewer_says>
+
+<what_candidate_should_provide>
+A structured recommendation including:
+1. Main recommendation (focus on business differentiation, increase load factor, explore new routes)
+2. Supporting reasons (3 key points)
+3. Risks (customer preferences, financial burden)
+4. Next steps (customer analysis, route evaluation)
+</what_candidate_should_provide>
+</phase_6>
+
+<case_end>
+"Thank you for your analysis. Do you have any questions about the case?"
+</case_end>
