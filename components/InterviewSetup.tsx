@@ -10,6 +10,7 @@ import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Spark
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
+import DocumentUpload from "./DocumentUpload";
 import { useRouter } from "next/navigation";
 
 interface InterviewCase {
@@ -22,6 +23,7 @@ interface InterviewCase {
   stretch_area: string;
   total_time: string;
   overview: string;
+  requires_documents: boolean; // NEW: Flag for document requirements
   phases: Array<{
     name: string;
     details: string;
@@ -47,6 +49,7 @@ interface InterviewSetupProps {
     caseId: string;
     interviewerId: string;
     difficultyId: string;
+    sessionId?: string; // NEW: Pass session ID from document upload
   }) => void;
 }
 
@@ -67,6 +70,8 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   
   const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(1);
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [documentSessionId, setDocumentSessionId] = useState<string>("");
   
   // Handle session selection from SessionSelector
   const handleSessionSelect = (sessionId: string) => {
@@ -119,12 +124,42 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
   const handleStartInterview = () => {
     if (canProceed) {
-      onStartInterview({
-        caseId: selectedCase,
-        interviewerId: selectedInterviewer,
-        difficultyId: selectedDifficulty
-      });
+      // Check if the selected case requires documents
+      const selectedCaseData = cases.find(c => c.id === selectedCase);
+      const requiresDocuments = selectedCaseData?.requires_documents || false;
+      
+      if (requiresDocuments) {
+        console.log("📋 Case requires documents - showing document upload screen");
+        // Generate session ID once for document upload and interview
+        const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        setDocumentSessionId(sessionId);
+        setShowDocumentUpload(true);
+      } else {
+        console.log("📋 Case doesn't require documents - proceeding directly to interview");
+        onStartInterview({
+          caseId: selectedCase,
+          interviewerId: selectedInterviewer,
+          difficultyId: selectedDifficulty
+        });
+      }
     }
+  };
+
+  // Handle document upload completion
+  const handleDocumentUploadComplete = () => {
+    console.log("📋 Documents processed - proceeding to interview", { 
+      documentSessionId,
+      hasDocumentData: !!documentSessionId 
+    });
+    setShowDocumentUpload(false);
+    
+    // Use the same session ID that was used for document processing
+    onStartInterview({
+      caseId: selectedCase,
+      interviewerId: selectedInterviewer,
+      difficultyId: selectedDifficulty,
+      sessionId: documentSessionId // Pass the session ID that has the document data
+    });
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -155,6 +190,16 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
           className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"
         />
       </div>
+    );
+  }
+
+  // Show document upload screen if case requires documents
+  if (showDocumentUpload && documentSessionId) {
+    return (
+      <DocumentUpload 
+        sessionId={documentSessionId}
+        onContinue={handleDocumentUploadComplete}
+      />
     );
   }
 
@@ -315,6 +360,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             <div className="flex justify-between items-start mb-3">
                               <h3 className="font-semibold text-lg">{case_.title}</h3>
                               <div className="flex gap-2">
+                                {case_.requires_documents && (
+                                  <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                    📄 Requires Documents
+                                  </Badge>
+                                )}
                                 {case_.type && (
                                   <Badge className={getTypeColor(case_.type)}>
                                     {case_.type}

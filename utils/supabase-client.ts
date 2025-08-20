@@ -156,6 +156,11 @@ export async function upsertInterviewSession(sessionData: Partial<InterviewSessi
       // We store the real transcript in Supabase Storage; this field just needs a non-null placeholder
       (sessionDataWithoutTranscript as any).transcript_data = '';
     }
+    
+    // Ensure started_at is never null
+    if (!sessionDataWithoutTranscript.started_at) {
+      (sessionDataWithoutTranscript as any).started_at = new Date().toISOString();
+    }
 
     const { error } = await supabase
       .from('interview_sessions')
@@ -376,5 +381,25 @@ export async function listCompletedSessions(limit: number = 10): Promise<Intervi
   } catch (error) {
     console.error('Error listing completed sessions:', error);
     return [];
+  }
+}
+
+// Get document analysis from cache for a session
+export async function getDocumentAnalysis(sessionId: string): Promise<any | null> {
+  try {
+    const { sessionCache } = await import("./session-cache");
+    const cacheKey = `document_analysis_${sessionId}`;
+    const analysis = sessionCache.get(cacheKey);
+    
+    console.log("📋 Retrieved document analysis from cache:", {
+      sessionId,
+      hasAnalysis: !!analysis,
+      cacheKey
+    });
+    
+    return analysis || null;
+  } catch (error) {
+    console.error('Error getting document analysis:', error);
+    return null;
   }
 }

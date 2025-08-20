@@ -153,26 +153,47 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
     phaseDurations: caseMetadata?.phases?.map(p => p.duration) || []
   });
 
+  // Extract data with clear logging of what's missing
+  const interviewerIdentity = data.interviewer_profiles?.prompt_id?.prompt_content;
+  const caseTemplate = data.interview_cases?.prompt_id?.prompt_content;
+  const difficultyPrompt = data.difficulty_profiles?.prompt_id?.prompt_content || data.difficulty_profiles?.display_name;
+  
+  // Log missing data clearly
+  if (!interviewerIdentity) {
+    console.log("⚠️ No interviewer identity found in database - will use professional fallback");
+  }
+  if (!caseTemplate) {
+    console.log("⚠️ No case template found in database - will use general interview fallback");
+  }
+  if (!difficultyPrompt) {
+    console.log("⚠️ No difficulty prompt found in database - will use professional level fallback");
+  }
+  if (!caseMetadata) {
+    console.log("⚠️ No phase metadata found in database - will run as free-form interview");
+  }
+  if (!coachingConfig) {
+    console.log("⚠️ No coaching config found in database - will use professional approach fallback");
+  }
+
   // Cache the static data for the entire session duration
   const staticData = {
-    INTERVIEWER_IDENTITY: data.interviewer_profiles?.prompt_id?.prompt_content || "Default AI Interviewer",
-    INTERVIEW_CASE_TEMPLATE: data.interview_cases?.prompt_id?.prompt_content || "General Interview Case",
-    DIFFICULTY_PROMPT: data.difficulty_profiles?.prompt_id?.prompt_content || data.difficulty_profiles?.display_name || "Mid Level",
+    INTERVIEWER_IDENTITY: interviewerIdentity,
+    INTERVIEW_CASE_TEMPLATE: caseTemplate,
+    DIFFICULTY_PROMPT: difficultyPrompt,
     caseMetadata,
     coachingConfig
   };
 
   // Cache for the entire session (long TTL since this never changes)
   sessionCache.set(cacheKey, staticData, 60 * 60 * 1000); // 1 hour
-  console.log("✅ Session settings cached with case metadata and coaching config");
-  console.log("💾 Cached data summary:", {
-    hasInterviewerIdentity: !!staticData.INTERVIEWER_IDENTITY,
-    interviewerIdentityLength: staticData.INTERVIEWER_IDENTITY?.length || 0,
-    hasCaseTemplate: !!staticData.INTERVIEW_CASE_TEMPLATE,
-    caseTemplateLength: staticData.INTERVIEW_CASE_TEMPLATE?.length || 0,
-    hasDifficultyPrompt: !!staticData.DIFFICULTY_PROMPT,
-    hasCaseMetadata: !!staticData.caseMetadata,
-    hasCoachingConfig: !!staticData.coachingConfig,
+  
+  console.log("✅ Session settings cached with graceful fallback handling");
+  console.log("💾 Data source summary:", {
+    interviewer: interviewerIdentity ? "database" : "will_use_fallback",
+    case: caseTemplate ? "database" : "will_use_fallback", 
+    difficulty: difficultyPrompt ? "database" : "will_use_fallback",
+    phases: caseMetadata ? "database" : "will_use_fallback",
+    coaching: coachingConfig ? "database" : "will_use_fallback",
     cacheKey
   });
 }
@@ -264,50 +285,118 @@ export async function buildSessionSettings(
   const allSubstitutions: any[] = [];
   const allWarnings: any[] = [];
   
-  // Process interviewer identity
-  const interviewerResult = await globalSubstituteVariables(
-    staticData.INTERVIEWER_IDENTITY || "Default AI Interviewer",
-    substitutionContext
-  );
+  // Process interviewer identity with elegant fallback
+  const interviewerContent = staticData.INTERVIEWER_IDENTITY || "You are a professional AI interviewer conducting this interview.";
+  const hasInterviewerData = !!staticData.INTERVIEWER_IDENTITY;
+  console.log("👤 Interviewer identity:", {
+    hasCustomIdentity: hasInterviewerData,
+    contentLength: interviewerContent.length,
+    usingFallback: !hasInterviewerData
+  });
+  
+  const interviewerResult = await globalSubstituteVariables(interviewerContent, substitutionContext);
   allSubstitutions.push(...interviewerResult.substitutions);
   allWarnings.push(...interviewerResult.warnings);
   
-  // Process interview case
-  const caseResult = await globalSubstituteVariables(
-    staticData.INTERVIEW_CASE_TEMPLATE || "General Interview Case",
-    substitutionContext
-  );
+  // Process interview case with elegant fallback + document analysis
+  let caseContent = staticData.INTERVIEW_CASE_TEMPLATE || "Conduct a general interview appropriate for the selected difficulty level.";
+  const hasCaseData = !!staticData.INTERVIEW_CASE_TEMPLATE;
+  
+  // Check if we have document analysis to append
+  let documentAnalysis = "";
+  try {
+    const { supabase } = await import("./supabase-client");
+    const analysisPath = `${sessionId}/document_analysis.txt`;
+    
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(analysisPath);
+    
+    if (!downloadError && fileData) {
+      const fileText = await fileData.text();
+      const analysisData = JSON.parse(fileText);
+      const analysis = analysisData.analysis;
+      
+      if (analysis) {
+        console.log("📋 Found document analysis - appending to case prompt");
+        documentAnalysis = "\n\nDOCUMENT ANALYSIS:\n";
+        
+        if (analysis.resume_markdown) {
+          documentAnalysis += `CANDIDATE RESUME:\n${analysis.resume_markdown}\n\n`;
+        }
+        
+        if (analysis.job_description_markdown) {
+          documentAnalysis += `JOB DESCRIPTION:\n${analysis.job_description_markdown}\n\n`;
+        }
+        
+        if (analysis.interview_questions && analysis.interview_questions.length > 0) {
+          documentAnalysis += `SUGGESTED PERSONALIZED QUESTIONS:\n`;
+          analysis.interview_questions.forEach((question: string, index: number) => {
+            documentAnalysis += `${index + 1}. ${question}\n`;
+          });
+        }
+      }
+    }
+  } catch (error) {
+    console.log("📋 No document analysis available for this session");
+  }
+  
+  // Append document analysis to case content if available
+  const finalCaseContent = caseContent + documentAnalysis;
+  
+  console.log("📋 Interview case:", {
+    hasCustomCase: hasCaseData,
+    originalContentLength: caseContent.length,
+    hasDocumentAnalysis: !!documentAnalysis,
+    documentAnalysisLength: documentAnalysis.length,
+    finalContentLength: finalCaseContent.length,
+    usingFallback: !hasCaseData
+  });
+  
+  const caseResult = await globalSubstituteVariables(finalCaseContent, substitutionContext);
   allSubstitutions.push(...caseResult.substitutions);
   allWarnings.push(...caseResult.warnings);
   
-  // SIMPLE: If coaching toggle is ON → send enabled prompt, if OFF → send disabled prompt
-  let rawCoachingPrompt = staticData.DIFFICULTY_PROMPT; // fallback
+  // Process coaching prompt with elegant fallback
+  let rawCoachingPrompt = "Maintain a professional interview approach appropriate for the difficulty level."; // elegant fallback
+  let hasCoachingConfig = false;
+  
   if (staticData.coachingConfig) {
-    // Simple boolean check - no complex logic needed
+    hasCoachingConfig = true;
     const isCoachingOn = coachModeEnabled === true;
     rawCoachingPrompt = isCoachingOn 
       ? staticData.coachingConfig.enabled_content   // Coaching ON
       : staticData.coachingConfig.disabled_content; // Coaching OFF
     
-    console.log("🎓 Simple coaching prompt selection:", {
+    console.log("🎓 Coaching prompt selection:", {
+      hasCoachingConfig: true,
       coachModeEnabled,
       isCoachingOn,
       promptType: isCoachingOn ? "ENABLED" : "DISABLED",
       promptLength: rawCoachingPrompt.length
     });
   } else {
-    console.log("⚠️ No coaching config found, using difficulty prompt as fallback");
+    console.log("🎓 Coaching configuration:", {
+      hasCoachingConfig: false,
+      usingFallback: true,
+      fallbackPrompt: "Professional interview approach"
+    });
   }
   
   const coachingResult = await globalSubstituteVariables(rawCoachingPrompt, substitutionContext);
   allSubstitutions.push(...coachingResult.substitutions);
   allWarnings.push(...coachingResult.warnings);
   
-  // Process difficulty prompt
-  const difficultyResult = await globalSubstituteVariables(
-    staticData.DIFFICULTY_PROMPT || "Mid Level",
-    substitutionContext
-  );
+  // Process difficulty prompt with elegant fallback
+  const difficultyContent = staticData.DIFFICULTY_PROMPT || "Conduct an interview at an appropriate professional level.";
+  const hasDifficultyData = !!staticData.DIFFICULTY_PROMPT;
+  console.log("⚡ Difficulty prompt:", {
+    hasCustomDifficulty: hasDifficultyData,
+    contentLength: difficultyContent.length,
+    usingFallback: !hasDifficultyData
+  });
+  
+  const difficultyResult = await globalSubstituteVariables(difficultyContent, substitutionContext);
   allSubstitutions.push(...difficultyResult.substitutions);
   allWarnings.push(...difficultyResult.warnings);
 
@@ -333,11 +422,24 @@ export async function buildSessionSettings(
     now: currentTime, // We can override Hume's built-in 'now' with our format
   };
 
-  console.log("📝 Final variables built:", {
-    INTERVIEWER_IDENTITY_length: variables.INTERVIEWER_IDENTITY?.toString().length || 0,
-    INTERVIEW_CASE_length: variables.INTERVIEW_CASE?.toString().length || 0,
-    COACHING_PROMPT_length: variables.COACHING_PROMPT?.toString().length || 0,
-    DIFFICULTY_PROMPT_length: variables.DIFFICULTY_PROMPT?.toString().length || 0,
+  // Enhanced logging showing data source quality
+  console.log("📝 Final variables built with data sources:", {
+    INTERVIEWER_IDENTITY: {
+      length: variables.INTERVIEWER_IDENTITY?.toString().length || 0,
+      source: hasInterviewerData ? "database" : "fallback"
+    },
+    INTERVIEW_CASE: {
+      length: variables.INTERVIEW_CASE?.toString().length || 0,
+      source: hasCaseData ? "database" : "fallback"
+    },
+    COACHING_PROMPT: {
+      length: variables.COACHING_PROMPT?.toString().length || 0,
+      source: hasCoachingConfig ? "database" : "fallback"
+    },
+    DIFFICULTY_PROMPT: {
+      length: variables.DIFFICULTY_PROMPT?.toString().length || 0,
+      source: hasDifficultyData ? "database" : "fallback"
+    },
     TOTAL_ELAPSED_TIME: variables.TOTAL_ELAPSED_TIME,
     now: variables.now
   });
@@ -360,7 +462,7 @@ export async function buildSessionSettings(
   // OLD SYSTEM APPROACH: Build dynamic context fresh every time (no caching)
   const contextParts: string[] = [];
   
-  // 1. ALWAYS ADD: Phase status if available (computed fresh)
+  // 1. CONDITIONALLY ADD: Phase status ONLY if phases exist (computed fresh)
   if (currentPhase && staticData.caseMetadata) {
     const phaseStatus = getPhaseStatus(currentPhase, staticData.caseMetadata, elapsedTime);
     contextParts.push(phaseStatus);
@@ -371,7 +473,7 @@ export async function buildSessionSettings(
       computedAt: Date.now()
     });
   } else {
-    console.log("⚠️ No phase status added - missing currentPhase or caseMetadata");
+    console.log("✅ No phases configured for this case - skipping phase context entirely for cleaner session");
   }
   
   // 2. CONDITIONALLY ADD: Phase timing nudges (computed fresh)
@@ -418,13 +520,33 @@ export async function buildSessionSettings(
     console.log("📤 No context parts - sending variables only");
   }
 
+  // Summary of data quality and session configuration
+  const dataQualitySummary = {
+    customData: {
+      interviewer: hasInterviewerData,
+      case: hasCaseData, 
+      coaching: hasCoachingConfig,
+      difficulty: hasDifficultyData,
+      phases: !!(currentPhase && staticData.caseMetadata)
+    },
+    fallbacksUsed: {
+      interviewer: !hasInterviewerData,
+      case: !hasCaseData,
+      coaching: !hasCoachingConfig, 
+      difficulty: !hasDifficultyData,
+      phases: !(currentPhase && staticData.caseMetadata)
+    }
+  };
+  
+  console.log("🎯 Session data quality summary:", dataQualitySummary);
   console.log("🎯 Final session settings ready:", {
     type: settings.type,
     hasVariables: !!settings.variables,
     variableCount: Object.keys(settings.variables || {}).length,
     hasTranscription: !!settings.transcription,
     hasContext: !!settings.context,
-    settingsSize: JSON.stringify(settings).length
+    settingsSize: JSON.stringify(settings).length,
+    contextType: settings.context ? "phase_timing" : "variables_only"
   });
 
   // Log the complete payload that will be sent to Hume (for debugging)
@@ -502,7 +624,10 @@ function getCurrentPhase(elapsedMs: number, caseMetadata: CaseMetadata | null): 
 
 // Generate detailed phase status context (exactly like old system)
 function getPhaseStatus(currentPhase: CurrentPhase | null, caseMetadata: CaseMetadata | null, elapsedTime: string): string {
+  // This function should only be called when phases exist
+  // If no phases, the caller should not call this function at all
   if (!currentPhase || !caseMetadata) {
+    console.warn("⚠️ getPhaseStatus called without valid phase data - this should not happen");
     return `INTERVIEW TIMING & PHASE STATUS (sent every session update):\n\nTotal elapsed time: ${elapsedTime}\nNo phase information available.`;
   }
 
