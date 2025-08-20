@@ -49,8 +49,26 @@ function ChatInterface({
   setShowEndScreen,
 }: any) {
   const { messages, sendSessionSettings, status } = useVoice();
+  
+  // Log status changes for debugging
+  useEffect(() => {
+    console.log("🔌 Hume connection status changed:", {
+      status: status.value,
+      timestamp: new Date().toISOString(),
+      sessionId
+    });
+  }, [status.value, sessionId]);
   const [coachingMode, setCoachingMode] = useState(false);
   const [isUpdatingCoaching, setIsUpdatingCoaching] = useState(false);
+  
+  // Expose coaching mode globally for other components (local state only)
+  useEffect(() => {
+    (window as any).__getCurrentCoachingMode = () => coachingMode;
+    
+    return () => {
+      delete (window as any).__getCurrentCoachingMode;
+    };
+  }, [coachingMode]);
   const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
 
   const [finalEvaluation, setFinalEvaluation] = useState<any>(null);
@@ -180,10 +198,21 @@ function ChatInterface({
     // Always update the ref with current messages
     currentMessagesRef.current = messages;
     
+    console.log("📨 Messages updated:", {
+      messageCount: messages.length,
+      isCallActive,
+      messageTypes: messages.map(m => m.type),
+      lastMessage: messages[messages.length - 1]?.type || "none"
+    });
+    
     if (isCallActive && messages.length > 0) {
       const newTranscript = buildTranscriptFromMessages(messages);
       setStoredTranscript(newTranscript);
-      console.log("💾 [CHAT] Updated stored transcript:", newTranscript.length, "entries");
+      console.log("💾 Updated stored transcript:", {
+        messagesProcessed: messages.length,
+        transcriptEntries: newTranscript.length,
+        isCallActive
+      });
     }
   }, [messages, isCallActive]);
 
@@ -398,39 +427,66 @@ function ChatInterface({
     }, [showEndScreen, storedTranscript, finalEvaluation, isGeneratingFinalReport, transcriptEvaluator]);
   
     const handleCoachingToggle = async (enabled: boolean) => {
-    if (isUpdatingCoaching) return;
+    if (isUpdatingCoaching) {
+      console.log("⚠️ Coaching toggle already in progress, ignoring");
+      return;
+    }
+    
+    console.log("🎓 Coaching mode toggle initiated (LOCAL ONLY - no database update):", {
+      sessionId,
+      newState: enabled,
+      previousState: coachingMode,
+      isConnected: status.value === "connected"
+    });
     
     setIsUpdatingCoaching(true);
     
     try {
-      // Update database
-      const { supabase } = await import("@/utils/supabase-client");
-      const { error } = await supabase
-        .from("interview_sessions")
-        .update({ coach_mode_enabled: enabled })
-        .eq("session_id", sessionId);
-      
-      if (error) {
-        toast.error("Failed to update coaching mode");
-        return;
-      }
-
-      // Update local state
+      // NO DATABASE UPDATE - just local state change
+      // Database is only for prompt lookup, not state storage
+      console.log("🔄 Updating local coaching state (no database write)");
       setCoachingMode(enabled);
+      console.log("✅ Local coaching state updated:", { newCoachingMode: enabled });
       
-      // Send updated session settings to Hume immediately
+      // Send updated session settings to Hume immediately with enhanced context
       if (status.value === "connected") {
-        const { buildSessionSettings } = await import("@/utils/session-context");
+        console.log("🔌 Sending real-time coaching update to Hume...");
+        const { buildSessionSettings, initializeSessionSettings } = await import("@/utils/session-context");
+        
+        // Ensure session is initialized
+        await initializeSessionSettings(sessionId);
+        
+        // Calculate elapsed time from start of interview
+        const elapsed = (window as any).__getInterviewElapsed ? (window as any).__getInterviewElapsed() : 0;
+        console.log("⏱️ Interview elapsed time for coaching update:", {
+          elapsedMs: elapsed,
+          elapsedMinutes: Math.round(elapsed / 60000 * 10) / 10
+        });
+        
+        const temporaryContext = `Coaching mode manually ${enabled ? 'enabled' : 'disabled'} by user.`;
+        console.log("📝 Building session settings with coaching change:", {
+          temporaryContext,
+          newCoachingMode: enabled
+        });
+        
         const sessionSettings = await buildSessionSettings(
           sessionId,
-          0, // elapsed time will be calculated properly
-          "active", // current phase
-          undefined, // no temporary context
+          elapsed,
+          undefined, // startTime will be calculated internally
+          temporaryContext, // temporary context
           enabled // pass the new coaching mode
         );
         
+        console.log("📤 Sending coaching update to Hume:", {
+          settingsSize: JSON.stringify(sessionSettings).length,
+          hasContext: !!sessionSettings.context,
+          contextIncludes: sessionSettings.context?.text?.includes("Coaching mode manually") || false
+        });
+        
         await sendSessionSettings(sessionSettings as any);
-        console.log("✅ Coaching mode updated in real-time");
+        console.log("✅ Coaching mode updated in real-time with enhanced context");
+      } else {
+        console.log("⚠️ Not connected to Hume - coaching update will apply on next connection");
       }
       
       toast.success(enabled ? "Coaching mode enabled! 🎓" : "Coaching mode disabled");
@@ -1230,7 +1286,14 @@ export default function ClientComponent({
       }
     >
       <VoiceProvider
-        onMessage={() => {
+        onMessage={(msg: any) => {
+          console.log("📨 Message received from Hume:", {
+            type: msg?.type,
+            hasContent: !!msg?.content,
+            contentLength: msg?.content?.length || 0,
+            timestamp: new Date().toISOString()
+          });
+
           if (timeout.current) {
             window.clearTimeout(timeout.current);
           }
@@ -1247,6 +1310,11 @@ export default function ClientComponent({
           }, 200);
         }}
         onError={(error) => {
+          console.error("❌ Hume VoiceProvider error:", {
+            message: error.message,
+            timestamp: new Date().toISOString(),
+            errorDetails: error
+          });
           toast.error(error.message);
         }}
         onAudioReceived={async (msg: any) => {
@@ -1267,9 +1335,15 @@ export default function ClientComponent({
             }
           }
         }}
-        onAudioStart={() => assistantBus.resume()}
+        onAudioStart={() => {
+          console.log("🔊 Audio playback started from Hume");
+          assistantBus.resume();
+        }}
         onAudioEnd={(clipId) => {
-          console.log("🔇 Audio finished playing:", clipId);
+          console.log("🔇 Audio finished playing:", {
+            clipId,
+            timestamp: new Date().toISOString()
+          });
         }}
 
       >
