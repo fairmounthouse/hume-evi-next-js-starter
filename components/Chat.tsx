@@ -20,6 +20,9 @@ import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
 import TranscriptEvaluator from "@/utils/transcriptEvaluator";
 import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
+import EnhancedDetailedAnalysis from "./EnhancedDetailedAnalysis";
+import TranscriptDrawer from "./TranscriptDrawer";
+import FloatingTranscriptButton from "./FloatingTranscriptButton";
 
 // Chat interface component with voice interaction capabilities
 function ChatInterface({
@@ -81,6 +84,7 @@ function ChatInterface({
   const [endScreenDataStored, setEndScreenDataStored] = useState(false);
   const [isVideoProcessing, setIsVideoProcessing] = useState(false);
   const [videoCheckInterval, setVideoCheckInterval] = useState<NodeJS.Timeout | null>(null);
+  const [isTranscriptDrawerOpen, setIsTranscriptDrawerOpen] = useState(false);
 
   // Function to load end screen data from cache
   const loadEndScreenFromCache = useCallback(async (targetSessionId: string) => {
@@ -754,9 +758,16 @@ function ChatInterface({
           
           {/* Main Content Area - Scrollable */}
           <div className="flex-grow overflow-hidden p-6">
-            <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div 
+              className={cn(
+                "h-full grid gap-4",
+                isTranscriptDrawerOpen 
+                  ? "grid-cols-1 lg:grid-cols-[25%_45%_30%]" 
+                  : "grid-cols-1 lg:grid-cols-[30%_70%]"
+              )}
+            >
             {/* Video Preview with Direct Seeking */}
-            <Card className="p-6 flex flex-col">
+            <Card className="p-6 flex flex-col" style={{ minWidth: '280px' }}>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <span>🎥</span>
                 Interview Recording
@@ -821,83 +832,31 @@ function ChatInterface({
               </div>
             </Card>
 
-            {/* Detailed Analysis */}
-            <Card className="p-6 flex flex-col">
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Detailed Analysis
-              </h3>
-              
-              {isGeneratingFinalReport ? (
+            {/* Enhanced Detailed Analysis */}
+            {isGeneratingFinalReport ? (
+              <Card className="p-6 flex flex-col">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Detailed Analysis
+                </h3>
                 <div className="flex-grow flex items-center justify-center">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
                     <p className="text-sm text-blue-600 dark:text-blue-400">Generating detailed analysis...</p>
                   </div>
                 </div>
-              ) : finalEvaluation ? (
-                <div className="flex-grow overflow-y-auto space-y-3 pr-1">
-                  {/* Overall Score */}
-                  <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className={cn("text-2xl font-bold mb-1", 
-                      finalEvaluation.summary.total_score >= 80 ? "text-green-600" :
-                      finalEvaluation.summary.total_score >= 60 ? "text-yellow-600" : "text-red-600"
-                    )}>
-                      {finalEvaluation.summary.total_score}/100
-                    </div>
-                    <p className="text-sm text-muted-foreground">Overall Score</p>
-                  </div>
-                  
-                  {/* Hiring Recommendation */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg">
-                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Hiring Recommendation</p>
-                    <p className="text-xs text-gray-700 dark:text-gray-300">{finalEvaluation.summary.hiring_recommendation}</p>
-                  </div>
-                  
-                  {/* Key Factors */}
-                  <div className="space-y-2">
-                    <h4 className="font-semibold text-sm">Key Evaluation Factors</h4>
-                    {finalEvaluation.factors.slice(0, 3).map((factor: any, index: number) => (
-                      <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                        <span className="text-sm">{factor.factor_name}</span>
-                        <Badge className={cn(
-                          factor.score >= 8 ? "bg-green-100 text-green-800" :
-                          factor.score >= 6 ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
-                        )}>
-                          {factor.score}/10
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Key Strengths & Weaknesses */}
-                  <div className="space-y-3 pt-3 border-t">
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2 text-green-600 dark:text-green-400">Key Strengths</h4>
-                      <ul className="space-y-1">
-                        {finalEvaluation.summary.key_strengths.slice(0, 2).map((strength: string, index: number) => (
-                          <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1">
-                            <span className="text-green-500 mt-0.5">•</span>
-                            {strength}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2 text-red-600 dark:text-red-400">Areas for Improvement</h4>
-                      <ul className="space-y-1">
-                        {finalEvaluation.summary.critical_weaknesses.slice(0, 2).map((weakness: string, index: number) => (
-                          <li key={index} className="text-xs text-gray-600 dark:text-gray-400 flex items-start gap-1">
-                            <span className="text-red-500 mt-0.5">•</span>
-                            {weakness}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              </Card>
+            ) : finalEvaluation ? (
+              <EnhancedDetailedAnalysis 
+                evaluation={finalEvaluation} 
+                confidence={finalEvaluation.confidence}
+              />
+            ) : (
+              <Card className="p-6 flex flex-col">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Detailed Analysis
+                </h3>
                 <div className="flex-grow flex items-center justify-center">
                   <div className="text-center">
                     <Button 
@@ -909,65 +868,27 @@ function ChatInterface({
                     </Button>
                   </div>
                 </div>
-              )}
-            </Card>
-            
-            {/* Transcript Preview */}
-            <Card className="p-6 flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Transcript Preview</h3>
-                <div className="flex gap-1">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => downloadTranscript('txt')}
-                    disabled={storedTranscript.length === 0}
-                  >
-                    <Download className="w-3 h-3 mr-1" />
-                    TXT
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => downloadTranscript('json')}
-                    disabled={storedTranscript.length === 0}
-                  >
-                    <Download className="w-3 h-3 mr-1" />
-                    JSON
-                  </Button>
-                </div>
-              </div>
-              <div className="flex-grow bg-gray-50 dark:bg-gray-800 rounded-lg p-4 overflow-y-auto max-h-[600px]">
-                {storedTranscript.length > 0 ? (
-                  <div className="space-y-3">
-                    {storedTranscript.map((entry, index) => (
-                      <div 
-                        key={index} 
-                        className="text-sm p-3 rounded-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant={entry.speaker === "user" ? "default" : "secondary"} className="text-xs">
-                            {entry.speaker === "user" ? "Interviewee" : "AI Interviewer"}
-                          </Badge>
-                          <span className="text-xs text-muted-foreground font-mono">
-                            {new Date(entry.timestamp * 1000).toLocaleTimeString()}
-                          </span>
-                        </div>
-                        <p className="text-muted-foreground pl-2 border-l-2 border-gray-200 dark:border-gray-600">
-                          {entry.text}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center">No transcript data available</p>
-                )}
-              </div>
-              
-
-            </Card>
+              </Card>
+            )}
             </div>
           </div>
+          
+          {/* Floating Transcript Button */}
+          <FloatingTranscriptButton onClick={() => setIsTranscriptDrawerOpen(true)} />
+          
+          {/* Transcript Drawer */}
+          <TranscriptDrawer
+            isOpen={isTranscriptDrawerOpen}
+            onClose={() => setIsTranscriptDrawerOpen(false)}
+            transcript={storedTranscript.map(entry => ({
+              id: entry.id || `${entry.timestamp}-${entry.speaker}`,
+              speaker: entry.speaker,
+              text: entry.text,
+              timestamp: entry.timestamp * 1000, // Convert to milliseconds
+              emotions: entry.emotions,
+              confidence: entry.confidence
+            }))}
+          />
         </div>
       ) : showVideoReview ? (
         <div className="grow flex flex-col overflow-hidden pt-14 p-6">
