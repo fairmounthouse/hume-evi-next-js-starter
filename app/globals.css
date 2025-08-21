@@ -121,3 +121,598 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ================================
+   EXHIBIT DISPLAY SYSTEM STYLES
+   ================================ */
+
+/* Base container styling - normal interview mode */
+.main-container {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 180px); /* Normal height when no exhibit */
+  padding: 16px;
+  padding-bottom: 80px; /* Normal padding */
+  transition: all 0.3s ease;
+}
+
+/* Ensure end screen is not affected by exhibit styles */
+.interview-end-screen .main-container,
+.interview-end-screen .exhibit-active,
+.interview-end-screen .transcript-collapsed {
+  display: block !important;
+  grid-template-columns: unset !important;
+  grid-template-rows: unset !important;
+  height: auto !important;
+  padding: 0 !important;
+}
+
+/* Hide all exhibit-related elements on end screen */
+.interview-end-screen .exhibit-viewer,
+.interview-end-screen .exhibit-column,
+.interview-end-screen .exhibit-controls,
+.interview-end-screen .exhibit-close,
+.interview-end-screen .exhibit-tabs {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Ensure transcript scrolling works on all screens */
+.interview-end-screen .transcript-content,
+.transcript-content {
+  overflow-y: auto !important;
+  max-height: 100% !important;
+}
+
+/* Custom scrollbar for transcript */
+.transcript-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.transcript-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.dark .transcript-content::-webkit-scrollbar-track {
+  background: rgb(55 65 81);
+}
+
+.transcript-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.dark .transcript-content::-webkit-scrollbar-thumb {
+  background: rgb(107 114 128);
+}
+
+.transcript-content::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+.dark .transcript-content::-webkit-scrollbar-thumb:hover {
+  background: rgb(156 163 175);
+}
+
+/* When exhibit is active, switch to 3-column grid with more height */
+.main-container.exhibit-active {
+  display: grid;
+  grid-template-columns: 0.75fr 1.15fr 380px; /* Transcript much smaller (0.75fr = 25% total reduction), exhibit much larger (1.15fr), right column fixed at 380px */
+  grid-template-rows: 1fr; /* Single row for proper alignment */
+  height: calc(100vh - 30px); /* Increased by ~5% - much taller containers */
+  padding: 16px; /* Same padding as normal mode for consistent borders */
+  padding-bottom: 80px; /* Extra bottom padding for meeting controls */
+  max-height: calc(100vh - 30px); /* Maximize available space */
+  align-items: stretch; /* Ensure all columns have same height */
+}
+
+/* Transcript collapse functionality removed */
+
+/* Panel styling - no resizing */
+.transcript-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.right-column {
+  width: 380px; /* Even wider to accommodate up to 5 case exhibits comfortably */
+  flex-shrink: 0;
+  max-height: 100%; /* Prevent overflow beyond container */
+  overflow-y: auto; /* Allow scrolling if content is too tall */
+}
+
+.exhibit-column {
+  overflow: hidden;
+}
+
+/* Transcript styling - normal state */
+.transcript-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  height: 100%;
+  max-height: 100%; /* Prevent overflow beyond container */
+  overflow-y: auto;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.dark .transcript-section {
+  background: rgb(17 24 39);
+}
+
+/* Transcript column positioning */
+.transcript-column {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0; /* Allow flex children to shrink */
+}
+
+.exhibit-active .transcript-column {
+  grid-row: 1; /* Single row alignment */
+  grid-column: 1; /* First column */
+  height: 100%; /* Full height alignment */
+}
+
+.exhibit-active .right-column {
+  grid-row: 1; /* Single row alignment */
+  grid-column: 3; /* Third column */
+  height: 100%; /* Full height alignment */
+}
+
+/* Ensure transcript content is scrollable */
+.transcript-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* Critical for flex scrolling */
+}
+
+.transcript-header {
+  flex-shrink: 0;
+  margin-bottom: 16px;
+}
+
+/* Transcript styling - exhibit active (compact) */
+.exhibit-active .transcript-section {
+  padding: 12px;
+  background: #f8f9fa;
+}
+
+.dark .exhibit-active .transcript-section {
+  background: rgb(31 41 55);
+}
+
+.exhibit-active .transcript-header h3 {
+  font-size: 14px;
+}
+
+.exhibit-active .transcript-message {
+  font-size: 12px;
+  padding: 6px;
+  margin-bottom: 6px;
+}
+
+.exhibit-active .timestamp {
+  font-size: 10px;
+}
+
+/* Transcript collapse functionality completely removed */
+
+/* Exhibit viewer - same height as transcript and right panel */
+.exhibit-viewer {
+  background: white;
+  border-radius: 12px;
+  height: 100%; /* Same as transcript and right panel */
+  max-height: 100%; /* Prevent overflow beyond container */
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: fadeInScale 0.3s ease;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  position: relative;
+  z-index: 10; /* Higher than default to ensure proper stacking */
+  overflow: hidden; /* Keep everything contained */
+}
+
+.dark .exhibit-viewer {
+  background: rgb(17 24 39);
+  border-color: rgb(55 65 81);
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes fadeOutScale {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+/* Clean close button in top-right */
+.exhibit-header {
+  display: none;
+}
+
+.exhibit-title {
+  display: none;
+}
+
+/* Close button - always visible in top-right */
+.exhibit-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex !important; /* Force display */
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  z-index: 30; /* Above everything */
+}
+
+.dark .exhibit-close {
+  background: rgba(17, 24, 39, 0.95);
+  border-color: rgb(55 65 81);
+  color: #9ca3af;
+}
+
+.exhibit-close:hover {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border-color: #ef4444;
+  transform: scale(1.05);
+}
+
+.dark .exhibit-close:hover {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  border-color: #ef4444;
+}
+
+/* Content area - navigable container */
+.exhibit-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  position: relative;
+  background: #fafafa;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.dark .exhibit-content {
+  background: rgb(31 41 55);
+}
+
+.exhibit-content.dragging {
+  cursor: grabbing;
+}
+
+/* Image container - scales and pans within bounds */
+.exhibit-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: inherit;
+  padding: 16px;
+  transform-origin: center center;
+  user-select: none;
+  -webkit-user-drag: none;
+  /* No transition for instant response */
+}
+
+/* Only apply transition when not dragging */
+.exhibit-image:not(.dragging) {
+  transition: transform 0.1s linear;
+}
+
+.dark .exhibit-image {
+  background: rgb(17 24 39);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* When zoomed, image becomes draggable */
+.exhibit-image.zoomed {
+  cursor: grab;
+}
+
+.exhibit-image.zoomed:active {
+  cursor: grabbing;
+}
+
+/* Zoom controls - outside image area, never overlapping */
+.exhibit-controls {
+  position: static;
+  display: flex;
+  justify-content: center;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px;
+  gap: 4px;
+  margin: 0;
+  border-radius: 0 0 12px 12px;
+  z-index: 60; /* Above meeting controls to prevent overlap */
+  position: relative; /* Establish stacking context */
+}
+
+.dark .exhibit-controls {
+  background: rgb(17 24 39);
+  border-color: rgb(55 65 81);
+}
+
+.control-btn {
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  white-space: nowrap;
+  position: relative;
+}
+
+.dark .control-btn {
+  color: #9ca3af;
+}
+
+.control-btn:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+}
+
+.dark .control-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+}
+
+.control-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.control-btn:disabled:hover {
+  background: transparent;
+  color: #6b7280;
+}
+
+.dark .control-btn:disabled:hover {
+  color: #9ca3af;
+}
+
+/* Loading state for exhibit image */
+.exhibit-image.loading {
+  opacity: 0.6;
+}
+
+.exhibit-image.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+
+
+/* Exhibit column positioning */
+.exhibit-column {
+  grid-column: 2;
+  grid-row: 1;
+  background: transparent;
+  border-radius: 8px;
+  overflow: hidden; /* Contain content properly */
+  display: flex;
+  flex-direction: column;
+  align-self: stretch; /* Fill available height */
+  justify-self: stretch; /* Fill available width */
+  min-height: 0; /* Allow flex children to shrink */
+  max-height: 100%; /* Prevent overflow beyond grid cell */
+  height: 100%; /* Ensure full height alignment */
+}
+
+.dark .exhibit-column {
+  background: transparent;
+}
+
+/* Right column always stays in same position */
+.right-column {
+  order: 3;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 1024px) {
+  .main-container.exhibit-active {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    height: calc(100vh - 100px); /* Increased height for mobile too */
+    padding-bottom: 90px; /* Appropriate padding for mobile controls */
+  }
+  
+  .transcript-section {
+    order: 1;
+    max-height: 200px;
+  }
+  
+  .exhibit-column {
+    order: 2;
+  }
+  
+  .right-column {
+    order: 3;
+    width: 100%;
+    max-height: 300px; /* Limit height on mobile */
+  }
+  
+  .exhibit-controls {
+    bottom: 12px;
+    padding: 6px;
+    z-index: 70; /* Even higher on mobile */
+  }
+  
+  .control-btn {
+    padding: 6px 8px;
+    font-size: 11px;
+  }
+  
+
+}
+
+@media (max-width: 768px) {
+  .main-container {
+    padding: 8px;
+    gap: 8px;
+  }
+  
+  .main-container.exhibit-active {
+    gap: 8px;
+  }
+  
+  .exhibit-viewer {
+    border-radius: 8px;
+  }
+  
+  .exhibit-header {
+    padding: 10px 16px;
+  }
+  
+  .exhibit-content {
+    padding: 16px;
+  }
+  
+  .exhibit-title {
+    font-size: 13px;
+  }
+  
+  .exhibit-close {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+}
+
+/* Loading states */
+.exhibit-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: rgba(255,255,255,0.7);
+  font-size: 14px;
+}
+
+.exhibit-loading::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Focus states for accessibility */
+.exhibit-close:focus,
+.control-btn:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .exhibit-viewer {
+    background: #000000;
+    border: 2px solid #ffffff;
+  }
+  
+  .exhibit-header {
+    background: #333333;
+    border-bottom: 2px solid #ffffff;
+  }
+  
+  .exhibit-controls {
+    background: #000000;
+    border: 1px solid #ffffff;
+  }
+  
+  .exhibit-tabs {
+    background: #000000;
+    border: 1px solid #ffffff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .main-container,
+  .transcript-section,
+  .exhibit-image,
+  .control-btn,
+  .exhibit-tab {
+    transition: none;
+  }
+  
+  .exhibit-viewer {
+    animation: none;
+  }
+  
+  .exhibit-image:hover {
+    transform: none;
+  }
+}

@@ -5,17 +5,18 @@ import Messages from "./Messages";
 import Controls from "./Controls";
 import StartCall from "./StartCall";
 import VideoInput, { VideoInputRef } from "./VideoInput";
-import RecordingControls from "./RecordingControls";
+
 import VideoReviewInterface from "./VideoReviewInterface";
 import SessionSelector from "./SessionSelector";
 import { ComponentRef, useRef, useState, useEffect, useMemo, useCallback } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
 import { Button } from "./ui/button";
 import { Toggle } from "./ui/toggle";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { GraduationCap, FileText, Download, User } from "lucide-react";
+import { GraduationCap, FileText, Download, User, Maximize2, X, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
 import TranscriptEvaluator from "@/utils/transcriptEvaluator";
@@ -23,6 +24,9 @@ import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
 import EnhancedDetailedAnalysis from "./EnhancedDetailedAnalysis";
 import TranscriptDrawer from "./TranscriptDrawer";
 import FloatingTranscriptButton from "./FloatingTranscriptButton";
+import ExhibitModal from "./ExhibitModal";
+import { ExhibitManager, ExhibitManagerState, initializeGlobalExhibitManager } from "@/utils/exhibit-manager";
+import { useSmartScroll } from "@/hooks/useSmartScroll";
 
 // Chat interface component with voice interaction capabilities
 function ChatInterface({
@@ -50,8 +54,21 @@ function ChatInterface({
   messagesRef,
   showEndScreen,
   setShowEndScreen,
+  onToolCall,
+  unlockedExhibits,
+  primaryExhibit,
+  expandedExhibit,
+  onClosePrimaryExhibit,
+  onShowExhibitFromSidebar,
+  onExpandExhibit,
+  onCloseModal,
 }: any) {
-  const { messages, sendSessionSettings, status } = useVoice();
+  const { messages, sendSessionSettings, status, sendToolMessage } = useVoice();
+  
+  // Transcript scrolling refs and state
+  const transcriptScrollRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
   
   // Log status changes for debugging
   useEffect(() => {
@@ -72,6 +89,15 @@ function ChatInterface({
       delete (window as any).__getCurrentCoachingMode;
     };
   }, [coachingMode]);
+
+  // Expose recording status globally for Nav component
+  useEffect(() => {
+    (window as any).__getRecordingStatus = () => isCallActive || forceShowRecording;
+    
+    return () => {
+      delete (window as any).__getRecordingStatus;
+    };
+  }, [isCallActive, forceShowRecording]);
   const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
 
   const [finalEvaluation, setFinalEvaluation] = useState<any>(null);
@@ -85,6 +111,16 @@ function ChatInterface({
   const [isVideoProcessing, setIsVideoProcessing] = useState(false);
   const [videoCheckInterval, setVideoCheckInterval] = useState<NodeJS.Timeout | null>(null);
   const [isTranscriptDrawerOpen, setIsTranscriptDrawerOpen] = useState(false);
+  
+  // Exhibit Manager state
+  const [exhibitManagerState, setExhibitManagerState] = useState<ExhibitManagerState>({
+    isActive: false,
+    currentExhibit: null,
+    currentZoom: 1,
+    isTranscriptCollapsed: false,
+    availableExhibits: []
+  });
+  const [exhibitManager, setExhibitManager] = useState<ExhibitManager | null>(null);
 
   // Function to load end screen data from cache
   const loadEndScreenFromCache = useCallback(async (targetSessionId: string) => {
@@ -265,6 +301,12 @@ function ChatInterface({
       console.log("🔚 Current messages:", messages.length, "messages");
       console.log("🔚 Current messagesRef:", currentMessagesRef.current.length, "messages");
       
+      // Immediately close exhibit when call ends
+      if (exhibitManager) {
+        exhibitManager.closeExhibit();
+        console.log("🔚 Closed exhibit immediately on call end");
+      }
+      
       // Immediately preserve transcript data before anything gets cleared
       const preservedTranscript = storedTranscript.length > 0 
         ? storedTranscript 
@@ -280,7 +322,7 @@ function ChatInterface({
         setHasBeenConnected(false); // Reset for next interview
       }, 100);
     }
-  }, [status.value, isCallActive, storedTranscript, hasBeenConnected]);
+  }, [status.value, isCallActive, storedTranscript, hasBeenConnected, exhibitManager]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -429,6 +471,110 @@ function ChatInterface({
   
       autoGenerateFinalReport();
     }, [showEndScreen, storedTranscript, finalEvaluation, isGeneratingFinalReport, transcriptEvaluator]);
+
+  // Initialize Exhibit Manager - only during active interview, not on end screen
+  useEffect(() => {
+    if (showEndScreen) {
+      // Clean up any existing exhibit manager when going to end screen
+      const globalManager = (window as any).exhibitManager;
+      if (globalManager) {
+        globalManager.destroy();
+        delete (window as any).exhibitManager;
+      }
+      return;
+    }
+    
+    const manager = initializeGlobalExhibitManager((state: ExhibitManagerState) => {
+      setExhibitManagerState(state);
+    });
+    setExhibitManager(manager);
+
+    // Update available exhibits when unlocked exhibits change
+    if (unlockedExhibits.length > 0) {
+      manager.setExhibits(unlockedExhibits.map((exhibit: any) => ({
+        id: exhibit.id,
+        exhibit_name: exhibit.exhibit_name,
+        display_name: exhibit.display_name || exhibit.exhibit_name,
+        description: exhibit.description,
+        image_url: exhibit.image_url,
+        case_id: exhibit.case_id || '',
+        unlocked_at: exhibit.unlocked_at,
+        auto_displayed: exhibit.auto_displayed
+      })));
+    }
+
+    return () => {
+      manager.destroy();
+    };
+  }, [unlockedExhibits, showEndScreen]);
+
+  // Auto-open exhibits when AI tool calls create them
+  useEffect(() => {
+    if (showEndScreen || !exhibitManager) return;
+
+    // Find any newly unlocked exhibits that should be auto-displayed
+    const autoDisplayExhibit = unlockedExhibits.find((exhibit: any) => 
+      exhibit.auto_displayed && 
+      Date.now() - exhibit.unlocked_at.getTime() < 2000 // Within last 2 seconds
+    );
+
+    if (autoDisplayExhibit && exhibitManager && !exhibitManagerState.isActive) {
+      console.log("🤖 Auto-opening exhibit from AI tool call:", autoDisplayExhibit.display_name);
+      exhibitManager.openExhibit(autoDisplayExhibit.id);
+    }
+  }, [unlockedExhibits, exhibitManager, showEndScreen, exhibitManagerState.isActive]);
+
+  // Auto-scroll transcript when new messages arrive (only if at bottom)
+  useEffect(() => {
+    if (isAtBottom && transcriptScrollRef.current) {
+      setTimeout(() => {
+        if (transcriptScrollRef.current) {
+          transcriptScrollRef.current.scrollTo({
+            top: transcriptScrollRef.current.scrollHeight,
+            behavior: 'smooth'
+          });
+        }
+      }, 100);
+    }
+  }, [messages.length, isAtBottom]);
+
+  // Handle transcript scroll to detect bottom position
+  const handleTranscriptScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const element = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = element;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    const atBottom = distanceFromBottom <= 50; // Within 50px of bottom
+    
+    setIsAtBottom(atBottom);
+    setShowScrollButton(!atBottom && messages.length > 3);
+  };
+
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTo({
+        top: transcriptScrollRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
+      setIsAtBottom(true);
+      setShowScrollButton(false);
+    }
+  };
+
+  // Clean up exhibit state when transitioning to end screen
+  useEffect(() => {
+    if (showEndScreen) {
+      // Close any open exhibits
+      if (exhibitManager) {
+        exhibitManager.closeExhibit();
+      }
+      // Clear expanded exhibit modal (if the function is available)
+      if (onCloseModal) {
+        onCloseModal();
+      }
+      console.log("🧹 Cleaned up exhibit state for end screen");
+    }
+  }, [showEndScreen, exhibitManager, onCloseModal]);
   
     const handleCoachingToggle = async (enabled: boolean) => {
     if (isUpdatingCoaching) {
@@ -698,7 +844,7 @@ function ChatInterface({
   return (
     <>
       {showEndScreen ? (
-        <div className="grow flex flex-col overflow-hidden pt-14">
+        <div className="interview-end-screen grow flex flex-col overflow-hidden pt-14">
           {/* Top Navigation Bar - Fixed Height, accounting for fixed nav */}
           <div className="flex-shrink-0 bg-background border-b px-6 py-4">
             <div className="flex justify-between items-center">
@@ -760,7 +906,7 @@ function ChatInterface({
           <div className="flex-grow overflow-hidden p-6">
             <div 
               className={cn(
-                "h-full grid gap-4",
+                "h-full grid gap-4 transition-all duration-300",
                 isTranscriptDrawerOpen 
                   ? "grid-cols-1 lg:grid-cols-[25%_45%_30%]" 
                   : "grid-cols-1 lg:grid-cols-[30%_70%]"
@@ -939,164 +1085,248 @@ function ChatInterface({
           )}
         </div>
       ) : (
-        <div className="grow flex flex-col md:flex-row gap-4 h-full min-h-0 pt-14">
-          <div className="grow flex flex-col min-h-0 h-full">
-            <div className="grow overflow-y-auto min-h-0">
-              <Messages ref={messagesRef} />
-            </div>
-            
-            {/* Bottom Controls */}
-            <div className="flex-shrink-0 flex gap-2 items-center p-4 border-t bg-white dark:bg-gray-900">
-              <Controls />
-              <div className="ml-auto flex gap-2 items-center">
-                                {/* Session Selector for debugging - hide when viewing a specific session */}
-                 {!urlSessionId && (
-                   <SessionSelector 
-                     onSelectSession={loadEndScreenFromCache}
-                     currentSessionId={sessionId}
-                   />
-                 )}
-                 {isCallActive && storedTranscript.length > 0 && (
-                  <div className="flex gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadTranscript('txt')}
-                      className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      TXT
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadTranscript('json')}
-                      className="border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800"
-                    >
-                      <Download className="w-4 h-4 mr-1" />
-                      JSON
-                    </Button>
-                  </div>
+        <div 
+          id="mainContainer" 
+          className={cn(
+            "main-container grow h-full min-h-0 pt-14",
+            exhibitManagerState.isActive && "exhibit-active"
+          )}
+        >
+          {/* Left Column - Transcript Section */}
+          <div className={cn(
+            "transcript-column",
+            !exhibitManagerState.isActive && "flex-1" // Take full space when no exhibit
+          )}>
+            <div className="transcript-section">
+              <div className="transcript-header relative">
+                <h3>Transcript</h3>
+                {/* Scroll to bottom button - always visible when not at bottom */}
+                {showScrollButton && (
+                  <button
+                    onClick={scrollToBottom}
+                    className="absolute top-0 right-0 w-8 h-8 bg-blue-500 hover:bg-blue-600 
+                              text-white rounded-full shadow-lg flex items-center justify-center 
+                              transition-all duration-200 z-10 text-sm"
+                    title="Go to latest message"
+                    aria-label="Scroll to latest message"
+                  >
+                    ↓
+                  </button>
                 )}
               </div>
+              <div 
+                ref={transcriptScrollRef}
+                className="transcript-content flex-1 overflow-y-auto min-h-0"
+                onScroll={handleTranscriptScroll}
+              >
+                <Messages ref={messagesRef} />
+              </div>
+              
+              {/* Session Selector - Only show when needed */}
+              {!urlSessionId && (
+                <div className="flex-shrink-0 flex justify-end p-4 border-t bg-white dark:bg-gray-900">
+                  <SessionSelector 
+                    onSelectSession={loadEndScreenFromCache}
+                    currentSessionId={sessionId}
+                  />
+                </div>
+              )}
             </div>
           </div>
-          
-          {/* Minimal Recording Indicator */}
-          {(isCallActive || forceShowRecording) && (
-            <div className="fixed top-4 left-4 z-40 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-medium shadow-lg">
-              🔴 REC
-            </div>
-          )}
-          
-          {/* Recording Controls */}
-          {(isCallActive || forceShowRecording) && (
-            <div className="fixed bottom-4 left-4 z-30 bg-background/95 backdrop-blur-sm border rounded-lg p-3 shadow-lg">
-              <RecordingControls
-                videoStream={videoRef.current?.getStream() || null}
-                audioCtx={audioCtx}
-                audioStream={assistantBus.getStream()}
-                isCallActive={isCallActive || forceShowRecording}
-                autoStart={shouldAutoRecord}
-                onRecordingComplete={async (videoId) => {
-                  console.log("Recording complete, video ID:", videoId);
-                  toast.success(`Recording saved! ID: ${videoId}`);
-                  
-                  // Check video status after a short delay
-                  setTimeout(async () => {
-                    try {
-                      const response = await fetch(
-                        `/api/recording/video/${videoId}?_t=${Date.now()}`,
-                        { 
-                          cache: 'no-store',
-                          next: { 
-                            revalidate: 0,
-                            tags: [`video-${videoId}`] 
-                          } 
-                        }
-                      );
-                      const videoDetails = await response.json();
-                      console.log("Video details from Cloudflare:", videoDetails);
-                      
-                      if (videoDetails.ready && videoDetails.state === 'ready') {
-                        toast.success("Video is ready to stream!");
-                        console.log("Video playback URL:", videoDetails.playbackUrl);
-                        handleVideoReady(videoId, videoDetails.playbackUrl);
-                      } else if (videoDetails.state === 'error') {
-                        toast.error(`Video processing failed: ${videoDetails.errorReasonText || 'Unknown error'}`);
-                        console.error("Video processing error:", videoDetails);
-                      } else {
-                        toast.info(`Video is processing (${videoDetails.pctComplete}% complete)...`);
-                        // Set a temporary URL so the button shows up
-                        setFinalVideoUrl(`https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/watch`);
-                        setIsVideoProcessing(true); // This will trigger the polling effect
-                        console.log(`Video still processing: ${videoDetails.state}, started polling`);
-                      }
-                    } catch (error) {
-                      console.error("Failed to fetch video details:", error);
-                    }
-                  }, 5000); // Check after 5 seconds
-                }}
-              />
-            </div>
-          )}
-          
-          <div className="w-full md:w-80 flex-shrink-0 p-4 pt-16 space-y-4 flex flex-col max-h-full overflow-hidden">
-              {/* Video Input */}
-              <div className="flex-shrink-0">
+
+          {/* Right Column - Video and Feedback */}
+          <div className="right-column w-full flex-shrink-0 p-4 pt-12 space-y-4 flex flex-col max-h-full overflow-y-auto">
+            {/* Video Input */}
+            <div className="flex-shrink-0">
               <VideoInput ref={videoRef} autoStart={isCallActive} />
-              </div>
-            
-              {/* Simple Coaching Toggle - Only show during active call */}
-              {isCallActive && (
-                <div className="flex-shrink-0 space-y-2">
-                  <div className="flex items-center justify-center gap-2 text-sm">
-                    <span className={cn(
-                      "font-medium transition-colors",
-                      coachingMode ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"
-                    )}>
-                      Coaching
-                    </span>
+            </div>
+          
+            {/* Coaching & Download Controls - Combined on one line */}
+            {isCallActive && (
+              <div className="flex-shrink-0">
+                <div className="flex gap-2 items-center">
+                  {/* Coaching Toggle */}
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground">Coaching</span>
                     <Toggle
                       size="sm"
                       pressed={coachingMode}
                       disabled={isUpdatingCoaching}
                       onPressedChange={handleCoachingToggle}
                       className={cn(
-                        "h-6 w-11 p-0 transition-all duration-200",
+                        "h-5 w-9 p-0 transition-all duration-200",
                         coachingMode 
                           ? "bg-blue-500 hover:bg-blue-600 data-[state=on]:bg-blue-500" 
                           : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
                       )}
                     >
                       <GraduationCap className={cn(
-                        "h-3 w-3 transition-colors",
+                        "h-2.5 w-2.5 transition-colors",
                         coachingMode ? "text-white" : "text-gray-500 dark:text-gray-400"
                       )} />
                     </Toggle>
-                    <span className={cn(
-                      "text-xs font-medium transition-colors",
-                      coachingMode 
-                        ? "text-blue-600 dark:text-blue-400" 
-                        : "text-muted-foreground"
-                    )}>
-                      {coachingMode ? "ON" : "OFF"}
-                    </span>
                   </div>
+                  
+                  {/* Download Buttons */}
+                  {storedTranscript.length > 0 && (
+                    <>
+                      <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-1" />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadTranscript('txt')}
+                        className="text-xs px-2"
+                      >
+                        <Download className="w-3 h-3 mr-1" />
+                        TXT
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadTranscript('json')}
+                        className="text-xs px-2"
+                      >
+                        <Download className="w-3 h-3 mr-1" />
+                        JSON
+                      </Button>
+                    </>
+                  )}
                 </div>
-              )}
-              
-              {/* Live Feedback Display - Integrated into sidebar */}
-              <div className="flex-shrink-0">
-                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                  <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                  Live Feedback
-                </div>
-                <FeedbackDisplay ref={feedbackDisplayRef} />
               </div>
+            )}
+
+            {/* Live Feedback Display - Integrated into sidebar */}
+            <div className="flex-shrink-0">
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                Live Feedback
+              </div>
+              <FeedbackDisplay ref={feedbackDisplayRef} />
+            </div>
+
+            {/* Case Exhibits Panel - Only show during active interview */}
+            {isCallActive && unlockedExhibits.length > 0 && (
+              <div className="flex-shrink-0 mt-4">
+                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  Case Exhibits
+                  <span className="ml-auto bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 py-0.5 rounded text-xs">
+                    {unlockedExhibits.length}
+                  </span>
+                </div>
+                
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {unlockedExhibits.map((exhibit: any) => {
+                    const isPrimary = exhibitManagerState.currentExhibit?.id === exhibit.id;
+                    const isNewlyUnlocked = Date.now() - exhibit.unlocked_at.getTime() < 5000;
+                    
+                    return (
+                      <div
+                        key={exhibit.id}
+                        className={cn(
+                          "p-2 rounded-lg border cursor-pointer transition-all duration-200",
+                          isPrimary 
+                            ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 ring-1 ring-blue-200 dark:ring-blue-800" 
+                            : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800",
+                          isNewlyUnlocked && "ring-2 ring-green-400 animate-pulse"
+                        )}
+                        data-exhibit-trigger
+                        data-exhibit-id={exhibit.id}
+                        data-react-handled="true"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          console.log('🖱️ Sidebar exhibit clicked:', {
+                            exhibitId: exhibit.id,
+                            displayName: exhibit.display_name,
+                            isPrimary,
+                            managerActive: exhibitManagerState.isActive,
+                            currentExhibit: exhibitManagerState.currentExhibit?.id
+                          });
+                          
+                          if (exhibitManager) {
+                            if (isPrimary) {
+                              // If clicking active exhibit, close it
+                              console.log('🔄 Closing active exhibit from sidebar');
+                              exhibitManager.closeExhibit();
+                            } else {
+                              // If clicking different exhibit, open it
+                              console.log('🔄 Opening exhibit from sidebar:', exhibit.display_name);
+                              
+                              // Add a small delay to prevent conflicts
+                              setTimeout(() => {
+                                exhibitManager.openExhibit(exhibit.id);
+                              }, 50);
+                            }
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={exhibit.image_url}
+                            alt={exhibit.display_name}
+                            className="w-8 h-8 object-cover rounded flex-shrink-0"
+                            loading="lazy"
+                          />
+                          
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-medium truncate">
+                              {exhibit.display_name}
+                            </h4>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {isPrimary ? (
+                                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                                  Active
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">
+                                  Click to show
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className={cn(
+                            "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                            isPrimary ? "bg-blue-500" : "bg-gray-300"
+                          )} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <p className="text-xs text-muted-foreground text-center">
+                    Exhibits unlocked by AI
+                  </p>
+                </div>
+              </div>
+            )}
+
+
           </div>
+          
+
+          
+
+
         </div>
       )}
+
+      {/* Voice Controls - Fixed at bottom */}
+      {!showEndScreen && <Controls />}
+
+      {/* Exhibit Modal - Only show during active interview, not on end screen */}
+      {!showEndScreen && (
+        <ExhibitModal
+          exhibit={expandedExhibit}
+          onClose={onCloseModal}
+        />
+      )}
+
+
 
     </>
   );
@@ -1119,6 +1349,12 @@ export default function ClientComponent({
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<any[]>([]);
   const [showEndScreen, setShowEndScreen] = useState(false);
+
+  // Exhibit state for ClientComponent level
+  const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
+  const [unlockedExhibits, setUnlockedExhibits] = useState<any[]>([]);
+  const [primaryExhibit, setPrimaryExhibit] = useState<any>(null);
+  const [expandedExhibit, setExpandedExhibit] = useState<any>(null);
   
   // Get interview configuration from URL params
   const selectedCaseId = searchParams.get('caseId');
@@ -1132,6 +1368,116 @@ export default function ClientComponent({
 
   // optional: use configId from environment variable
   const configId = process.env['NEXT_PUBLIC_HUME_CONFIG_ID'];
+
+  // Tool call handler for exhibit display
+  const handleToolCall = useCallback(async (toolCallMessage: any) => {
+    console.log("🔧 Tool call received:", {
+      name: toolCallMessage.name,
+      toolCallId: toolCallMessage.tool_call_id || toolCallMessage.toolCallId,
+      parameters: toolCallMessage.parameters
+    });
+
+    if (toolCallMessage.name === "show_exhibit") {
+      try {
+        const { exhibit_name } = JSON.parse(toolCallMessage.parameters);
+        
+        if (!selectedCaseId) {
+          throw new Error("No case ID available for this session");
+        }
+        
+        // Fetch exhibit from API
+        const response = await fetch('/api/exhibits/show', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exhibit_name,
+            case_id: selectedCaseId
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.exhibit) {
+          const newExhibit = {
+            ...result.exhibit,
+            unlocked_at: new Date(),
+            auto_displayed: true
+          };
+          
+          // Add to unlocked exhibits if not already there
+          setUnlockedExhibits(prev => {
+            const exists = prev.find(e => e.exhibit_name === exhibit_name);
+            if (exists) {
+              // Update existing with new unlock time
+              return prev.map(e => 
+                e.exhibit_name === exhibit_name 
+                  ? { ...e, unlocked_at: new Date(), auto_displayed: true }
+                  : e
+              );
+            } else {
+              return [...prev, newExhibit];
+            }
+          });
+          
+          // Trigger exhibit display via ExhibitManager (will be handled by useEffect below)
+          
+          console.log("✅ Exhibit unlocked and displayed:", newExhibit.display_name);
+          toast.success(`📸 Exhibit displayed: ${newExhibit.display_name || newExhibit.exhibit_name}`);
+          
+          return {
+            type: "tool_response" as const,
+            toolCallId: toolCallMessage.tool_call_id || toolCallMessage.toolCallId,
+            content: `Successfully displayed exhibit: ${newExhibit.display_name || newExhibit.exhibit_name}`
+          };
+        } else {
+          throw new Error(result.error || "Exhibit not found");
+        }
+      } catch (error) {
+        console.error("Error handling show_exhibit tool call:", error);
+        
+        const errorResponse = {
+          type: "tool_error" as const,
+          toolCallId: toolCallMessage.tool_call_id || toolCallMessage.toolCallId,
+          error: "Exhibit display failed",
+          content: `Failed to display exhibit: ${(error as Error).message}`
+        };
+        
+        toast.error(`Failed to display exhibit: ${(error as Error).message}`);
+        return errorResponse;
+      }
+    } else {
+      // Handle unknown tool
+      return {
+        type: "tool_error" as const,
+        toolCallId: toolCallMessage.tool_call_id || toolCallMessage.toolCallId,
+        error: "Tool not found",
+        content: `Tool "${toolCallMessage.name}" is not implemented`
+      };
+    }
+  }, [selectedCaseId]);
+
+  // Exhibit Control Functions
+  const handleClosePrimaryExhibit = useCallback(() => {
+    setPrimaryExhibit(null);
+  }, []);
+
+  const handleShowExhibitFromSidebar = useCallback((exhibitId: string) => {
+    const exhibit = unlockedExhibits.find(e => e.id === exhibitId);
+    if (exhibit) {
+      setPrimaryExhibit({ ...exhibit, auto_displayed: false });
+    }
+  }, [unlockedExhibits]);
+
+  const handleExpandExhibit = useCallback((exhibitId: string) => {
+    const exhibit = unlockedExhibits.find(e => e.id === exhibitId);
+    if (exhibit) {
+      setExpandedExhibit(exhibit);
+    }
+  }, [unlockedExhibits]);
+
+  const handleCloseModal = useCallback(() => {
+    setExpandedExhibit(null);
+  }, []);
   
   // Monitor video stream availability (less frequently to reduce spam)
   useEffect(() => {
@@ -1173,6 +1519,32 @@ export default function ClientComponent({
   const [sessionId] = useState(() => {
     return urlSessionId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   });
+
+  // Get case ID from session cache
+  useEffect(() => {
+    const getCaseIdFromCache = async () => {
+      if (sessionId && !currentCaseId) {
+        try {
+          const { getCaseId } = await import("@/utils/session-context");
+          const caseId = getCaseId(sessionId);
+          
+          if (caseId) {
+            setCurrentCaseId(caseId);
+            console.log("📋 Case ID found for exhibits:", caseId);
+          }
+        } catch (error) {
+          console.error("Error getting case ID from cache:", error);
+        }
+      }
+    };
+    
+    const interval = setInterval(getCaseIdFromCache, 1000);
+    getCaseIdFromCache();
+    
+    return () => clearInterval(interval);
+  }, [sessionId, currentCaseId]);
+
+
 
 
 
@@ -1230,6 +1602,7 @@ export default function ClientComponent({
             }
           }, 200);
         }}
+        onToolCall={handleToolCall}
         onError={(error) => {
           console.error("❌ Hume VoiceProvider error:", {
             message: error.message,
@@ -1288,6 +1661,14 @@ export default function ClientComponent({
           handleVideoReady={handleVideoReady}
           showEndScreen={showEndScreen}
           setShowEndScreen={setShowEndScreen}
+          onToolCall={handleToolCall}
+          unlockedExhibits={unlockedExhibits}
+          primaryExhibit={primaryExhibit}
+          expandedExhibit={expandedExhibit}
+          onClosePrimaryExhibit={handleClosePrimaryExhibit}
+          onShowExhibitFromSidebar={handleShowExhibitFromSidebar}
+          onExpandExhibit={handleExpandExhibit}
+          onCloseModal={handleCloseModal}
 
           videoRef={videoRef}
           audioCtx={audioCtx}

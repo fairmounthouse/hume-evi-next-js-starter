@@ -23,15 +23,11 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
   const [nextEvaluation, setNextEvaluation] = useState<number>(20);
   const [isEvaluationActive, setIsEvaluationActive] = useState(false);
 
-  // Auto-hide feedback after 10 seconds
+  // Keep feedback visible until replaced by new feedback
   useEffect(() => {
     if (feedback) {
       setIsVisible(true);
-      const timer = setTimeout(() => {
-        setIsVisible(false);
-      }, 10000);
-
-      return () => clearTimeout(timer);
+      // Don't auto-hide - keep until next feedback arrives
     }
   }, [feedback]);
 
@@ -128,31 +124,20 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
   };
 
   return (
-    <div className={cn("w-full min-h-[60px] max-h-[200px] overflow-y-auto", className)}>
-      <AnimatePresence mode="wait">
-        {isLoading && (
-          <motion.div
-            key="loading"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg"
-          >
+    <div className={cn("w-full h-[180px] overflow-y-auto", className)}>
+      {/* Fixed height container - always shows content */}
+      <div className="h-full">
+        {isLoading ? (
+          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg h-full">
             <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />
             <span className="text-xs text-gray-600 dark:text-gray-400">
               Analyzing...
             </span>
-          </motion.div>
-        )}
-        
-        {feedback && isVisible && !isLoading && (
-          <motion.div
-            key={`feedback-${feedback.status}-${feedback.confidence}`}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
+          </div>
+        ) : feedback && isVisible ? (
+          <div
             className={cn(
-              "border rounded-lg p-3 relative",
+              "border rounded-lg p-3 relative h-full flex flex-col",
               getStatusColor(feedback.status)
             )}
           >
@@ -170,7 +155,7 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
             </div>
             
             {/* Feedback text */}
-            <div className="max-h-[120px] overflow-y-auto mb-3">
+            <div className="flex-1 overflow-y-auto mb-3">
               <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                 {feedback.feedback}
               </p>
@@ -185,41 +170,21 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
                 transition={{ duration: 10, ease: "linear" }}
               />
             </div>
-          </motion.div>
-        )}
-        
-        {/* Timer and Empty state */}
-        {!feedback && !isLoading && (
-          <motion.div
-            key="empty-state"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            className="text-center py-3 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg"
-          >
+          </div>
+        ) : (
+          <div className="text-center py-3 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg h-full flex flex-col justify-center">
             {isEvaluationActive ? (
-              <div>
-                <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                  Next evaluation in {nextEvaluation}s
-                </div>
-                {/* Minimalistic progress bar */}
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1">
-                  <motion.div
-                    className="bg-blue-500 h-1 rounded-full"
-                    initial={{ width: "100%" }}
-                    animate={{ width: `${(nextEvaluation / 20) * 100}%` }}
-                    transition={{ duration: 0.8, ease: "easeOut" }}
-                  />
-                </div>
+              <div className="text-xs text-gray-400 dark:text-gray-600">
+                Evaluating performance...
               </div>
             ) : (
               <div className="text-xs text-gray-400 dark:text-gray-600">
                 Waiting to start...
               </div>
             )}
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 });
