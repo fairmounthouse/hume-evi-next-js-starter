@@ -157,7 +157,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
   const [selectedExample, setSelectedExample] = useState<any>(null);
   const [selectedFactorIndex, setSelectedFactorIndex] = useState<number>(0);
 
-  // Height matching effect
+  // Dynamic height matching effect
   useEffect(() => {
     const matchHeights = () => {
       const container = document.querySelector('.detailed-factors-container') as HTMLElement;
@@ -165,13 +165,16 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
       const details = document.querySelector('.factor-details') as HTMLElement;
       
       if (container && nav && details) {
-        const containerHeight = container.offsetHeight;
+        const containerHeight = container.getBoundingClientRect().height;
         nav.style.height = `${containerHeight}px`;
         details.style.height = `${containerHeight}px`;
       }
     };
 
-    const timer = setTimeout(matchHeights, 100);
+    // Match heights on mount and when content changes
+    const timer = setTimeout(matchHeights, 50);
+    
+    // Also match on window resize
     window.addEventListener('resize', matchHeights);
     
     return () => {
@@ -179,6 +182,8 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
       window.removeEventListener('resize', matchHeights);
     };
   }, [activeTab, selectedFactorIndex]);
+
+
 
   const getScoreBadgeColor = (score: number) => {
     if (score >= 8) return "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300";
@@ -403,7 +408,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
               >
                 {/* Fixed Layout Container */}
                 <div 
-                  className="detailed-factors-container flex h-full"
+                  className="detailed-factors-container flex"
                   style={{
                     display: 'flex',
                     height: 'calc(100vh - 250px)',

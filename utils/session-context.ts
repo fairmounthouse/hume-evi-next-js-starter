@@ -36,12 +36,14 @@ export interface CurrentPhase {
 // Enhanced row subset with case metadata and coaching config
 // NO coach_mode_enabled - coaching is local toggle only, database is for prompt lookup
 interface RawSessionRow {
+  case_id: string | null;
   interviewer_profiles: {
     prompt_id: { prompt_content: string } | null;
   } | null;
   interview_cases: {
     phases: PhaseInfo[] | null;
     additional_metadata: any | null;
+    exhibits: Record<string, string> | null;
     prompt_id: { prompt_content: string } | null;
   } | null;
   difficulty_profiles: {
@@ -78,8 +80,9 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
   const { data, error } = await supabase
     .from("interview_sessions")
     .select(
-      `interviewer_profiles(prompt_id(prompt_content)),
-       interview_cases(phases, additional_metadata, prompt_id(prompt_content)),
+      `case_id,
+       interviewer_profiles(prompt_id(prompt_content)),
+       interview_cases(phases, additional_metadata, exhibits, prompt_id(prompt_content)),
        difficulty_profiles(display_name, prompt_id(prompt_content))`
     )
     .eq("session_id", sessionId)
@@ -181,7 +184,9 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
     INTERVIEW_CASE_TEMPLATE: caseTemplate,
     DIFFICULTY_PROMPT: difficultyPrompt,
     caseMetadata,
-    coachingConfig
+    coachingConfig,
+    caseId: data.case_id,
+    caseExhibits: data.interview_cases?.exhibits || {}
   };
 
   // Cache for the entire session (long TTL since this never changes)
@@ -359,9 +364,22 @@ export async function buildSessionSettings(
   } catch (error) {
     console.log("📋 No document analysis available for this session:", error);
   }
+
+  // Get available exhibits for this case (from cached data)
+  let exhibitsInfo = "";
+  if (staticData.caseExhibits && Object.keys(staticData.caseExhibits).length > 0) {
+    const availableExhibits = Object.keys(staticData.caseExhibits);
+    exhibitsInfo = `\n\nAVAILABLE CASE EXHIBITS:\nYou can show visual exhibits during this interview using the show_exhibit tool.\nAvailable exhibits: ${availableExhibits.join(', ')}\n\nUse these when discussing relevant topics to enhance understanding.\n`;
+    
+    console.log("📸 Found case exhibits for AI:", {
+      caseId: staticData.caseId,
+      availableExhibits,
+      count: availableExhibits.length
+    });
+  }
   
-  // Append document analysis to case content if available
-  const finalCaseContent = caseContent + documentAnalysis;
+  // Append document analysis and exhibits info to case content if available
+  const finalCaseContent = caseContent + documentAnalysis + exhibitsInfo;
   
   console.log("📋 Interview case:", {
     hasCustomCase: hasCaseData,
@@ -439,6 +457,9 @@ export async function buildSessionSettings(
     DIFFICULTY_PROMPT: difficultyResult.processedText,
     TOTAL_ELAPSED_TIME: elapsedTime,
     now: currentTime, // We can override Hume's built-in 'now' with our format
+    AVAILABLE_EXHIBITS: staticData.caseExhibits && Object.keys(staticData.caseExhibits).length > 0 
+      ? Object.keys(staticData.caseExhibits).join(', ')
+      : 'None available for this case'
   };
 
   // Enhanced logging showing data source quality
@@ -714,6 +735,22 @@ export function getCaseMetadata(sessionId: string): CaseMetadata | null {
   const staticData = sessionCache.get<any>(cacheKey);
   
   return staticData?.caseMetadata || null;
+}
+
+// Export helper to get case exhibits
+export function getCaseExhibits(sessionId: string): Record<string, string> {
+  const cacheKey = `session_settings_${sessionId}`;
+  const staticData = sessionCache.get<any>(cacheKey);
+  
+  return staticData?.caseExhibits || {};
+}
+
+// Export helper to get case ID
+export function getCaseId(sessionId: string): string | null {
+  const cacheKey = `session_settings_${sessionId}`;
+  const staticData = sessionCache.get<any>(cacheKey);
+  
+  return staticData?.caseId || null;
 }
 
 // Export global variable substitution for external use
