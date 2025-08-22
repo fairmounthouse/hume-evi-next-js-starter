@@ -1,13 +1,14 @@
 import { createClient } from "@supabase/supabase-js";
 
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+// Note: For now, we're just adding user_id to sessions for basic user association
+// The RLS policies are set up but we'll use the regular supabase client
+// TODO: Implement full Clerk authentication later if needed
+
+// Fallback client for non-authenticated operations (admin functions)
 export function createSupabaseClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error("Missing Supabase environment variables");
-  }
-
   return createClient(supabaseUrl, supabaseKey, {
     auth: {
       persistSession: false,
@@ -76,7 +77,15 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
 
     if (!textError && !jsonError) {
       console.log('✅ Transcript uploaded to Supabase Storage');
-      return textPath;
+      
+      // Return complete Supabase URL instead of just internal path
+      const { data: urlData } = await supabase.storage
+        .from('interviews')
+        .getPublicUrl(textPath);
+      
+      const completeUrl = urlData.publicUrl;
+      console.log('📋 Complete transcript URL:', completeUrl);
+      return completeUrl;
     }
 
     return null;
@@ -102,73 +111,158 @@ export async function getTranscriptDownloadUrl(sessionId: string, format: 'txt' 
 }
 
 export interface InterviewSession {
-  id?: string; // uuid, auto-generated
-  session_id: string; // varchar(255), required
-  started_at: string; // timestamp with time zone, required
-  ended_at?: string; // timestamp with time zone
-  duration_seconds?: number; // numeric
-  coach_mode_enabled?: boolean; // boolean, default false
-  transcript_data: string; // text, required
-  emotion_summary?: Record<string, any>; // jsonb
-  detailed_analysis?: Record<string, any>; // jsonb
-  speech_rate_data?: Record<string, any>; // jsonb
-  engagement_metrics?: Record<string, any>; // jsonb
-  status?: string; // varchar(50), default 'in_progress'
-  has_detailed_analysis?: boolean; // boolean, default false
+  // REQUIRED FIELDS (NOT NULL in database)
+  id?: string; // uuid, auto-generated primary key
+  session_id: string; // varchar(255), unique identifier
+  started_at: string; // timestamp with time zone, interview start time
+  
+  // USER ASSOCIATION (for Clerk integration)
+  user_id?: string; // Clerk user ID for RLS policies
+  
+  // TIMING & STATUS
+  ended_at?: string; // timestamp with time zone, must be >= started_at if provided
+  duration_seconds?: number; // numeric, must be >= 0 if provided
+  status?: 'in_progress' | 'completed' | 'error' | 'cancelled'; // default 'in_progress'
+  
+  // FOREIGN KEY REFERENCES
+  case_id?: string; // uuid, FK to interview_cases.id
+  interviewer_profile_id?: string; // uuid, FK to interviewer_profiles.id
+  difficulty_profile_id?: string; // uuid, FK to difficulty_profiles.id
+  
+  // MEDIA STORAGE (consolidated from session_media table)
+  video_url?: string; // Cloudflare Stream URL
+  video_duration_seconds?: number; // Video length in seconds
+  video_file_size_bytes?: number; // Video file size in bytes
+  transcript_path?: string; // Complete Supabase Storage URL to transcript file (TXT format)
+  live_transcript_data?: any[]; // Live session transcript format (same as Chat component)
+  
+  // AI ANALYSIS RESULTS
+  detailed_analysis?: Record<string, any>; // Complete AI evaluation with factors, summary, confidence
+  
+  // FEEDBACK SURVEYS
+  feedback_data?: Record<string, any>; // Post-interview feedback (NPS, realism, etc.)
+  analysis_feedback_data?: Record<string, any>; // Analysis quality feedback
+  
+  // METADATA
   created_at?: string; // timestamp with time zone, default now()
   updated_at?: string; // timestamp with time zone, default now()
-  case_id?: string; // uuid
-  evi_chat_id?: string; // varchar(255)
-  evi_chat_status?: string; // varchar(50), default 'pending'
-  evi_transcript_data?: Record<string, any>; // jsonb
-  evi_sync_offset_ms?: number; // numeric
-  evi_sync_status?: string; // varchar(50), default 'not_synced'
-  interviewer_profile_id?: string; // uuid
-  difficulty_profile_id?: string; // uuid
-  case_metadata?: Record<string, any>; // jsonb
-  transcript_path?: string; // text
-  // Note: video_url and final_evaluation columns don't exist yet
-  // They are stored inside detailed_analysis for now
+}
+
+// Validate and fix session data to ensure database compliance
+function validateAndFixSessionData(data: Partial<InterviewSession>): Partial<InterviewSession> {
+  const fixed = { ...data };
+  
+  // 1. Ensure required fields are present
+  if (!fixed.session_id) {
+    throw new Error("session_id is required but missing");
+  }
+  
+  // 2. Add user_id for Clerk integration (will be set by calling code)
+  if (!fixed.user_id) {
+    console.log("📝 [VALIDATION] user_id not provided - will be set by authenticated client");
+  }
+  
+  // Note: transcript_data column has been removed - we use transcript_path now
+  
+  // 3. Validate and fix timestamps
+  if (fixed.started_at && fixed.ended_at) {
+    const startTime = new Date(fixed.started_at);
+    const endTime = new Date(fixed.ended_at);
+    
+    if (endTime < startTime) {
+      console.warn("⚠️ [VALIDATION] ended_at before started_at, applying 10-second fallback");
+      const fallbackEndTime = new Date(startTime.getTime() + 10000); // 10 second consistent fallback
+      fixed.ended_at = fallbackEndTime.toISOString();
+      
+      console.log("🕐 [VALIDATION] Timestamp corrected:", {
+        originalStarted: startTime.toISOString(),
+        originalEnded: endTime.toISOString(),
+        correctedEnded: fallbackEndTime.toISOString(),
+        fallbackBufferMs: 10000
+      });
+    }
+  }
+  
+  // 4. Validate duration_seconds
+  if (fixed.duration_seconds !== null && fixed.duration_seconds !== undefined && fixed.duration_seconds < 0) {
+    console.warn("⚠️ [VALIDATION] Negative duration detected, setting to 0");
+    fixed.duration_seconds = 0;
+  }
+  
+  // 5. Validate enum values
+  const validStatuses = ['in_progress', 'completed', 'error', 'cancelled'];
+  if (fixed.status && !validStatuses.includes(fixed.status)) {
+    console.warn(`⚠️ [VALIDATION] Invalid status '${fixed.status}', setting to 'completed'`);
+    fixed.status = 'completed' as any;
+  }
+  
+  // Note: EVI columns have been removed from the schema
+  
+  return fixed;
 }
 
 export async function upsertInterviewSession(sessionData: Partial<InterviewSession>): Promise<boolean> {
   try {
-    const jsonFields: Array<keyof Pick<InterviewSession, 'emotion_summary' | 'detailed_analysis' | 'speech_rate_data' | 'engagement_metrics'>> = [
-      'emotion_summary',
+    // Validate and fix data before database operation
+    const validatedData = validateAndFixSessionData(sessionData);
+    const jsonFields: Array<keyof Pick<InterviewSession, 'detailed_analysis' | 'feedback_data' | 'analysis_feedback_data' | 'live_transcript_data'>> = [
       'detailed_analysis',
-      'speech_rate_data',
-      'engagement_metrics',
+      'feedback_data', 
+      'analysis_feedback_data',
+      'live_transcript_data',
     ];
 
-    // Convert objects to JSON strings for specific fields (excluding evi_transcript_data)
+    // Convert objects to JSON strings for specific fields, but NOT for live_transcript_data (keep as array)
     for (const field of jsonFields) {
       const fieldKey = field as keyof InterviewSession;
-      if (sessionData[fieldKey] !== undefined && typeof sessionData[fieldKey] === 'object') {
-        (sessionData as any)[fieldKey] = JSON.stringify(sessionData[fieldKey]);
+      if (validatedData[fieldKey] !== undefined && typeof validatedData[fieldKey] === 'object') {
+        // Don't double-encode live_transcript_data - keep as array for Supabase
+        if (fieldKey !== 'live_transcript_data') {
+          (validatedData as any)[fieldKey] = JSON.stringify(validatedData[fieldKey]);
+        }
       }
     }
 
-    // Remove evi_transcript_data if present - we'll store it in Supabase Storage instead
-    const { evi_transcript_data, transcript_path, ...sessionDataWithoutTranscript } = sessionData;
+    // Use all validated data (cleaned up schema - no need to remove fields)
+    const sessionDataForUpsert = validatedData;
 
-    // Ensure required non-null columns always have a value
-    if (sessionDataWithoutTranscript.transcript_data === undefined) {
-      // We store the real transcript in Supabase Storage; this field just needs a non-null placeholder
-      (sessionDataWithoutTranscript as any).transcript_data = '';
+    // Handle started_at for existing sessions (REQUIRED - NOT NULL)
+    if (!sessionDataForUpsert.started_at) {
+      // Check if session already exists to preserve existing started_at
+      const { data: existingSession } = await supabase
+        .from('interview_sessions')
+        .select('started_at, ended_at')
+        .eq('session_id', sessionDataForUpsert.session_id)
+        .single();
+      
+      if (existingSession?.started_at) {
+        // Session exists, use existing started_at value to avoid overwriting
+        (sessionDataForUpsert as any).started_at = existingSession.started_at;
+        console.log("📝 Session exists, preserving existing started_at:", existingSession.started_at);
+      } else {
+        // New session, set started_at to current time
+        (sessionDataForUpsert as any).started_at = new Date().toISOString();
+        console.log("📝 New session, setting started_at to current time");
+      }
     }
+
+    const finalData = sessionDataForUpsert;
     
-    // Ensure started_at is never null
-    if (!sessionDataWithoutTranscript.started_at) {
-      (sessionDataWithoutTranscript as any).started_at = new Date().toISOString();
-    }
+    // Note: Timestamp validation is now done in validateAndFixSessionData function
+
+    console.log("📝 About to upsert session data:", {
+      session_id: finalData.session_id,
+      has_started_at: !!finalData.started_at,
+      has_ended_at: !!finalData.ended_at,
+      started_at: finalData.started_at,
+      ended_at: finalData.ended_at,
+      status: finalData.status,
+      transcript_path: finalData.transcript_path
+    });
 
     const { error } = await supabase
       .from('interview_sessions')
-      .upsert({
-        ...sessionDataWithoutTranscript,
-        // Only include transcript_path if it's provided
-        ...(transcript_path ? { transcript_path } : {})
-      }, {
+      .upsert(finalData, {
         onConflict: 'session_id',
         ignoreDuplicates: false
       });
@@ -198,18 +292,23 @@ export async function storeEndScreenData(
     // Upload transcript to storage
     const transcriptPath = await uploadTranscriptToStorage(sessionId, transcript);
     
-    // Store everything in the session record (only existing fields for now)
-    const success = await upsertInterviewSession({
-      session_id: sessionId,
-      transcript_path: transcriptPath || undefined,
-      detailed_analysis: finalEvaluation, // Store evaluation in existing field
-      has_detailed_analysis: true,
-      status: 'completed',
-      ended_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      // Include started_at in case this is a new row (shouldn't happen, but prevents null constraint error)
-      started_at: new Date().toISOString()
-    });
+    // Use direct update instead of upsert to avoid overwriting required fields
+    const { error } = await supabase
+      .from('interview_sessions')
+      .update({
+        transcript_path: transcriptPath || undefined,
+        detailed_analysis: finalEvaluation, // Store evaluation in existing field
+        // Note: has_detailed_analysis column removed - check detailed_analysis IS NOT NULL instead
+        status: 'completed' as const,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('session_id', sessionId);
+
+    const success = !error;
+    
+    if (error) {
+      console.error('Error updating session with end screen data:', error);
+    }
     
     // TODO: Add video_url and final_evaluation columns to database
     // For now, we'll store video URL in detailed_analysis.video_url
@@ -221,10 +320,17 @@ export async function storeEndScreenData(
       };
       
       // Update with enhanced evaluation that includes video URL
-      await upsertInterviewSession({
-        session_id: sessionId,
-        detailed_analysis: enhancedEvaluation
-      });
+      const { error: updateError } = await supabase
+        .from('interview_sessions')
+        .update({
+          detailed_analysis: enhancedEvaluation,
+          updated_at: new Date().toISOString()
+        })
+        .eq('session_id', sessionId);
+      
+      if (updateError) {
+        console.error('Error updating session with enhanced evaluation:', updateError);
+      }
     }
     
     if (success) {
@@ -274,17 +380,9 @@ export async function getEndScreenData(sessionId: string): Promise<{
         }
       } catch (error) {
         console.error('Error fetching transcript from storage:', error);
-        // Fallback to transcript_data if available
-        if (sessionData.transcript_data) {
-          // Parse if it's a JSON string, otherwise split by lines
-          try {
-            const parsed = JSON.parse(sessionData.transcript_data);
-            transcript = parsed.entries || [];
-          } catch {
-            // Handle plain text format
-            transcript = [];
-          }
-        }
+        // Note: transcript_data column has been removed - we only use transcript_path now
+        console.log("⚠️ Failed to load transcript from storage, no fallback available");
+        transcript = [];
       }
     }
     
@@ -319,27 +417,12 @@ export async function getEndScreenData(sessionId: string): Promise<{
       }
     }
     
-    if (!videoUrl && sessionData.video_url) {
+    // Video URL is now directly in interview_sessions table (streamlined structure)
+    if (sessionData.video_url) {
       videoUrl = sessionData.video_url;
-    }
-    
-    // Also check session_media table for video URL
-    if (!videoUrl) {
-      try {
-        const { data: mediaData } = await supabase
-          .from('session_media')
-          .select('file_url')
-          .eq('session_id', sessionId)
-          .eq('media_type', 'video')
-          .single();
-          
-        if (mediaData?.file_url) {
-          videoUrl = mediaData.file_url;
-          console.log('Found video URL in session_media table');
-        }
-      } catch (error) {
-        console.log('No video found in session_media table');
-      }
+      console.log('✅ Found video URL in interview_sessions table:', videoUrl);
+    } else {
+      console.log('⚠️ No video URL found for this session');
     }
     
     const result = {
@@ -400,6 +483,211 @@ export async function getDocumentAnalysis(sessionId: string): Promise<any | null
     return analysis || null;
   } catch (error) {
     console.error('Error getting document analysis:', error);
+    return null;
+  }
+}
+
+// Submit feedback for a session
+export interface FeedbackData {
+  sessionId: string;
+  npsScore: number | null;
+  realisticScore: number | null;
+  challenges: string;
+  motivation: string;
+  features: string[];
+  otherFeature: string;
+  followUpInterest: string | null;
+  submittedAt: string;
+  // Tracking fields for analytics
+  completed: boolean; // true if fully submitted, false if closed early
+  lastQuestionIndex: number; // which question they were on when closed/submitted
+  totalQuestions: number; // total questions in survey
+  closeReason: 'completed' | 'closed_by_user' | 'skipped'; // how the survey ended
+}
+
+export async function submitSessionFeedback(feedbackData: FeedbackData): Promise<boolean> {
+  try {
+    console.log(`📝 Submitting feedback for session: ${feedbackData.sessionId}`);
+    
+    // Use direct update instead of upsert to avoid timestamp conflicts
+    const { error } = await supabase
+      .from('interview_sessions')
+      .update({
+        feedback_data: feedbackData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('session_id', feedbackData.sessionId);
+
+    const success = !error;
+    
+    if (success) {
+      console.log(`✅ Feedback submitted successfully for session: ${feedbackData.sessionId}`);
+    } else {
+      console.error(`❌ Failed to submit feedback for session: ${feedbackData.sessionId}`);
+    }
+    
+    return success;
+  } catch (error) {
+    console.error('Error submitting feedback:', error);
+    return false;
+  }
+}
+
+// Submit analysis feedback for a session
+export interface AnalysisFeedbackData {
+  sessionId: string;
+  accuracyRating: number | null;
+  helpfulnessAnswer: string | null;
+  submittedAt: string;
+  // Tracking fields for analytics
+  completed: boolean;
+  lastQuestionIndex: number;
+  totalQuestions: number;
+  closeReason: 'completed' | 'closed_by_user' | 'skipped';
+}
+
+export async function submitAnalysisFeedback(feedbackData: AnalysisFeedbackData): Promise<boolean> {
+  try {
+    console.log(`📊 Submitting analysis feedback for session: ${feedbackData.sessionId}`);
+    
+    // Use direct update instead of upsert to avoid timestamp conflicts
+    const { error } = await supabase
+      .from('interview_sessions')
+      .update({
+        analysis_feedback_data: feedbackData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('session_id', feedbackData.sessionId);
+
+    const success = !error;
+
+    if (success) {
+      console.log(`✅ Analysis feedback submitted successfully for session: ${feedbackData.sessionId}`);
+    } else {
+      console.error(`❌ Failed to submit analysis feedback for session: ${feedbackData.sessionId}`, error);
+    }
+    
+    return success;
+  } catch (error) {
+    console.error('Error submitting analysis feedback:', error);
+    return false;
+  }
+}
+
+// Get complete session data for session viewer (reuse existing logic)
+export async function getSessionData(sessionId: string) {
+  try {
+    console.log(`📋 Fetching complete session data for: ${sessionId}`);
+    
+    // Get session data with all related info
+    const { data: sessionData, error } = await supabase
+      .from('interview_sessions')
+      .select(`
+        *,
+        interview_cases(title, type, industry, difficulty),
+        interviewer_profiles(name, company, role),
+        difficulty_profiles(display_name, level)
+      `)
+      .eq('session_id', sessionId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching session:', error);
+      return null;
+    }
+    
+    if (!sessionData) {
+      console.log('Session not found');
+      return null;
+    }
+    
+    // Get transcript - prefer live format, fallback to storage
+    let transcript: any[] = [];
+    
+    // First try live_transcript_data (handle double-encoded JSON)
+    if (sessionData.live_transcript_data) {
+      try {
+        let transcriptData = sessionData.live_transcript_data;
+        
+        // Handle double-encoded JSON string
+        if (typeof transcriptData === 'string') {
+          transcriptData = JSON.parse(transcriptData);
+        }
+        
+        // Handle if it's still a string (double-encoded)
+        if (typeof transcriptData === 'string') {
+          transcriptData = JSON.parse(transcriptData);
+        }
+        
+        if (Array.isArray(transcriptData)) {
+          transcript = transcriptData;
+          console.log('✅ Using live transcript data format:', transcript.length, 'entries');
+        }
+      } catch (error) {
+        console.error('Error parsing live_transcript_data:', error);
+      }
+    }
+    
+    // Fallback to storage format if live data failed
+    if (transcript.length === 0 && sessionData.transcript_path) {
+      // Fallback to storage format
+      try {
+        const response = await fetch(sessionData.transcript_path);
+        if (response.ok) {
+          const transcriptData = await response.json();
+          transcript = transcriptData.entries || [];
+        }
+      } catch (error) {
+        console.error('Error fetching transcript from storage:', error);
+        transcript = [];
+      }
+    }
+    
+    // Extract final evaluation
+    let finalEvaluation = null;
+    if (sessionData.detailed_analysis) {
+      try {
+        finalEvaluation = typeof sessionData.detailed_analysis === 'string' 
+          ? JSON.parse(sessionData.detailed_analysis)
+          : sessionData.detailed_analysis;
+      } catch (error) {
+        console.error('Error parsing final evaluation:', error);
+      }
+    }
+    
+    // Get video URL
+    const videoUrl = sessionData.video_url || null;
+    
+    // Enhance session data with joined info
+    const enhancedSessionData = {
+      ...sessionData,
+      case_title: sessionData.interview_cases?.title || 'Unknown Case',
+      case_type: sessionData.interview_cases?.type || 'Unknown',
+      case_industry: sessionData.interview_cases?.industry || 'Unknown',
+      case_difficulty: sessionData.interview_cases?.difficulty || 'Unknown',
+      
+      interviewer_name: sessionData.interviewer_profiles?.name || 'Unknown Interviewer',
+      interviewer_company: sessionData.interviewer_profiles?.company || 'Unknown Company',
+      interviewer_role: sessionData.interviewer_profiles?.role || 'Unknown Role',
+      
+      difficulty_level: sessionData.difficulty_profiles?.display_name || 'Unknown',
+      
+      // Extract overall score from detailed analysis
+      overall_score: finalEvaluation?.summary?.total_score || null,
+    };
+    
+    const result = {
+      transcript,
+      finalEvaluation,
+      videoUrl,
+      sessionData: enhancedSessionData,
+    };
+    
+    console.log(`✅ Session data loaded successfully for: ${sessionId}`);
+    return result;
+    
+  } catch (error) {
+    console.error('Error in getSessionData:', error);
     return null;
   }
 }

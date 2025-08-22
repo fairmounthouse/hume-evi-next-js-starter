@@ -5,6 +5,7 @@ import { Phone } from "lucide-react";
 import { toast } from "sonner";
 import { useEffect, useRef, useState } from "react";
 import { getCurrentPhaseInfo, getCaseMetadata } from "@/utils/session-context";
+import { useUser } from "@clerk/nextjs";
 
 export default function StartCall({
   configId,
@@ -24,6 +25,7 @@ export default function StartCall({
   onCallStart?: () => void;
 }) {
   const { status, connect, sendSessionSettings } = useVoice();
+  const { user } = useUser(); // Get current Clerk user
 
   // Track interview start time & phase with enhanced management
   const startTimeRef = useRef<number | null>(null);
@@ -249,12 +251,15 @@ export default function StartCall({
                 console.log("💾 Creating session record in database...");
                 const { upsertInterviewSession } = await import("@/utils/supabase-client");
                 
+                // Get current user ID from Clerk (simple approach)
+                const userId = user?.id || undefined;
+                console.log("👤 Current user ID:", userId);
+                
                 const sessionData = {
                   session_id: sessionId,
                   started_at: new Date().toISOString(),
-                  transcript_data: "",
-                  // NO coach_mode_enabled - database is only for prompt lookup
-                  status: "in_progress",
+                  user_id: userId, // Associate session with authenticated user
+                  status: "in_progress" as const,
                   // Use selected configuration from setup screen
                   case_id: selectedCaseId || undefined,
                   interviewer_profile_id: selectedInterviewerId || undefined,
