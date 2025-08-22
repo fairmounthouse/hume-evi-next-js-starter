@@ -117,7 +117,7 @@ export class ExhibitManager {
         };
         
         document.addEventListener('keydown', keyHandler);
-        this.eventListeners.push({ element: document, event: 'keydown', handler: keyHandler });
+        this.eventListeners.push({ element: document, event: 'keydown', handler: keyHandler as unknown as EventListener });
       }
       
       console.log('✅ ExhibitManager initialized with', this.eventListeners.length, 'event listeners');

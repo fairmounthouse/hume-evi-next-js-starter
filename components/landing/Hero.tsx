@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Eye } from "lucide-react";
 import Link from "next/link";
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
 export function Hero() {
 
@@ -107,11 +108,33 @@ export function Hero() {
             <a href="#results" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
               Success Stories
             </a>
-            <Link href="/interview">
-              <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
-                Start Mock Interview
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3">
+              <SignedOut>
+                <SignInButton mode="modal" fallbackRedirectUrl="/">
+                  <button className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign in</button>
+                </SignInButton>
+                <SignUpButton mode="modal" fallbackRedirectUrl="/">
+                  <button className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign up</button>
+                </SignUpButton>
+              </SignedOut>
+              <SignedIn>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+            </div>
+            <SignedIn>
+              <Link href="/interview/setup">
+                <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
+                  Start Mock Interview
+                </Button>
+              </Link>
+            </SignedIn>
+            <SignedOut>
+              <Link href="/sign-in?redirect=/interview/setup">
+                <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
+                  Start Mock Interview
+                </Button>
+              </Link>
+            </SignedOut>
           </div>
         </div>
       </nav>
@@ -161,25 +184,52 @@ export function Hero() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="flex flex-col sm:flex-row gap-4 mb-12"
             >
-              <Link href="/interview">
-                <Button
-                  size="lg"
-                  className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Start Your Reality Check
-                </Button>
-              </Link>
-              <Link href="/interview">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="h-12 px-8 text-base font-semibold border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  5-Minute Live Mock
-                </Button>
-              </Link>
+              <SignedIn>
+                <Link href="/interview/setup">
+                  <Button
+                    size="lg"
+                    className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Start Your Reality Check
+                  </Button>
+                </Link>
+              </SignedIn>
+              <SignedOut>
+                <Link href="/sign-in?redirect=/interview/setup">
+                  <Button
+                    size="lg"
+                    className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Start Your Reality Check
+                  </Button>
+                </Link>
+              </SignedOut>
+              <SignedIn>
+                <Link href="/interview/setup">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-12 px-8 text-base font-semibold border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    5-Minute Live Mock
+                  </Button>
+                </Link>
+              </SignedIn>
+              <SignedOut>
+                <Link href="/sign-in?redirect=/interview/setup">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="h-12 px-8 text-base font-semibold border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
+                  >
+                    <Play className="mr-2 h-4 w-4" />
+                    5-Minute Live Mock
+                  </Button>
+                </Link>
+              </SignedOut>
             </motion.div>
 
           </motion.div>
@@ -273,7 +323,7 @@ export function Hero() {
                 </div>
 
                 {/* Start button */}
-                <Link href="/interview" className="block">
+                <Link href="/sign-in" className="block">
                   <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm transition-colors text-base">
                     See Your Blind Spots Now
                     <ArrowRight className="ml-2 h-5 w-5" />

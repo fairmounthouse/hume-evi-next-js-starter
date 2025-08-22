@@ -6,6 +6,9 @@ import { Nav } from "@/components/Nav";
 import { cn } from "@/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import {
+  ClerkProvider,
+} from "@clerk/nextjs";
 
 export const metadata: Metadata = {
   title: "Hume AI - EVI - Next.js Starter",
@@ -18,32 +21,34 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script 
-          src="https://embed.cloudflarestream.com/embed/sdk.latest.js" 
-          async 
-        />
-      </head>
-      <body
-        suppressHydrationWarning
-        className={cn(
-          GeistSans.variable,
-          GeistMono.variable,
-          "flex flex-col min-h-screen"
-        )}
-      >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
+    <ClerkProvider>
+      <html lang="en" suppressHydrationWarning>
+        <head>
+          <script 
+            src="https://embed.cloudflarestream.com/embed/sdk.latest.js" 
+            async 
+          />
+        </head>
+        <body
+          suppressHydrationWarning
+          className={cn(
+            GeistSans.variable,
+            GeistMono.variable,
+            "flex flex-col min-h-screen"
+          )}
         >
-          <Nav />
-          {children}
-          <Toaster position="top-center" richColors={true} />
-        </ThemeProvider>
-      </body>
-    </html>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="light"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <Nav />
+            {children}
+            <Toaster position="top-center" richColors={true} />
+          </ThemeProvider>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }

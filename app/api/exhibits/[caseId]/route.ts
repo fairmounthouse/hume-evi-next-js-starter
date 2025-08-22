@@ -4,7 +4,7 @@ import { supabase } from "@/utils/supabase-client";
 // GET /api/exhibits/[caseId] - Get all exhibits for a case
 export async function GET(
   request: NextRequest,
-  { params }: { params: { caseId: string } }
+  { params }: any
 ) {
   try {
     const { data, error } = await supabase

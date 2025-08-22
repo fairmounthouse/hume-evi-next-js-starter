@@ -8,6 +8,7 @@ import { Results } from "@/components/landing/Results";
 import { Footer } from "@/components/landing/Footer";
 import { motion, useScroll, useSpring } from "framer-motion";
 import { useEffect, useState } from "react";
+import { SignedIn, SignedOut } from "@clerk/nextjs";
 
 export default function LandingPage() {
   const [isClient, setIsClient] = useState(false);
@@ -91,17 +92,32 @@ export default function LandingPage() {
           transition={{ delay: 2, duration: 0.5 }}
           className="fixed bottom-8 right-8 z-40"
         >
-          <motion.a
-            href="/interview"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Start Interview
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
-          </motion.a>
+          <SignedIn>
+            <motion.a
+              href="/interview/setup"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Start Interview
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </motion.a>
+          </SignedIn>
+          <SignedOut>
+            <motion.a
+              href="/sign-in?redirect=/interview/setup"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              Start Interview
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </motion.a>
+          </SignedOut>
         </motion.div>
       </main>
     </>
