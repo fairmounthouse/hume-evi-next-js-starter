@@ -205,28 +205,13 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto px-6 py-8">
-        {/* Header with Session Selector */}
-        <div className="flex justify-between items-start mb-8">
-          <motion.div 
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex-1 text-center"
-          >
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Set Up Your Interview
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-              Choose your interview case, interviewer, and difficulty level for a personalized experience
-            </p>
-          </motion.div>
-          
-          {/* Session Selector in top right */}
+      <div className="container mx-auto px-5 pt-16 pb-7">
+        {/* Session Selector - positioned separately */}
+        <div className="flex justify-end mb-6">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
-            className="ml-4"
+            transition={{ delay: 0.1 }}
           >
             <SessionSelector 
               onSelectSession={handleSessionSelect}
@@ -234,6 +219,20 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             />
           </motion.div>
         </div>
+
+        {/* Main Header - centered */}
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-8"
+        >
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
+            Set Up Your Interview
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Choose your interview case, interviewer, and difficulty level for a personalized experience
+          </p>
+        </motion.div>
 
         {/* Progress Steps */}
         <motion.div 

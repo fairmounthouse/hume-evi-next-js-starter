@@ -15,7 +15,7 @@ interface RecordingControlsProps {
   audioCtx: AudioContext;
   isCallActive?: boolean;
   autoStart?: boolean;
-  onRecordingComplete?: (videoId: string) => void;
+  onRecordingComplete?: (videoId: string, metadata?: { duration: number; fileSize: number }) => void;
 }
 
 export default function RecordingControls({
@@ -343,6 +343,14 @@ export default function RecordingControls({
       );
       
       console.log("Video uploaded with ID:", videoId);
+      
+      // Pass recording metadata along with video ID
+      const recordingMetadata = {
+        duration: duration,
+        fileSize: blob.size
+      };
+      
+      onRecordingComplete?.(videoId, recordingMetadata);
     } catch (error) {
       console.error("Upload error:", error);
       toast.error("Failed to upload recording");

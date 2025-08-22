@@ -27,6 +27,10 @@ import FloatingTranscriptButton from "./FloatingTranscriptButton";
 import ExhibitModal from "./ExhibitModal";
 import { ExhibitManager, ExhibitManagerState, initializeGlobalExhibitManager } from "@/utils/exhibit-manager";
 import { useSmartScroll } from "@/hooks/useSmartScroll";
+import FeedbackForm from "./FeedbackForm";
+import AnalysisFeedbackForm from "./AnalysisFeedbackForm";
+import { submitSessionFeedback, submitAnalysisFeedback } from "@/utils/supabase-client";
+import RecordingControls from "./RecordingControls";
 
 // Chat interface component with voice interaction capabilities
 function ChatInterface({
@@ -54,6 +58,7 @@ function ChatInterface({
   messagesRef,
   showEndScreen,
   setShowEndScreen,
+
   onToolCall,
   unlockedExhibits,
   primaryExhibit,
@@ -90,18 +95,11 @@ function ChatInterface({
     };
   }, [coachingMode]);
 
-  // Expose recording status globally for Nav component
-  useEffect(() => {
-    (window as any).__getRecordingStatus = () => isCallActive || forceShowRecording;
-    
-    return () => {
-      delete (window as any).__getRecordingStatus;
-    };
-  }, [isCallActive, forceShowRecording]);
+
   const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
 
   const [finalEvaluation, setFinalEvaluation] = useState<any>(null);
-  const [isGeneratingFinalReport, setIsGeneratingFinalReport] = useState(false);
+
   const [evaluationCache, setEvaluationCache] = useState<Map<string, any>>(new Map());
   const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
@@ -111,6 +109,12 @@ function ChatInterface({
   const [isVideoProcessing, setIsVideoProcessing] = useState(false);
   const [videoCheckInterval, setVideoCheckInterval] = useState<NodeJS.Timeout | null>(null);
   const [isTranscriptDrawerOpen, setIsTranscriptDrawerOpen] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [showAnalysisFeedbackForm, setShowAnalysisFeedbackForm] = useState(false);
+  const [analysisFeedbackSubmitted, setAnalysisFeedbackSubmitted] = useState(false);
+  const [firstSurveyCompletedAt, setFirstSurveyCompletedAt] = useState<number | null>(null);
+  const [analysisCompletedAt, setAnalysisCompletedAt] = useState<number | null>(null);
   
   // Exhibit Manager state
   const [exhibitManagerState, setExhibitManagerState] = useState<ExhibitManagerState>({
@@ -216,12 +220,13 @@ function ChatInterface({
         const { supabase } = await import("@/utils/supabase-client");
         const { data, error } = await supabase
           .from("interview_sessions")
-          .select("coach_mode_enabled")
+          .select("status")
           .eq("session_id", sessionId)
           .single();
 
         if (!error && data) {
-          setCoachingMode(data.coach_mode_enabled || false);
+          // Note: coach_mode_enabled column removed - coaching is local toggle only
+          setCoachingMode(false);
         }
       } catch (error) {
         console.error("Failed to load coaching mode:", error);
@@ -401,14 +406,14 @@ function ChatInterface({
             if (videoDetails.playbackUrl) {
               setFinalVideoUrl(videoDetails.playbackUrl);
               
-              // Also update in session_media
+              // Also update in interview_sessions table (streamlined)
               try {
-                const { supabase } = await import("@/utils/supabase-client");
-                await supabase
-                  .from("session_media")
-                  .update({ file_url: videoDetails.playbackUrl })
-                  .eq('session_id', sessionId)
-                  .eq('media_type', 'video');
+                const { upsertInterviewSession } = await import("@/utils/supabase-client");
+                await upsertInterviewSession({
+                  session_id: sessionId,
+                  video_url: videoDetails.playbackUrl,
+                  updated_at: new Date().toISOString(),
+                });
               } catch (e) {
                 console.error("Failed to update video URL:", e);
               }
@@ -450,27 +455,43 @@ function ChatInterface({
     }
   }, [finalVideoUrl, isVideoProcessing, sessionId]); // Removed videoCheckInterval from deps to prevent re-runs
   
-    // Add auto-generation of final report when interview ends
-    useEffect(() => {
-      const autoGenerateFinalReport = async () => {
-        if (showEndScreen && storedTranscript.length > 0 && !finalEvaluation && !isGeneratingFinalReport) {
-          console.log("🤖 Auto-generating final report...");
-          try {
-            setIsGeneratingFinalReport(true);
-            const evaluation = await transcriptEvaluator.getDetailedEvaluation(storedTranscript);
-            setFinalEvaluation(evaluation);
-            toast.success("Analysis complete! Your session is fully cached.");
-          } catch (error) {
-            console.error("Error auto-generating final report:", error);
-            toast.error("Failed to generate analysis - you can retry manually");
-          } finally {
-            setIsGeneratingFinalReport(false);
-          }
-        }
+    // Note: Detailed analysis is now called immediately on interview end
+    // No need for useEffect since we start it right away
+
+  // Smart timing: Show analysis feedback 1 minute after BOTH survey completion AND analysis completion
+  useEffect(() => {
+    if (
+      !analysisFeedbackSubmitted && 
+      showEndScreen && 
+      !showAnalysisFeedbackForm &&
+      firstSurveyCompletedAt && 
+      analysisCompletedAt
+    ) {
+      // Both are complete - wait 1 minute after whichever finished last
+      const lastCompletionTime = Math.max(firstSurveyCompletedAt, analysisCompletedAt);
+      const timeElapsed = Date.now() - lastCompletionTime;
+      const waitTime = Math.max(0, 60000 - timeElapsed); // 1 minute minus elapsed time
+      
+      console.log("📊 [ANALYSIS FEEDBACK] Smart timing:", {
+        surveyCompletedAt: new Date(firstSurveyCompletedAt).toISOString(),
+        analysisCompletedAt: new Date(analysisCompletedAt).toISOString(),
+        lastCompletionTime: new Date(lastCompletionTime).toISOString(),
+        timeElapsedMs: timeElapsed,
+        waitTimeMs: waitTime,
+        willShowIn: `${Math.round(waitTime/1000)} seconds`
+      });
+      
+      const timer = setTimeout(() => {
+        console.log("📊 [ANALYSIS FEEDBACK] Smart timer elapsed, showing analysis feedback form");
+        setShowAnalysisFeedbackForm(true);
+      }, waitTime);
+      
+      return () => {
+        console.log("📊 [ANALYSIS FEEDBACK] Cleaning up smart timer");
+        clearTimeout(timer);
       };
-  
-      autoGenerateFinalReport();
-    }, [showEndScreen, storedTranscript, finalEvaluation, isGeneratingFinalReport, transcriptEvaluator]);
+    }
+  }, [firstSurveyCompletedAt, analysisCompletedAt, analysisFeedbackSubmitted, showEndScreen, showAnalysisFeedbackForm]);
 
   // Initialize Exhibit Manager - only during active interview, not on end screen
   useEffect(() => {
@@ -666,18 +687,37 @@ function ChatInterface({
           const transcriptPath = await uploadTranscriptToStorage(sessionId, preservedTranscript);
           
           // Save session metadata to database
-          const sessionStartTime = preservedTranscript[0]?.timestamp 
-            ? new Date(preservedTranscript[0].timestamp * 1000).toISOString()
-            : new Date().toISOString();
+          const now = new Date();
+          const firstMessageTime = preservedTranscript[0]?.timestamp 
+            ? new Date(preservedTranscript[0].timestamp * 1000)
+            : now;
+          
+          // CRITICAL: Ensure ended_at is ALWAYS after started_at with consistent fallback
+          const sessionStartTime = firstMessageTime.toISOString();
+          const minEndTime = new Date(firstMessageTime.getTime() + 5000); // 5 second minimum buffer
+          const actualEndTime = new Date(Math.max(now.getTime(), minEndTime.getTime()));
+          const sessionEndTime = actualEndTime.toISOString();
+          
+          // Debug logging for timestamp validation
+          console.log("🕐 [TIMESTAMP] Validation:", {
+            firstMessageTimestamp: preservedTranscript[0]?.timestamp,
+            firstMessageTime: firstMessageTime.toISOString(),
+            currentTime: now.toISOString(),
+            calculatedStartTime: sessionStartTime,
+            calculatedEndTime: sessionEndTime,
+            timeDifferenceMs: actualEndTime.getTime() - firstMessageTime.getTime(),
+            isValid: actualEndTime >= firstMessageTime,
+            usedFallback: actualEndTime.getTime() === minEndTime.getTime()
+          });
           
           await upsertInterviewSession({
             session_id: sessionId,
             started_at: sessionStartTime, // Required field - use first message timestamp or current time
-            status: "completed",
-            ended_at: new Date().toISOString(),
-            duration_seconds: Math.floor((Date.now() - (preservedTranscript[0]?.timestamp * 1000 || Date.now())) / 1000),
+            status: "completed" as const,
+            ended_at: sessionEndTime, // Ensure this is after started_at
+            duration_seconds: Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000),
             transcript_path: transcriptPath || undefined, // Store the storage path, handle null case
-            transcript_data: "", // Required field - we store actual transcript in storage
+            live_transcript_data: preservedTranscript, // Store live session format for UI consistency
           });
           console.log("✅ [END] Session data and transcript saved to Supabase");
         } catch (supabaseError) {
@@ -692,6 +732,25 @@ function ChatInterface({
       setForceShowRecording(false);
       setShowEndScreen(true);
       
+      // Show feedback form if not already submitted for new sessions
+      // Add a small delay to let the user see the end screen first
+      console.log("📝 [FEEDBACK] Checking feedback conditions:", {
+        feedbackSubmitted,
+        urlSessionId,
+        sessionId,
+        shouldShow: !feedbackSubmitted
+      });
+      
+      if (!feedbackSubmitted) {
+        console.log("📝 [FEEDBACK] Showing feedback form for session in 2 seconds");
+        setTimeout(() => {
+          console.log("📝 [FEEDBACK] Timeout triggered - setting showFeedbackForm to true");
+          setShowFeedbackForm(true);
+        }, 2000); // 2 second delay
+      } else {
+        console.log("📝 [FEEDBACK] Skipping feedback form - already submitted for this session");
+      }
+      
       // Automatically generate detailed analysis (with caching)
       if (preservedTranscript.length > 0) {
         const transcriptHash = JSON.stringify(preservedTranscript.map(t => ({ speaker: t.speaker, text: t.text })));
@@ -700,26 +759,31 @@ function ChatInterface({
         if (cachedEvaluation) {
           console.log("🔚 [END] Using cached detailed analysis");
           setFinalEvaluation(cachedEvaluation);
+          setAnalysisCompletedAt(Date.now()); // Track completion time for cached too
         } else {
-          console.log("🔚 [END] Auto-generating detailed analysis...");
-          setIsGeneratingFinalReport(true);
-          try {
-            const transcriptData = preservedTranscript.length > 0 ? preservedTranscript : buildTranscriptFromMessages(messages);
-            const evaluation = await transcriptEvaluator.getDetailedEvaluation(transcriptData);
-            
-            // Cache the evaluation
-            const newCache = new Map(evaluationCache);
-            newCache.set(transcriptHash, evaluation);
-            setEvaluationCache(newCache);
-            
-            setFinalEvaluation(evaluation);
-            console.log("✅ [END] Auto-generated detailed analysis complete and cached");
-          } catch (error) {
-            console.error("Error auto-generating final report:", error);
-            toast.error("Failed to generate detailed analysis");
-          } finally {
-            setIsGeneratingFinalReport(false);
-          }
+          console.log("🔚 [END] Starting detailed analysis immediately (so it's ready when user finishes feedback)");
+          // Start analysis immediately - don't wait for useEffect
+          const startAnalysis = async () => {
+            try {
+              const transcriptData = preservedTranscript.length > 0 ? preservedTranscript : buildTranscriptFromMessages(messages);
+              const evaluation = await transcriptEvaluator.getDetailedEvaluation(transcriptData);
+              
+              // Cache the evaluation
+              const newCache = new Map(evaluationCache);
+              newCache.set(transcriptHash, evaluation);
+              setEvaluationCache(newCache);
+              
+              setFinalEvaluation(evaluation);
+              setAnalysisCompletedAt(Date.now()); // Track completion time
+              console.log("✅ [END] Detailed analysis complete and ready at:", new Date().toISOString());
+            } catch (error) {
+              console.error("Error generating detailed analysis:", error);
+              toast.error("Failed to generate detailed analysis");
+            }
+          };
+          
+          // Start analysis in background immediately
+          startAnalysis();
         }
       }
       
@@ -826,19 +890,85 @@ function ChatInterface({
 
 
 
-  const handleGenerateFinalReport = async () => {
+
+
+  const handleFeedbackSubmit = async (feedbackData: any) => {
     try {
-      setIsGeneratingFinalReport(true);
-      const transcriptData = storedTranscript.length > 0 ? storedTranscript : buildTranscriptFromMessages(messages);
+      console.log("📝 Submitting complete feedback:", feedbackData);
+      const success = await submitSessionFeedback(feedbackData);
       
-      const evaluation = await transcriptEvaluator.getDetailedEvaluation(transcriptData);
-      setFinalEvaluation(evaluation);
+      if (success) {
+        setFeedbackSubmitted(true);
+        setShowFeedbackForm(false); // Close the form
+        setFirstSurveyCompletedAt(Date.now()); // Track completion time
+        console.log("📝 [FEEDBACK] First survey completed at:", new Date().toISOString());
+        toast.success("Thank you for your feedback!");
+      } else {
+        toast.error("Failed to submit feedback. Please try again.");
+      }
     } catch (error) {
-      console.error("Error generating final report:", error);
-      toast.error("Failed to generate final report");
-    } finally {
-      setIsGeneratingFinalReport(false);
+      console.error("Error submitting feedback:", error);
+      toast.error("Failed to submit feedback. Please try again.");
     }
+  };
+
+  const handlePartialFeedbackSubmit = async (feedbackData: any) => {
+    try {
+      console.log(`📝 Saving partial feedback (closed at question ${feedbackData.lastQuestionIndex + 1}/${feedbackData.totalQuestions}):`, feedbackData);
+      const success = await submitSessionFeedback(feedbackData);
+      
+      if (success) {
+        setFeedbackSubmitted(true);
+        setFirstSurveyCompletedAt(Date.now()); // Track completion time for partial too
+        console.log("✅ Partial feedback saved for analytics at:", new Date().toISOString());
+      } else {
+        console.error("❌ Failed to save partial feedback");
+      }
+    } catch (error) {
+      console.error("Error saving partial feedback:", error);
+    }
+  };
+
+  const handleFeedbackClose = () => {
+    setShowFeedbackForm(false);
+  };
+
+  const handleAnalysisFeedbackSubmit = async (feedbackData: any) => {
+    try {
+      console.log("📊 Submitting analysis feedback:", feedbackData);
+      const success = await submitAnalysisFeedback(feedbackData);
+      
+      if (success) {
+        setAnalysisFeedbackSubmitted(true);
+        setShowAnalysisFeedbackForm(false);
+        toast.success("Thank you for your feedback on the analysis!");
+      } else {
+        toast.error("Failed to submit analysis feedback. Please try again.");
+      }
+    } catch (error) {
+      console.error("Error submitting analysis feedback:", error);
+      toast.error("Failed to submit analysis feedback. Please try again.");
+    }
+  };
+
+  const handlePartialAnalysisFeedbackSubmit = async (feedbackData: any) => {
+    try {
+      console.log(`📊 Saving partial analysis feedback (closed at question ${feedbackData.lastQuestionIndex + 1}/${feedbackData.totalQuestions}):`, feedbackData);
+      const success = await submitAnalysisFeedback(feedbackData);
+      
+      if (success) {
+        setAnalysisFeedbackSubmitted(true);
+        console.log("✅ Partial analysis feedback saved for analytics");
+      } else {
+        console.error("❌ Failed to save partial analysis feedback");
+      }
+    } catch (error) {
+      console.error("Error saving partial analysis feedback:", error);
+    }
+  };
+
+  const handleAnalysisFeedbackClose = () => {
+    setShowAnalysisFeedbackForm(false);
   };
 
   return (
@@ -873,14 +1003,7 @@ function ChatInterface({
                   JSON
                 </Button>
               </div>
-              <Button 
-                variant="outline" 
-                onClick={handleGenerateFinalReport}
-                disabled={isGeneratingFinalReport}
-              >
-                <FileText className="w-4 h-4 mr-1" />
-                {isGeneratingFinalReport ? "Generating..." : "Detailed Report"}
-              </Button>
+
 
                {/* Only show session selector on main interview page, not when viewing a specific session */}
                {!urlSessionId && (
@@ -979,20 +1102,7 @@ function ChatInterface({
             </Card>
 
             {/* Enhanced Detailed Analysis */}
-            {isGeneratingFinalReport ? (
-              <Card className="p-6 flex flex-col">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Detailed Analysis
-                </h3>
-                <div className="flex-grow flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-sm text-blue-600 dark:text-blue-400">Generating detailed analysis...</p>
-                  </div>
-                </div>
-              </Card>
-            ) : finalEvaluation ? (
+            {finalEvaluation ? (
               <EnhancedDetailedAnalysis 
                 evaluation={finalEvaluation} 
                 confidence={finalEvaluation.confidence}
@@ -1005,13 +1115,9 @@ function ChatInterface({
                 </h3>
                 <div className="flex-grow flex items-center justify-center">
                   <div className="text-center">
-                    <Button 
-                      onClick={handleGenerateFinalReport}
-                      disabled={storedTranscript.length === 0}
-                    >
-                      <FileText className="w-4 h-4 mr-1" />
-                      Generate Analysis
-                    </Button>
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Generating detailed analysis...</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">This may take 30-90 seconds</p>
                   </div>
                 </div>
               </Card>
@@ -1140,6 +1246,8 @@ function ChatInterface({
             <div className="flex-shrink-0">
               <VideoInput ref={videoRef} autoStart={isCallActive} />
             </div>
+
+
           
             {/* Coaching & Download Controls - Combined on one line */}
             {isCallActive && (
@@ -1318,6 +1426,71 @@ function ChatInterface({
       {/* Voice Controls - Fixed at bottom */}
       {!showEndScreen && <Controls />}
 
+      {/* Hidden Recording System - No UI, just functionality */}
+      {(isCallActive || forceShowRecording) && (
+        <div style={{ display: 'none' }}>
+          <RecordingControls
+            videoStream={videoRef.current?.getStream() || null}
+            audioCtx={audioCtx}
+            audioStream={assistantBus.getStream()}
+            isCallActive={isCallActive || forceShowRecording}
+            autoStart={shouldAutoRecord}
+            onRecordingComplete={async (videoId, recordingMetadata) => {
+              console.log("🎥 Background recording complete:", {
+                videoId,
+                duration: recordingMetadata?.duration,
+                fileSize: recordingMetadata?.fileSize
+              });
+              
+              // Store video metadata immediately
+              if (recordingMetadata) {
+                const { upsertInterviewSession } = await import("@/utils/supabase-client");
+                await upsertInterviewSession({
+                  session_id: sessionId,
+                  video_duration_seconds: recordingMetadata.duration,
+                  video_file_size_bytes: recordingMetadata.fileSize,
+                  updated_at: new Date().toISOString(),
+                });
+                console.log("📊 Video metadata stored:", recordingMetadata);
+              }
+              
+              // Check video status after a short delay
+              setTimeout(async () => {
+                try {
+                  const response = await fetch(`/api/recording/video/${videoId}?_t=${Date.now()}`, { 
+                    cache: 'no-store' 
+                  });
+                  const videoDetails = await response.json();
+                  
+                  if (videoDetails.ready) {
+                    const playbackUrl = videoDetails.playbackUrl || `https://customer-demo.cloudflarestream.com/${videoId}/watch`;
+                    setFinalVideoUrl(playbackUrl);
+                    console.log("✅ Video ready immediately:", playbackUrl);
+                    
+                    // Store in interview_sessions table (streamlined)
+                    handleVideoReady(videoId, playbackUrl);
+                  } else {
+                    console.log("🔄 Video still processing, will check periodically");
+                    const processingUrl = `https://customer-demo.cloudflarestream.com/${videoId}/watch`;
+                    setFinalVideoUrl(processingUrl);
+                    setIsVideoProcessing(true);
+                    
+                    // Store in interview_sessions table (streamlined)
+                    handleVideoReady(videoId, processingUrl);
+                  }
+                } catch (error) {
+                  console.error("Error checking video status:", error);
+                  // Fallback: assume it will be ready and set URL
+                  const fallbackUrl = `https://customer-demo.cloudflarestream.com/${videoId}/watch`;
+                  setFinalVideoUrl(fallbackUrl);
+                  handleVideoReady(videoId, fallbackUrl);
+                }
+              }, 2000);
+            }}
+          />
+        </div>
+      )}
+
       {/* Exhibit Modal - Only show during active interview, not on end screen */}
       {!showEndScreen && (
         <ExhibitModal
@@ -1326,7 +1499,31 @@ function ChatInterface({
         />
       )}
 
+      {/* Feedback Form - Show after interview ends */}
+      {showFeedbackForm && (
+        <>
+          {(() => { console.log("📝 [FEEDBACK] Rendering FeedbackForm component now!"); return null; })()}
+          <FeedbackForm
+            onClose={handleFeedbackClose}
+            onSubmit={handleFeedbackSubmit}
+            onPartialSubmit={handlePartialFeedbackSubmit}
+            sessionData={{ id: sessionId }}
+          />
+        </>
+      )}
 
+      {/* Analysis Feedback Form - Show 1 minute after analysis completes */}
+      {showAnalysisFeedbackForm && (
+        <>
+          {(() => { console.log("📊 [ANALYSIS FEEDBACK] Rendering AnalysisFeedbackForm component now!"); return null; })()}
+          <AnalysisFeedbackForm
+            onClose={handleAnalysisFeedbackClose}
+            onSubmit={handleAnalysisFeedbackSubmit}
+            onPartialSubmit={handlePartialAnalysisFeedbackSubmit}
+            sessionData={{ id: sessionId }}
+          />
+        </>
+      )}
 
     </>
   );
@@ -1552,21 +1749,16 @@ export default function ClientComponent({
   const handleVideoReady = async (videoId: string, playbackUrl?: string) => {
     if (!playbackUrl) return;
     try {
-      // persist to session_media table (proper structure)
-      const { supabase } = await import("@/utils/supabase-client");
-      await supabase
-        .from("session_media")
-        .upsert({
-          session_id: sessionId,
-          media_type: "video",
-          file_url: playbackUrl,
-          upload_status: "completed",
-        }, {
-          onConflict: 'session_id,media_type'
-        });
+      // Store video data directly in interview_sessions table (streamlined structure)
+      const { upsertInterviewSession } = await import("@/utils/supabase-client");
+      await upsertInterviewSession({
+        session_id: sessionId,
+        video_url: playbackUrl,
+        updated_at: new Date().toISOString(),
+      });
       
       setFinalVideoUrl(playbackUrl);
-      console.log("✅ [VIDEO] Video URL saved to session_media");
+      console.log("✅ [VIDEO] Video URL saved to interview_sessions");
     } catch (e) {
       console.error("Failed saving video url", e);
     }
@@ -1661,6 +1853,7 @@ export default function ClientComponent({
           handleVideoReady={handleVideoReady}
           showEndScreen={showEndScreen}
           setShowEndScreen={setShowEndScreen}
+
           onToolCall={handleToolCall}
           unlockedExhibits={unlockedExhibits}
           primaryExhibit={primaryExhibit}
