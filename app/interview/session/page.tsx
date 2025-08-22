@@ -1,21 +1,18 @@
 import { getHumeAccessToken } from "@/utils/getHumeAccessToken";
-import dynamic from "next/dynamic";
 import { redirect } from "next/navigation";
+import Chat from "@/components/Chat";
 
-const Chat = dynamic(() => import("@/components/Chat"), {
-  ssr: false,
-});
+export const dynamic = 'force-dynamic';
 
 export default async function InterviewSessionPage({
   searchParams,
-}: {
-  searchParams: { [key: string]: string | string[] | undefined }
-}) {
+}: any) {
   const accessToken = await getHumeAccessToken();
-  const sessionId = searchParams.sessionId;
-  const caseId = searchParams.caseId;
-  const interviewerId = searchParams.interviewerId;
-  const difficultyId = searchParams.difficultyId;
+  const params = await searchParams;
+  const sessionId = params?.sessionId;
+  const caseId = params?.caseId;
+  const interviewerId = params?.interviewerId;
+  const difficultyId = params?.difficultyId;
 
   if (!accessToken) {
     throw new Error('Unable to get access token');

@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
       exhibit: {
         id: `${case_id}-${exhibit_name}`,
         exhibit_name,
-        display_name: exhibit_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        display_name: exhibit_name.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
         description: `Case exhibit: ${exhibit_name}`,
         image_url: exhibit_url,
         file_type: "image/png"
