@@ -33,7 +33,7 @@ export interface ClerkUserData {
 export function extractClerkUserData(user: User): ClerkUserData {
   return {
     clerkId: user.id,
-    email: user.emailAddresses[0]?.emailAddress || '',
+    email: user.emailAddresses?.[0]?.emailAddress || '',
     firstName: user.firstName || undefined,
     lastName: user.lastName || undefined,
     fullName: user.fullName || undefined,
