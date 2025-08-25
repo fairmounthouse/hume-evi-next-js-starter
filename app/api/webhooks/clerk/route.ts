@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
         console.log(`👤 [CLERK WEBHOOK] New user created: ${user.id}`);
         
         try {
-          // Sync new user to Supabase
-          const response = await fetch(`${req.nextUrl.origin}/api/billing/init-user`, {
+          // Sync new user to Supabase (using webhook-safe endpoint)
+          const response = await fetch(`${req.nextUrl.origin}/api/billing/webhook-init-user`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -96,8 +96,8 @@ export async function POST(req: NextRequest) {
         console.log(`👤 [CLERK WEBHOOK] User updated: ${user.id}`);
         
         try {
-          // Re-sync user data to Supabase (including any billing/plan changes)
-          const response = await fetch(`${req.nextUrl.origin}/api/billing/force-sync`, {
+          // Re-sync user data to Supabase (using webhook-safe endpoint)
+          const response = await fetch(`${req.nextUrl.origin}/api/billing/webhook-force-sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -150,35 +150,80 @@ export async function POST(req: NextRequest) {
         console.log(`💳 [CLERK COMMERCE] Subscription ${eventType}:`, subscription.id);
         
         try {
-          // Extract the active plan from subscription items
-          const activeItem = subscription.items?.find((item: any) => 
-            item.status === 'active' || item.status === 'upcoming'
-          );
+          if (!subscription.payer) {
+            console.log(`⚠️ [CLERK COMMERCE] No payer found in subscription`);
+            break;
+          }
+
+          const userId = subscription.payer.user_id;
           
-          if (activeItem && subscription.payer) {
-            const planSlug = activeItem.plan.slug; // e.g., "starter", "professional", "premium"
-            const userId = subscription.payer.user_id;
+          // Handle different subscription item statuses
+          // Priority: active > upcoming > others
+          const currentActiveItem = subscription.items?.find((item: any) => item.status === 'active');
+          const upcomingItem = subscription.items?.find((item: any) => item.status === 'upcoming');
+          
+          let planToApply = null;
+          let isImmediate = true;
+          
+          if (currentActiveItem) {
+            // User has an active plan right now
+            planToApply = currentActiveItem;
+            console.log(`📋 [CLERK COMMERCE] User ${userId} has ACTIVE plan: ${currentActiveItem.plan.slug}`);
+          } else if (upcomingItem) {
+            // User has an upcoming plan (downgrades often show as upcoming)
+            planToApply = upcomingItem;
+            isImmediate = false;
+            console.log(`📋 [CLERK COMMERCE] User ${userId} has UPCOMING plan: ${upcomingItem.plan.slug} (starts ${new Date(upcomingItem.period_start)})`);
+          }
+          
+          if (planToApply) {
+            const planSlug = planToApply.plan.slug;
             
-            console.log(`📋 [CLERK COMMERCE] User ${userId} has plan: ${planSlug}`);
-            
-            // Update user's plan in Supabase
-            const response = await fetch(`${req.nextUrl.origin}/api/billing/upgrade-plan`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                clerkUserId: userId,
-                newPlanKey: planSlug,
-                subscriptionId: subscription.id,
-                periodStart: activeItem.period_start,
-                periodEnd: activeItem.period_end
-              })
-            });
-            
-            if (response.ok) {
-              console.log(`✅ [CLERK COMMERCE] Successfully updated plan to ${planSlug}`);
+            // For immediate changes (upgrades, active plans)
+            if (isImmediate || currentActiveItem) {
+              const response = await fetch(`${req.nextUrl.origin}/api/billing/webhook-upgrade-plan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  clerkUserId: userId,
+                  newPlanKey: planSlug,
+                  subscriptionId: subscription.id,
+                  periodStart: planToApply.period_start,
+                  periodEnd: planToApply.period_end
+                })
+              });
+              
+              if (response.ok) {
+                console.log(`✅ [CLERK COMMERCE] Successfully updated plan to ${planSlug} (immediate)`);
+              } else {
+                console.error(`❌ [CLERK COMMERCE] Failed to update plan:`, await response.text());
+              }
             } else {
-              console.error(`❌ [CLERK COMMERCE] Failed to update plan:`, await response.text());
+              // For upcoming changes (downgrades), we might want to schedule them
+              // For now, we'll apply them immediately but log the timing
+              console.log(`📅 [CLERK COMMERCE] Applying upcoming plan ${planSlug} immediately (normally starts ${new Date(planToApply.period_start)})`);
+              
+              const response = await fetch(`${req.nextUrl.origin}/api/billing/webhook-upgrade-plan`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  clerkUserId: userId,
+                  newPlanKey: planSlug,
+                  subscriptionId: subscription.id,
+                  periodStart: planToApply.period_start,
+                  periodEnd: planToApply.period_end,
+                  isScheduled: true
+                })
+              });
+              
+              if (response.ok) {
+                console.log(`✅ [CLERK COMMERCE] Successfully scheduled plan change to ${planSlug}`);
+              } else {
+                console.error(`❌ [CLERK COMMERCE] Failed to schedule plan change:`, await response.text());
+              }
             }
+          } else {
+            console.log(`⚠️ [CLERK COMMERCE] No active or upcoming plan found for user ${userId}`);
           }
         } catch (error) {
           console.error('Error handling subscription event:', error);
@@ -196,8 +241,8 @@ export async function POST(req: NextRequest) {
           if (subscription.payer) {
             const userId = subscription.payer.user_id;
             
-            // Downgrade to free plan
-            const response = await fetch(`${req.nextUrl.origin}/api/billing/upgrade-plan`, {
+            // Downgrade to free plan (using webhook-safe endpoint)
+            const response = await fetch(`${req.nextUrl.origin}/api/billing/webhook-upgrade-plan`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
