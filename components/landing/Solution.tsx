@@ -309,7 +309,7 @@ export function Solution() {
             viewport={{ once: true }}
             className="text-center mt-16"
           >
-            <Link href="/interview">
+            <Link href="/sign-in?redirect=/dashboard">
               <Button
                 size="lg"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md transition-all duration-200"

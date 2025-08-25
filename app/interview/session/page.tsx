@@ -1,6 +1,7 @@
 import { getHumeAccessToken } from "@/utils/getHumeAccessToken";
 import { redirect } from "next/navigation";
 import Chat from "@/components/Chat";
+import UsageProtection from "@/components/UsageProtection";
 
 export const dynamic = 'force-dynamic';
 
@@ -24,10 +25,18 @@ export default async function InterviewSessionPage({
   }
 
   return (
-    <div className={"grow flex flex-col h-full min-h-screen max-h-screen overflow-hidden"}>
-      <Chat 
-        accessToken={accessToken}
-      />
-    </div>
+    // Only check minutes usage - no plan requirements
+    <UsageProtection
+      usageType="minutes_per_month"
+      usageAmount={1}
+      fallbackTitle="Monthly Minutes Exhausted"
+      fallbackDescription="You've used all your monthly interview minutes. Upgrade for more time or wait until next month."
+    >
+      <div className={"grow flex flex-col h-full min-h-screen max-h-screen overflow-hidden"}>
+        <Chat 
+          accessToken={accessToken}
+        />
+      </div>
+    </UsageProtection>
   );
 }

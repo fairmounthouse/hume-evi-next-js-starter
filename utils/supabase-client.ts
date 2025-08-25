@@ -18,6 +18,54 @@ export function createSupabaseClient() {
 
 export const supabase = createSupabaseClient();
 
+// Import billing functions
+import { ensureUserExists } from './billing-client';
+
+/**
+ * Create a session with proper user linking and billing setup
+ */
+export async function createSessionWithBilling(
+  sessionData: Partial<InterviewSession>,
+  clerkId?: string,
+  email?: string
+): Promise<InterviewSession> {
+  try {
+    // If user info is provided, ensure user exists in billing system
+    if (clerkId && email) {
+      await ensureUserExists(clerkId, email);
+      sessionData.user_id = clerkId;
+    }
+
+    // Validate and fix session data
+    const validatedData = validateAndFixSessionData(sessionData);
+    
+    console.log("💾 Creating session with billing integration:", {
+      sessionId: validatedData.session_id,
+      hasClerkId: !!clerkId,
+      hasEmail: !!email
+    });
+
+    // Create the session
+    const { data, error } = await supabase
+      .from("interview_sessions")
+      .insert(validatedData)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("❌ Failed to create session:", error);
+      throw error;
+    }
+
+    console.log("✅ Session created successfully with billing integration");
+    return data as InterviewSession;
+
+  } catch (error) {
+    console.error("❌ Error creating session with billing:", error);
+    throw error;
+  }
+}
+
 export async function uploadTranscriptToStorage(sessionId: string, transcript: any[]): Promise<string | null> {
   try {
     // Create transcript text content

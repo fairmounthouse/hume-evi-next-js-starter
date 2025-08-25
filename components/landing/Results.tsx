@@ -230,7 +230,7 @@ export function Results() {
                 </div>
               </div>
               
-              <Link href="/interview">
+              <Link href="/sign-in?redirect=/dashboard">
                 <Button
                   size="lg"
                   className="h-14 px-8 text-lg font-semibold bg-white text-blue-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl transition-all duration-200 transform hover:-translate-y-0.5"
@@ -270,7 +270,7 @@ export function Results() {
             <span className="block mt-2 text-blue-600">And fix it before it costs you an offer.</span>
           </p>
           
-          <Link href="/interview">
+          <Link href="/sign-in?redirect=/dashboard">
             <Button
               size="lg"
               className="h-14 px-8 text-lg font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md transition-all duration-200"

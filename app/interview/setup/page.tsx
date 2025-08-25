@@ -1,6 +1,7 @@
 "use client";
 
 import InterviewSetup from "@/components/InterviewSetup";
+import UsageProtection from "@/components/UsageProtection";
 import { useRouter } from "next/navigation";
 
 export default function InterviewSetupPage() {
@@ -32,5 +33,15 @@ export default function InterviewSetupPage() {
     router.push(`/interview/session?${params.toString()}`);
   };
 
-  return <InterviewSetup onStartInterview={handleStartInterview} />;
+  return (
+    // Block users who have exceeded their monthly minute limits
+    <UsageProtection
+      usageType="minutes_per_month"
+      usageAmount={1}
+      fallbackTitle="Monthly Minutes Exhausted"
+      fallbackDescription="You've used all your monthly interview minutes. Upgrade your plan to continue practicing or wait until your next billing period."
+    >
+      <InterviewSetup onStartInterview={handleStartInterview} />
+    </UsageProtection>
+  );
 }

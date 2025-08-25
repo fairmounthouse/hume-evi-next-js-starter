@@ -6,7 +6,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { ChevronDown, Clock, User, Video, FileText, RefreshCw } from "lucide-react";
 import { cn } from "@/utils";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface SessionSelectorProps {
   onSelectSession: (sessionId: string) => void;

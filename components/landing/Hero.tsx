@@ -108,6 +108,9 @@ export function Hero() {
             <a href="#results" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
               Success Stories
             </a>
+            <Link href="/pricing" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
+              Pricing
+            </Link>
             <div className="flex items-center gap-3">
               <SignedOut>
                 <SignInButton mode="modal" fallbackRedirectUrl="/">
@@ -122,14 +125,14 @@ export function Hero() {
               </SignedIn>
             </div>
             <SignedIn>
-              <Link href="/interview/setup">
+              <Link href="/dashboard">
                 <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
-                  Start Mock Interview
+                  Go to Dashboard
                 </Button>
               </Link>
             </SignedIn>
             <SignedOut>
-              <Link href="/sign-in?redirect=/interview/setup">
+              <Link href="/sign-in?redirect=/dashboard">
                 <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
                   Start Mock Interview
                 </Button>
@@ -185,18 +188,18 @@ export function Hero() {
               className="flex flex-col sm:flex-row gap-4 mb-12"
             >
               <SignedIn>
-                <Link href="/interview/setup">
+                <Link href="/dashboard">
                   <Button
                     size="lg"
                     className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <Eye className="mr-2 h-4 w-4" />
-                    Start Your Reality Check
+                    Go to Dashboard
                   </Button>
                 </Link>
               </SignedIn>
               <SignedOut>
-                <Link href="/sign-in?redirect=/interview/setup">
+                <Link href="/sign-in?redirect=/dashboard">
                   <Button
                     size="lg"
                     className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
@@ -218,18 +221,6 @@ export function Hero() {
                   </Button>
                 </Link>
               </SignedIn>
-              <SignedOut>
-                <Link href="/sign-in?redirect=/interview/setup">
-                  <Button
-                    size="lg"
-                    variant="outline"
-                    className="h-12 px-8 text-base font-semibold border-2 border-gray-200 hover:border-gray-300 hover:bg-gray-50 transition-all duration-200"
-                  >
-                    <Play className="mr-2 h-4 w-4" />
-                    5-Minute Live Mock
-                  </Button>
-                </Link>
-              </SignedOut>
             </motion.div>
 
           </motion.div>

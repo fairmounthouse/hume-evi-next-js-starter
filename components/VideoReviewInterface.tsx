@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Play, Pause, Volume2, VolumeX, Clock } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX, Clock, Crown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { TranscriptEntry } from "@/utils/feedbackTypes";
 import { FinalEvaluation } from "@/utils/feedbackTypes";
 import { cn } from "@/utils";
+
+import Link from "next/link";
 
 // Declare the Cloudflare Stream player element for TypeScript
 declare global {
@@ -226,6 +228,7 @@ export default function VideoReviewInterface({
   };
 
   return (
+    // Video review available to everyone - only limited by usage minutes
     <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 h-full ${className}`}>
       {/* Video Player */}
       <div className="space-y-4">

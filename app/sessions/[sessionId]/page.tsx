@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import Link from 'next/link';
 import VideoTranscriptPlayer from '@/components/VideoTranscriptPlayer';
 import EnhancedDetailedAnalysis from '@/components/EnhancedDetailedAnalysis';
 import TranscriptDrawer from '@/components/TranscriptDrawer';
+import { Protect } from '@clerk/nextjs';
 
 export default function SessionViewerPage() {
   const params = useParams();
@@ -103,7 +104,9 @@ export default function SessionViewerPage() {
   const { transcript, finalEvaluation, videoUrl, sessionData: session } = sessionData;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    // Everyone can view their sessions - no restrictions
+    <div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-5 pt-16 pb-7">
         {/* Header */}
         <motion.div
@@ -374,6 +377,7 @@ export default function SessionViewerPage() {
           </Link>
         </motion.div>
       </div>
+          </div>
     </div>
   );
 }

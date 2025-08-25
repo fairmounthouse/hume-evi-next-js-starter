@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
 import DocumentUpload from "./DocumentUpload";
+
 import { useRouter } from "next/navigation";
 
 interface InterviewCase {
@@ -72,6 +73,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const [currentStep, setCurrentStep] = useState(1);
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [documentSessionId, setDocumentSessionId] = useState<string>("");
+
   
   // Handle session selection from SessionSelector
   const handleSessionSelect = (sessionId: string) => {
@@ -233,6 +235,9 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             Choose your interview case, interviewer, and difficulty level for a personalized experience
           </p>
         </motion.div>
+
+        {/* Usage Limit Check */}
+
 
         {/* Progress Steps */}
         <motion.div 
