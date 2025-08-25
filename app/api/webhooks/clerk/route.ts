@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { Webhook } from 'svix';
-import { syncUserToSupabase, extractClerkUserData } from '@/utils/user-sync';
 
-const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
+// Extended webhook event type to include Clerk Commerce events
+interface ExtendedWebhookEvent {
+  data: any;
+  object: string;
+  type: string;
+  timestamp?: number;
+  instance_id?: string;
+}
 
 export async function POST(req: NextRequest) {
-  if (!webhookSecret) {
-    console.error('Missing CLERK_WEBHOOK_SECRET');
-    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
+  // Get the webhook secret from environment variables
+  const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
+
+  if (!WEBHOOK_SECRET) {
+    throw new Error('Please add CLERK_WEBHOOK_SECRET from Clerk Dashboard to .env or .env.local');
   }
 
   // Get the headers
@@ -19,112 +27,157 @@ export async function POST(req: NextRequest) {
 
   // If there are no headers, error out
   if (!svix_id || !svix_timestamp || !svix_signature) {
-    return NextResponse.json({ error: 'Missing svix headers' }, { status: 400 });
+    return new Response('Error occurred -- no svix headers', {
+      status: 400
+    });
   }
 
   // Get the body
-  const payload = await req.text();
+  const payload = await req.json();
+  const body = JSON.stringify(payload);
 
-  // Create a new Svix instance with your secret.
-  const wh = new Webhook(webhookSecret);
+  // Create a new Svix instance with your secret
+  const wh = new Webhook(WEBHOOK_SECRET);
 
-  let evt: any;
+  let evt: ExtendedWebhookEvent;
 
   // Verify the payload with the headers
   try {
-    evt = wh.verify(payload, {
+    evt = wh.verify(body, {
       'svix-id': svix_id,
       'svix-timestamp': svix_timestamp,
       'svix-signature': svix_signature,
-    }) as any;
+    }) as ExtendedWebhookEvent;
   } catch (err) {
     console.error('Error verifying webhook:', err);
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    return new Response('Error occurred', {
+      status: 400
+    });
   }
 
-  // Handle the webhook
+  // Get the ID and type
+  const { id } = evt.data;
   const eventType = evt.type;
-  console.log(`🔔 [CLERK WEBHOOK] Received ${eventType} event`);
+
+  console.log(`🔔 [CLERK WEBHOOK] Received ${eventType} for ID: ${id}`);
 
   try {
+    // Handle different event types
     switch (eventType) {
-      case 'user.created':
-      case 'user.updated': {
+      case 'user.created': {
         const user = evt.data;
-        console.log(`👤 [CLERK SYNC] Syncing user: ${user.id}`);
+        console.log(`👤 [CLERK WEBHOOK] New user created: ${user.id}`);
         
-        // Extract comprehensive user data
-        const userData = extractClerkUserData(user);
-        
-        // Sync to Supabase
-        await syncUserToSupabase(userData);
-        
-        console.log(`✅ [CLERK SYNC] Successfully synced user: ${user.id}`);
-        break;
-      }
-      
-      case 'user.deleted': {
-        const user = evt.data;
-        console.log(`🗑️ [CLERK SYNC] User deleted: ${user.id}`);
-        
-        // Optionally handle user deletion
-        // For now, we'll keep the user data but mark as deleted
-        // You can implement soft delete logic here if needed
-        
-        break;
-      }
-      
-      case 'session.created': {
-        const session = evt.data;
-        console.log(`🔐 [CLERK SYNC] Session created for user: ${session.user_id}`);
-        
-        // Trigger user sync on session creation to ensure data is fresh
         try {
+          // Sync new user to Supabase
           const response = await fetch(`${req.nextUrl.origin}/api/billing/init-user`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ clerkId: session.user_id })
+            body: JSON.stringify({
+              email: user.email_addresses[0]?.email_address,
+              userData: user
+            })
           });
-          
+
           if (response.ok) {
-            console.log(`✅ [CLERK SYNC] User data refreshed on session creation`);
+            console.log(`✅ [CLERK WEBHOOK] Successfully synced new user to Supabase`);
+          } else {
+            console.error(`❌ [CLERK WEBHOOK] Failed to sync user:`, await response.text());
           }
         } catch (error) {
-          console.error('Error refreshing user data on session:', error);
+          console.error('Error syncing new user:', error);
         }
         
         break;
       }
 
-      // Handle Clerk billing/subscription events
+      case 'user.updated': {
+        const user = evt.data;
+        console.log(`👤 [CLERK WEBHOOK] User updated: ${user.id}`);
+        
+        try {
+          // Re-sync user data to Supabase (including any billing/plan changes)
+          const response = await fetch(`${req.nextUrl.origin}/api/billing/force-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userData: user
+            })
+          });
+
+          if (response.ok) {
+            console.log(`✅ [CLERK WEBHOOK] Successfully synced user update to Supabase`);
+          } else {
+            console.error(`❌ [CLERK WEBHOOK] Failed to sync user update:`, await response.text());
+          }
+        } catch (error) {
+          console.error('Error syncing user update:', error);
+        }
+        
+        break;
+      }
+
+      case 'user.deleted': {
+        const user = evt.data;
+        console.log(`👤 [CLERK WEBHOOK] User deleted: ${user.id}`);
+        
+        // Note: You might want to handle user deletion in Supabase here
+        // For now, we'll just log it
+        
+        break;
+      }
+
+      case 'session.created': {
+        const session = evt.data;
+        console.log(`🔐 [CLERK WEBHOOK] Session created for user: ${session.user_id}`);
+        
+        break;
+      }
+
+      case 'session.ended':
+      case 'session.removed':
+      case 'session.revoked': {
+        const session = evt.data;
+        console.log(`🔐 [CLERK WEBHOOK] Session ${eventType} for user: ${session.user_id}`);
+        
+        break;
+      }
+
+      // Clerk Commerce/Billing subscription events
       case 'subscription.created':
       case 'subscription.updated': {
         const subscription = evt.data;
-        console.log(`💳 [CLERK BILLING] Subscription ${eventType} for user: ${subscription.user_id}`);
+        console.log(`💳 [CLERK COMMERCE] Subscription ${eventType}:`, subscription.id);
         
         try {
-          // Extract plan information from Clerk subscription
-          const planKey = subscription.plan_id || subscription.price_id; // Depends on Clerk setup
+          // Extract the active plan from subscription items
+          const activeItem = subscription.items?.find((item: any) => 
+            item.status === 'active' || item.status === 'upcoming'
+          );
           
-          if (planKey) {
+          if (activeItem && subscription.payer) {
+            const planSlug = activeItem.plan.slug; // e.g., "starter", "professional", "premium"
+            const userId = subscription.payer.user_id;
+            
+            console.log(`📋 [CLERK COMMERCE] User ${userId} has plan: ${planSlug}`);
+            
+            // Update user's plan in Supabase
             const response = await fetch(`${req.nextUrl.origin}/api/billing/upgrade-plan`, {
               method: 'POST',
-              headers: { 
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${subscription.user_id}` // Pass user ID for auth
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                newPlanKey: planKey,
-                periodStart: subscription.current_period_start,
-                periodEnd: subscription.current_period_end
-                // Usage is always preserved - no reset
+                clerkUserId: userId,
+                newPlanKey: planSlug,
+                subscriptionId: subscription.id,
+                periodStart: activeItem.period_start,
+                periodEnd: activeItem.period_end
               })
             });
             
             if (response.ok) {
-              console.log(`✅ [CLERK BILLING] Successfully updated subscription in Supabase`);
+              console.log(`✅ [CLERK COMMERCE] Successfully updated plan to ${planSlug}`);
             } else {
-              console.error(`❌ [CLERK BILLING] Failed to update subscription:`, await response.text());
+              console.error(`❌ [CLERK COMMERCE] Failed to update plan:`, await response.text());
             }
           }
         } catch (error) {
@@ -134,27 +187,31 @@ export async function POST(req: NextRequest) {
         break;
       }
 
-      case 'subscription.cancelled':
-      case 'subscription.deleted': {
+      case 'subscription.canceled':
+      case 'subscription.ended': {
         const subscription = evt.data;
-        console.log(`💳 [CLERK BILLING] Subscription ${eventType} for user: ${subscription.user_id}`);
+        console.log(`💳 [CLERK COMMERCE] Subscription ${eventType}:`, subscription.id);
         
         try {
-          // Downgrade to free plan
-          const response = await fetch(`${req.nextUrl.origin}/api/billing/upgrade-plan`, {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${subscription.user_id}`
-            },
-            body: JSON.stringify({
-              newPlanKey: 'free_user'
-              // Usage is always preserved - no reset even on downgrades
-            })
-          });
-          
-          if (response.ok) {
-            console.log(`✅ [CLERK BILLING] Successfully downgraded to free plan`);
+          if (subscription.payer) {
+            const userId = subscription.payer.user_id;
+            
+            // Downgrade to free plan
+            const response = await fetch(`${req.nextUrl.origin}/api/billing/upgrade-plan`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clerkUserId: userId,
+                newPlanKey: 'free_user',
+                subscriptionId: null
+              })
+            });
+            
+            if (response.ok) {
+              console.log(`✅ [CLERK COMMERCE] Successfully downgraded to free plan`);
+            } else {
+              console.error(`❌ [CLERK COMMERCE] Failed to downgrade:`, await response.text());
+            }
           }
         } catch (error) {
           console.error('Error handling subscription cancellation:', error);
@@ -162,18 +219,24 @@ export async function POST(req: NextRequest) {
         
         break;
       }
-      
-      default:
-        console.log(`ℹ️ [CLERK WEBHOOK] Unhandled event type: ${eventType}`);
+
+      default: {
+        console.log(`⚠️ [CLERK WEBHOOK] Unhandled event type: ${eventType}`);
+        break;
+      }
     }
 
-    return NextResponse.json({ success: true, eventType });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Webhook processed successfully',
+      eventType 
+    });
     
   } catch (error) {
-    console.error(`❌ [CLERK WEBHOOK] Error processing ${eventType}:`, error);
-    return NextResponse.json(
-      { error: 'Webhook processing failed', eventType },
-      { status: 500 }
-    );
+    console.error('❌ [CLERK WEBHOOK] Error processing webhook:', error);
+    return NextResponse.json({ 
+      error: 'Webhook processing failed', 
+      eventType 
+    }, { status: 500 });
   }
 }
