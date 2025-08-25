@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   FileText, 
   ChevronRight, 
@@ -9,7 +9,8 @@ import {
   AlertTriangle, 
   Target,
   Clock,
-  X
+  X,
+  Crown
 } from "lucide-react";
 import { cn } from "@/utils";
 import { Card } from "./ui/card";
@@ -17,6 +18,8 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import CircularProgress from "./CircularProgress";
 import { FinalEvaluation } from "@/utils/feedbackTypes";
+
+import Link from "next/link";
 
 interface EnhancedDetailedAnalysisProps {
   evaluation: FinalEvaluation;

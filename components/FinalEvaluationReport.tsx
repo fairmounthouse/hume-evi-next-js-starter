@@ -5,7 +5,7 @@ import { cn } from "@/utils";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   FileText, 
   TrendingUp, 

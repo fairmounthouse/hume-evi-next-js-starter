@@ -9,7 +9,7 @@ import VideoInput, { VideoInputRef } from "./VideoInput";
 import VideoReviewInterface from "./VideoReviewInterface";
 import SessionSelector from "./SessionSelector";
 import { ComponentRef, useRef, useState, useEffect, useMemo, useCallback } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
 import { Button } from "./ui/button";
@@ -29,6 +29,7 @@ import { ExhibitManager, ExhibitManagerState, initializeGlobalExhibitManager } f
 import { useSmartScroll } from "@/hooks/useSmartScroll";
 import FeedbackForm from "./FeedbackForm";
 import AnalysisFeedbackForm from "./AnalysisFeedbackForm";
+import PostInterviewUsageWarning from "./PostInterviewUsageWarning";
 import { submitSessionFeedback, submitAnalysisFeedback } from "@/utils/supabase-client";
 import RecordingControls from "./RecordingControls";
 
@@ -85,6 +86,8 @@ function ChatInterface({
   }, [status.value, sessionId]);
   const [coachingMode, setCoachingMode] = useState(false);
   const [isUpdatingCoaching, setIsUpdatingCoaching] = useState(false);
+  const [completedInterviewDuration, setCompletedInterviewDuration] = useState<number>(0);
+  const [showUsageWarning, setShowUsageWarning] = useState(false);
   
   // Expose coaching mode globally for other components (local state only)
   useEffect(() => {
@@ -720,6 +723,36 @@ function ChatInterface({
             live_transcript_data: preservedTranscript, // Store live session format for UI consistency
           });
           console.log("✅ [END] Session data and transcript saved to Supabase");
+          
+          // Track usage for billing
+          try {
+            const durationMinutes = Math.ceil(Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000) / 60);
+            console.log("💰 [BILLING] Tracking interview usage:", { durationMinutes });
+            
+            // Store duration for usage warning component
+            setCompletedInterviewDuration(durationMinutes);
+            
+            const response = await fetch('/api/billing/track-usage', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                usageType: 'interview_session',
+                durationMinutes: durationMinutes
+              })
+            });
+            
+            if (response.ok) {
+              console.log("✅ [BILLING] Usage tracked successfully");
+              // Show usage warning after a short delay
+              setTimeout(() => {
+                setShowUsageWarning(true);
+              }, 2000);
+            } else {
+              console.error("⚠️ [BILLING] Failed to track usage:", await response.text());
+            }
+          } catch (billingError) {
+            console.error("⚠️ [BILLING] Usage tracking failed (non-critical):", billingError);
+          }
         } catch (supabaseError) {
           console.error("⚠️ [END] Supabase save failed (non-critical):", supabaseError);
         }
@@ -974,7 +1007,7 @@ function ChatInterface({
   return (
     <>
       {showEndScreen ? (
-        <div className="interview-end-screen grow flex flex-col overflow-hidden pt-14">
+        <div className="interview-end-screen grow flex flex-col h-full pt-14">
           {/* Top Navigation Bar - Fixed Height, accounting for fixed nav */}
           <div className="flex-shrink-0 bg-background border-b px-6 py-4">
             <div className="flex justify-between items-center">
@@ -1026,7 +1059,17 @@ function ChatInterface({
           </div>
           
           {/* Main Content Area - Scrollable */}
-          <div className="flex-grow overflow-hidden p-6">
+          <div className="flex-grow overflow-y-auto p-6">
+            {/* Usage Warning - Shows after interview completion */}
+            {showUsageWarning && completedInterviewDuration > 0 && (
+              <div className="mb-4">
+                <PostInterviewUsageWarning 
+                  sessionDurationMinutes={completedInterviewDuration}
+                  onClose={() => setShowUsageWarning(false)}
+                />
+              </div>
+            )}
+            
             <div 
               className={cn(
                 "h-full grid gap-4 transition-all duration-300",

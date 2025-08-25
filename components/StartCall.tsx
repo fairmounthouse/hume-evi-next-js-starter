@@ -1,5 +1,5 @@
 import { useVoice } from "@humeai/voice-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { Phone } from "lucide-react";
 import { toast } from "sonner";
@@ -249,16 +249,16 @@ export default function StartCall({
 
                 // First: Create session record with selected interview configuration
                 console.log("💾 Creating session record in database...");
-                const { upsertInterviewSession } = await import("@/utils/supabase-client");
+                const { createSessionWithBilling } = await import("@/utils/supabase-client");
                 
-                // Get current user ID from Clerk (simple approach)
+                // Get current user ID and email from Clerk
                 const userId = user?.id || undefined;
+                const userEmail = user?.emailAddresses?.[0]?.emailAddress || undefined;
                 console.log("👤 Current user ID:", userId);
                 
                 const sessionData = {
                   session_id: sessionId,
                   started_at: new Date().toISOString(),
-                  user_id: userId, // Associate session with authenticated user
                   status: "in_progress" as const,
                   // Use selected configuration from setup screen
                   case_id: selectedCaseId || undefined,
@@ -268,7 +268,11 @@ export default function StartCall({
 
                 console.log("📝 Session data to be created:", sessionData);
                 
-                const sessionCreated = await upsertInterviewSession(sessionData);
+                const sessionCreated = await createSessionWithBilling(
+                  sessionData, 
+                  userId, 
+                  userEmail
+                );
                 
                 if (!sessionCreated) {
                   throw new Error("Failed to create session record");

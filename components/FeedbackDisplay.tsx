@@ -2,7 +2,7 @@
 
 import { useState, useEffect, forwardRef, useImperativeHandle } from "react";
 import { cn } from "@/utils";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle, AlertCircle, XCircle, Loader2 } from "lucide-react";
 import { InInterviewFeedback } from "@/utils/feedbackTypes";
 

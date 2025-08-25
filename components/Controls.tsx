@@ -2,7 +2,7 @@
 import { useVoice } from "@humeai/voice-react";
 import { Button } from "./ui/button";
 import { Mic, MicOff, Phone, Volume2, VolumeX } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Toggle } from "./ui/toggle";
 import MicFFT from "./MicFFT";
 import { cn } from "@/utils";

@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { Button } from "./ui/button";
 import { Video, VideoOff, User } from "lucide-react";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/utils";
 import { toast } from "sonner";
 

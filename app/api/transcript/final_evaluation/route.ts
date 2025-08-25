@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 
 export async function POST(request: NextRequest) {
   try {
+    // Check authentication only - detailed analysis available to everyone
+    const { userId } = await auth();
+    
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const { transcript_text } = await request.json();
 
     if (!transcript_text || typeof transcript_text !== 'string') {
@@ -47,6 +58,9 @@ export async function POST(request: NextRequest) {
           { status: 502 }
         );
       }
+
+      // Note: Detailed analysis is now available to everyone - no usage tracking needed
+      // Only interview minutes are tracked and limited by plan
 
       // Return the detailed evaluation result
       return NextResponse.json({

@@ -6,9 +6,10 @@ export const fetchCache = 'force-no-store'
 
 export async function GET(
   request: NextRequest,
-  { params }: any
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
     const apiToken = process.env.CLOUDFLARE_STREAM_API_TOKEN;
 
@@ -28,7 +29,7 @@ export async function GET(
 
     // Get video details from Cloudflare Stream
     const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/${params.id}`,
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/stream/${id}`,
       {
         headers: {
           Authorization: `Bearer ${apiToken}`,

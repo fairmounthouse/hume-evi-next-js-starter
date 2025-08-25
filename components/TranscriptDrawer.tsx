@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, FileText, Download, User } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";

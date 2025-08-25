@@ -1,5 +1,5 @@
 "use client";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence } from "framer-motion";
 import { X, Image as ImageIcon, Download, Maximize2 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
