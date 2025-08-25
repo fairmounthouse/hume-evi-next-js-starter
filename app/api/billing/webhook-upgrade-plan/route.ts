@@ -25,10 +25,9 @@ export async function POST(request: NextRequest) {
 
     // Update user's plan in Supabase
     const { data: updateResult, error: updateError } = await supabase
-      .rpc('ensure_user_exists', {
+      .rpc('update_user_subscription', {
         p_clerk_id: clerkUserId,
-        p_plan_key: newPlanKey,
-        p_subscription_id: subscriptionId,
+        p_new_plan_key: newPlanKey,
         p_period_start: periodStart ? new Date(periodStart).toISOString() : null,
         p_period_end: periodEnd ? new Date(periodEnd).toISOString() : null
       });

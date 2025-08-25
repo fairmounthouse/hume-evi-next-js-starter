@@ -19,7 +19,17 @@ export async function POST(request: NextRequest) {
     // Extract user data for Supabase
     const extractedData = extractClerkUserData(userData);
     
+    // Fallback email from request body if extraction fails
+    if (!extractedData.email && email) {
+      extractedData.email = email;
+    }
+    
     if (!extractedData.clerkId || !extractedData.email) {
+      console.error('❌ [WEBHOOK INIT USER] Invalid user data:', { 
+        hasClerkId: !!extractedData.clerkId, 
+        hasEmail: !!extractedData.email,
+        userData: userData 
+      });
       return NextResponse.json(
         { error: "Invalid user data - missing clerkId or email" },
         { status: 400 }
