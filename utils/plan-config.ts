@@ -22,7 +22,7 @@ export interface PlanConfig {
 
 // 🎯 SINGLE SOURCE OF TRUTH for all plans
 // Usage-based limits are the actual enforcement mechanism
-export const PLAN_CONFIGS: readonly PlanConfig[] = [
+export const PLAN_CONFIGS: PlanConfig[] = [
   {
     key: 'free',
     name: 'Free',
@@ -193,7 +193,7 @@ export function getUserLimits(userPlan: PlanConfig) {
  * Get all available plans for display
  */
 export function getAllPlans(): PlanConfig[] {
-  return PLAN_CONFIGS;
+  return [...PLAN_CONFIGS];
 }
 
 /**

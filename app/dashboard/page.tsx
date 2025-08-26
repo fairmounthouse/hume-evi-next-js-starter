@@ -319,7 +319,7 @@ export default function DashboardPage() {
                       {hasAdvancedAnalytics ? '✅' : '❌'} Advanced Analytics
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      {hasVideoReview ? '✅' : '❌'} Video Review
+                      {canUseVideoReview ? '✅' : '❌'} Video Review
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       {hasUnlimitedSessions ? '✅' : '❌'} Unlimited Sessions
