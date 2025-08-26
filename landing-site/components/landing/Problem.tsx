@@ -97,7 +97,7 @@ export function Problem() {
                 whileHover={{ y: -5, transition: { duration: 0.2 } }}
                 className="group"
               >
-                <div className="relative h-full p-6 rounded-2xl bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
+                <div className="relative h-full p-6 rounded-2xl bg-white border border-gray-200 border-theme shadow-sm hover:shadow-md transition-all duration-300">
                   {/* Emoji icon */}
                   <div className="text-4xl mb-4">{failure.icon}</div>
                   

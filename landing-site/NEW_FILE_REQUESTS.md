@@ -17,6 +17,7 @@
 - `landing-site/app/layout.tsx`, `landing-site/app/page.tsx`, `landing-site/app/globals.css`
 - `landing-site/components/ui/button.tsx`
 - `landing-site/components/landing/{Hero,Problem,Solution,Transformation,Results,Footer}.tsx`
+- `landing-site/components/ThemePalette.tsx` (floating color wheel to tweak theme variables)
 - `landing-site/utils/index.ts`
 - `landing-site/public/grid.svg`
 - `landing-site/README.md`
@@ -25,3 +26,8 @@
 - All CTAs point to `${NEXT_PUBLIC_APP_URL}` (set in Vercel) for sign-in/signup and dashboard.
 - No Clerk provider or middleware in this app; it only links to the app subdomain.
 - Styles simplified to avoid main app theme dependencies.
+
+### Duplicate Functionality Search for ThemePalette
+- Searched for existing color picker/theming: none found in `components/*`, `app/*`, or `utils/*`.
+- Using off-the-shelf `react-colorful` for minimal custom code.
+- Component writes to CSS variables (`--theme-*`) to avoid invasive Tailwind config changes.

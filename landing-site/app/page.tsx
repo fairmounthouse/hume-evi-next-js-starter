@@ -6,6 +6,7 @@ import { Solution } from "../components/landing/Solution";
 import { Transformation } from "../components/landing/Transformation";
 import { Results } from "../components/landing/Results";
 import { Footer } from "../components/landing/Footer";
+import ThemePalette from "../components/ThemePalette";
 
 export default function Landing() {
   return (
@@ -16,6 +17,7 @@ export default function Landing() {
       <Transformation />
       <Results />
       <Footer />
+      <ThemePalette />
     </main>
   );
 }

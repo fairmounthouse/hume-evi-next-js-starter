@@ -83,7 +83,7 @@ export function Transformation() {
             </div>
             <div className="text-center">
               <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
-                <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md">Start Your Transformation<Zap className="ml-2 h-4 w-4" /></Button>
+                <Button className="bg-cta text-white shadow-sm hover:shadow-md">Start Your Transformation<Zap className="ml-2 h-4 w-4" /></Button>
               </a>
             </div>
           </div>

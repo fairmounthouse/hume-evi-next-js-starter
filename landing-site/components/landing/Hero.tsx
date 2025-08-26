@@ -19,7 +19,7 @@ export function Hero() {
         <motion.div className="absolute bottom-20 left-1/4 w-40 h-40 bg-gradient-to-br from-purple-300 to-pink-300 rounded-full filter blur-2xl opacity-30" animate={{ y: [0, 50, 0], x: [0, -30, 0], scale: [1, 1.1, 1] }} transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }} />
       </div>
       {/* Navigation Bar */}
-      <nav className="absolute top-0 left-0 right-0 z-40 px-6 py-4">
+      <nav data-theme="header" className="absolute top-0 left-0 right-0 z-40 px-6 py-4">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center shadow-sm">
@@ -38,7 +38,15 @@ export function Hero() {
               <a href={`${appUrl}/sign-up?redirect=/dashboard`} className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign up</a>
             </div>
             <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
-              <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">Start Mock Interview</Button>
+              <Button
+                className="px-6 shadow-md hover:shadow-lg transition-all"
+                style={{
+                  backgroundColor: "var(--theme-cta)",
+                  color: "#ffffff",
+                }}
+              >
+                Start Mock Interview
+              </Button>
             </a>
           </div>
         </div>
@@ -54,7 +62,7 @@ export function Hero() {
             </motion.h1>
             <motion.div className="flex flex-col sm:flex-row gap-4 mb-12">
               <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
-                <Button size="lg" className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200">
+                <Button size="lg" className="h-12 px-8 text-base font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200" style={{ backgroundColor: "var(--theme-cta)", color: "#ffffff" }}>
                   <Eye className="mr-2 h-4 w-4" /> Start Your Reality Check
                 </Button>
               </a>
@@ -68,57 +76,57 @@ export function Hero() {
 
           {/* Right Column - What We Catch Card */}
           <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6, delay: 0.3 }} className="relative">
-            <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+            <div data-hero-card="true" className="rounded-2xl border p-8 shadow-sm">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                  <span className="text-sm font-medium text-gray-600">Live analysis</span>
+                  <span className="text-sm font-medium" style={{ color: "color-mix(in srgb, var(--theme-hero) 60%, black)" }}>Live analysis</span>
                 </div>
               </div>
               <div className="mb-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-4">What partners see</h3>
+                <h3 className="text-xl font-semibold mb-4" style={{ color: "color-mix(in srgb, var(--theme-hero) 80%, black)" }}>What partners see</h3>
                 <div className="space-y-4">
-                  <motion.div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
+                  <motion.div className="flex items-start gap-3 p-3 rounded-xl border" style={{ background: "color-mix(in srgb, var(--theme-hero) 6%, white)", borderColor: "var(--theme-card-border)" }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 }}>
                     <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs font-bold">!</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Looking at ceiling during math</p>
-                      <p className="text-xs text-gray-600 mt-1">Making it up as they go</p>
+                      <p className="text-sm font-semibold" style={{ color: "color-mix(in srgb, var(--theme-hero) 85%, black)" }}>Looking at ceiling during math</p>
+                      <p className="text-xs mt-1" style={{ color: "color-mix(in srgb, var(--theme-hero) 50%, black)" }}>Making it up as they go</p>
                     </div>
                   </motion.div>
-                  <motion.div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
+                  <motion.div className="flex items-start gap-3 p-3 rounded-xl border" style={{ background: "color-mix(in srgb, var(--theme-hero) 6%, white)", borderColor: "var(--theme-card-border)" }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.6 }}>
                     <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs font-bold">!</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Voice rises when challenged</p>
-                      <p className="text-xs text-gray-600 mt-1">Not confident in answer</p>
+                      <p className="text-sm font-semibold" style={{ color: "color-mix(in srgb, var(--theme-hero) 85%, black)" }}>Voice rises when challenged</p>
+                      <p className="text-xs mt-1" style={{ color: "color-mix(in srgb, var(--theme-hero) 50%, black)" }}>Not confident in answer</p>
                     </div>
                   </motion.div>
-                  <motion.div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-200" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
+                  <motion.div className="flex items-start gap-3 p-3 rounded-xl border" style={{ background: "color-mix(in srgb, var(--theme-hero) 6%, white)", borderColor: "var(--theme-card-border)" }} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.7 }}>
                     <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-0.5">
                       <span className="text-white text-xs font-bold">!</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">Shoulders tense up</p>
-                      <p className="text-xs text-gray-600 mt-1">Defensive, not coachable</p>
+                      <p className="text-sm font-semibold" style={{ color: "color-mix(in srgb, var(--theme-hero) 85%, black)" }}>Shoulders tense up</p>
+                      <p className="text-xs mt-1" style={{ color: "color-mix(in srgb, var(--theme-hero) 50%, black)" }}>Defensive, not coachable</p>
                     </div>
                   </motion.div>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 mb-6">
-                <motion.div className="p-4 rounded-xl bg-white border border-gray-200" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8 }}>
-                  <p className="text-3xl font-bold text-gray-900">50+</p>
-                  <p className="text-xs text-gray-700 font-medium mt-1">Behavioral Tells Tracked</p>
+                <motion.div className="p-4 rounded-xl border" style={{ background: "color-mix(in srgb, var(--theme-hero) 4%, white)", borderColor: "var(--theme-card-border)" }} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8 }}>
+                  <p className="text-3xl font-bold" style={{ color: "color-mix(in srgb, var(--theme-hero) 88%, black)" }}>50+</p>
+                  <p className="text-xs font-medium mt-1" style={{ color: "color-mix(in srgb, var(--theme-hero) 55%, black)" }}>Behavioral Tells Tracked</p>
                 </motion.div>
-                <motion.div className="p-4 rounded-xl bg-white border border-gray-200" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.9 }}>
-                  <p className="text-3xl font-bold text-gray-900">Real-time</p>
-                  <p className="text-xs text-gray-700 font-medium mt-1">Coaching Feedback</p>
+                <motion.div className="p-4 rounded-xl border" style={{ background: "color-mix(in srgb, var(--theme-hero) 4%, white)", borderColor: "var(--theme-card-border)" }} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.9 }}>
+                  <p className="text-3xl font-bold" style={{ color: "color-mix(in srgb, var(--theme-hero) 88%, black)" }}>Real-time</p>
+                  <p className="text-xs font-medium mt-1" style={{ color: "color-mix(in srgb, var(--theme-hero) 55%, black)" }}>Coaching Feedback</p>
                 </motion.div>
               </div>
               <a href={`${appUrl}/sign-in?redirect=/dashboard`} className="block">
-                <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm transition-colors text-base">
+                <Button className="w-full h-12 bg-cta text-white font-semibold shadow-sm transition-colors text-base">
                   See Your Blind Spots Now
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>

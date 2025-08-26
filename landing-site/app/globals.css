@@ -5,3 +5,44 @@
   body { @apply bg-white text-gray-900; }
 }
 
+/* Theme variables and overrides */
+:root {
+  --theme-hero: #005587;
+  --theme-header: #fbf8ef;
+  --theme-section: #ffffff;
+  --theme-cta: #519cab;
+  --theme-accent: #ffc64f;
+  --theme-card-border: #c3e7fa;
+  --theme-footer: #005587;
+}
+
+[data-theme="header"] {
+  background-color: var(--theme-header);
+}
+
+[data-theme="footer"] {
+  background-color: var(--theme-footer);
+  color: #ffffff;
+}
+
+[data-theme-section="hero"] {
+  background: var(--theme-hero);
+  color: #ffffff;
+}
+
+[data-theme-section="section"] {
+  background-color: var(--theme-section);
+}
+
+.bg-cta { background-color: var(--theme-cta) !important; }
+.text-hero { color: var(--theme-hero) !important; }
+.border-theme { border-color: var(--theme-card-border) !important; }
+[data-theme-accent-bar="true"] { background-color: var(--theme-accent) !important; }
+
+/* Hero card theming */
+[data-hero-card="true"] {
+  background-color: var(--theme-header);
+  background: color-mix(in srgb, var(--theme-hero) 10%, white);
+  border-color: var(--theme-card-border);
+}
+
