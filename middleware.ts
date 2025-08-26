@@ -25,27 +25,8 @@ const isProtectedRoute = createRouteMatcher([
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
   
-  // Auto-sync user data on every protected route access
-  if (userId && isProtectedRoute(req)) {
-    try {
-      // Trigger background sync (fire-and-forget)
-      fetch(`${req.nextUrl.origin}/api/billing/init-user`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          forceRefresh: true,
-          source: 'middleware_auto_sync',
-          path: req.nextUrl.pathname
-        })
-      }).catch(error => {
-        console.error('🔄 [MIDDLEWARE SYNC] Background sync failed:', error);
-      });
-      
-      console.log(`🔄 [MIDDLEWARE SYNC] Triggered auto-sync for ${userId} on ${req.nextUrl.pathname}`);
-    } catch (error) {
-      console.error('🔄 [MIDDLEWARE SYNC] Error triggering sync:', error);
-    }
-  }
+  // Note: User sync is now handled by components to avoid redundant calls
+  // Middleware only handles routing logic
   
   // If user is authenticated and trying to access root, redirect to dashboard
   if (userId && req.nextUrl.pathname === "/") {
