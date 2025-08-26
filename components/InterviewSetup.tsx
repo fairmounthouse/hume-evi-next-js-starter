@@ -540,6 +540,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             <div className="relative">
               <div 
                 ref={casesGridRef}
+                onScroll={handleCasesScroll}
                 className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[70vh] overflow-y-auto pr-4 pt-2 pb-1 px-1"
               >
                 <AnimatePresence>
@@ -739,6 +740,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                   <div className="relative">
                     <div 
                       ref={interviewersGridRef}
+                      onScroll={handleInterviewersScroll}
                       className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-6 pt-2 pb-1 pl-1"
                     >
                     {filteredInterviewers.map((interviewer) => (
