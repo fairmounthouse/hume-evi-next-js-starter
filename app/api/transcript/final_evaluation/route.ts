@@ -1,16 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { getUserPlan, getUserLimits } from "@/utils/plan-config";
+import { checkUsageLimit, trackUsage } from "@/utils/billing-client";
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication only - detailed analysis available to everyone
-    const { userId } = await auth();
+    // Check authentication and plan access
+    const { userId, has } = await auth();
     
     if (!userId) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
       );
+    }
+
+    // 🎯 Check if user can use detailed analysis feature
+    const userPlan = getUserPlan(has);
+    const limits = getUserLimits(userPlan);
+    
+    if (!limits.canUseDetailedAnalysis) {
+      return NextResponse.json(
+        { 
+          error: "Detailed analysis not available on your plan",
+          planRequired: "starter",
+          currentPlan: userPlan.name,
+          upgradeUrl: "/pricing"
+        },
+        { status: 403 }
+      );
+    }
+
+    // Check usage limits (unless unlimited)
+    if (limits.detailedAnalysesPerMonth !== -1) {
+      const usageCheck = await checkUsageLimit(userId, 'detailed_analysis_per_month', 1);
+      
+      if (!usageCheck.allowed) {
+        return NextResponse.json(
+          { 
+            error: "Monthly detailed analysis limit reached",
+            currentUsage: usageCheck.current_usage,
+            limit: usageCheck.limit_value,
+            upgradeUrl: "/pricing"
+          },
+          { status: 429 }
+        );
+      }
     }
 
     const { transcript_text } = await request.json();
@@ -59,8 +94,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Note: Detailed analysis is now available to everyone - no usage tracking needed
-      // Only interview minutes are tracked and limited by plan
+      // 🎯 Track usage after successful analysis (unless unlimited)
+      if (limits.detailedAnalysesPerMonth !== -1) {
+        try {
+          await trackUsage(userId, 'detailed_analysis_per_month', 1);
+          console.log("✅ [BILLING] Detailed analysis usage tracked");
+        } catch (trackingError) {
+          console.error("⚠️ [BILLING] Failed to track detailed analysis usage (non-critical):", trackingError);
+        }
+      }
 
       // Return the detailed evaluation result
       return NextResponse.json({

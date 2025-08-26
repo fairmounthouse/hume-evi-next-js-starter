@@ -8,17 +8,7 @@ export interface UsageCheck {
   is_unlimited: boolean;
 }
 
-export interface SubscriptionInfo {
-  user_id: string;
-  clerk_id: string;
-  email: string;
-  plan_name: string;
-  plan_key: string;
-  plan_price_cents: number;
-  subscription_status: string;
-  current_period_start: string;
-  current_period_end: string;
-}
+// SubscriptionInfo interface removed - use Clerk directly for plan info
 
 export interface UsageSummary {
   limit_type: string;
@@ -29,20 +19,9 @@ export interface UsageSummary {
 }
 
 /**
- * Ensure user exists in the billing system with comprehensive data
+ * Ensure user exists in Supabase (minimal linking only)
  */
-export async function ensureUserExists(clerkId: string, email: string, userData?: any): Promise<string> {
-  // If comprehensive user data is provided, use it
-  if (userData) {
-    const { syncUserToSupabase, extractClientUserData } = await import('./user-sync');
-    const extractedData = extractClientUserData(userData);
-    
-    if (extractedData.clerkId && extractedData.email) {
-      return await syncUserToSupabase(extractedData as any);
-    }
-  }
-
-  // Fallback to basic user creation - now uses the fixed function with defaults
+export async function ensureUserExists(clerkId: string, email: string): Promise<string> {
   const { data, error } = await supabase
     .rpc('ensure_user_exists', {
       p_clerk_id: clerkId,
@@ -58,22 +37,7 @@ export async function ensureUserExists(clerkId: string, email: string, userData?
 }
 
 /**
- * Create default subscription for new user
- */
-export async function createDefaultSubscription(clerkId: string): Promise<void> {
-  const { error } = await supabase
-    .rpc('create_default_subscription', {
-      p_clerk_id: clerkId
-    });
-
-  if (error) {
-    console.error('Error creating default subscription:', error);
-    throw new Error(`Failed to create default subscription: ${error.message}`);
-  }
-}
-
-/**
- * Check if user can use a feature (with usage amount)
+ * Check if user can use a feature (usage tracking only - limits checked by Clerk)
  */
 export async function checkUsageLimit(
   clerkId: string, 
@@ -136,28 +100,7 @@ export async function trackInterviewSession(
 }
 
 /**
- * Get user's subscription information
- */
-export async function getUserSubscriptionInfo(clerkId: string): Promise<SubscriptionInfo | null> {
-  const { data, error } = await supabase
-    .rpc('get_user_subscription_info', {
-      p_clerk_id: clerkId
-    });
-
-  if (error) {
-    console.error('Error getting subscription info:', error);
-    throw new Error(`Failed to get subscription info: ${error.message}`);
-  }
-
-  if (data?.error) {
-    return null;
-  }
-
-  return data as SubscriptionInfo;
-}
-
-/**
- * Get user's usage summary
+ * Get user's usage summary (usage tracking only)
  */
 export async function getUserUsageSummary(clerkId: string): Promise<UsageSummary[]> {
   const { data, error } = await supabase
@@ -174,19 +117,22 @@ export async function getUserUsageSummary(clerkId: string): Promise<UsageSummary
 }
 
 /**
- * Initialize user in billing system (call on first login)
+ * Initialize user in system (minimal setup)
  */
 export async function initializeUserBilling(clerkId: string, email: string): Promise<void> {
   try {
-    // Ensure user exists
+    // Just ensure user exists for usage tracking
     await ensureUserExists(clerkId, email);
     
-    // Create default subscription if needed
-    await createDefaultSubscription(clerkId);
-    
-    console.log(`✅ User billing initialized for ${clerkId}`);
+    console.log(`✅ User initialized for usage tracking: ${clerkId}`);
   } catch (error) {
-    console.error('Error initializing user billing:', error);
+    console.error('Error initializing user:', error);
     throw error;
   }
 }
+
+// =====================================================
+// REMOVED FUNCTIONS (now handled by Clerk):
+// - getUserSubscriptionInfo() - use Clerk has() method
+// - createDefaultSubscription() - Clerk handles subscriptions
+// =====================================================
