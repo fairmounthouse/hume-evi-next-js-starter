@@ -726,7 +726,7 @@ function ChatInterface({
           
           // Track usage for billing
           try {
-            const durationMinutes = Math.ceil(Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000) / 60);
+            const durationMinutes = Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000 / 60);
             console.log("💰 [BILLING] Tracking interview usage:", { durationMinutes });
             
             // Store duration for usage warning component

@@ -59,12 +59,12 @@ export default function DashboardPage() {
   const hasVideoReview = has?.({ feature: 'video_review' }) || false;
   const hasUnlimitedSessions = has?.({ feature: 'unlimited_sessions' }) || false;
   
-  // Auto-sync with Clerk on every page load and user changes
+  // Auto-sync with Clerk on page load only (reduced frequency)
   const { syncUser, lastSync, isUserLoaded } = useClerkSync({
     onPageLoad: true,
-    onUserChange: true,
-    intervalMs: 30000, // Sync every 30 seconds
-    debug: true
+    onUserChange: false, // Disabled - user changes are rare
+    intervalMs: 300000, // Sync every 5 minutes instead of 30 seconds
+    debug: false // Reduced logging
   });
   const [usageData, setUsageData] = useState<UsageSummary[]>([]);
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
@@ -203,6 +203,59 @@ export default function DashboardPage() {
             <AlertTitle>Usage Warning</AlertTitle>
             <AlertDescription>
               You're at {warningUsage.percentage_used}% of your {formatUsageType(warningUsage.usage_type)} limit.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Development Sync Button - Only show in development */}
+        {process.env.NODE_ENV === 'development' && (
+          <Alert>
+            <Activity className="h-4 w-4" />
+            <AlertTitle>Development Mode</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>Webhooks don't work in local development. Manually sync your Clerk plan:</span>
+              <div className="flex gap-2 ml-4">
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/billing/manual-sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ planKey: 'premium' })
+                      });
+                      if (response.ok) {
+                        window.location.reload();
+                      }
+                    } catch (error) {
+                      console.error('Sync failed:', error);
+                    }
+                  }}
+                >
+                  Sync Premium
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/billing/manual-sync', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ planKey: 'free_user' })
+                      });
+                      if (response.ok) {
+                        window.location.reload();
+                      }
+                    } catch (error) {
+                      console.error('Sync failed:', error);
+                    }
+                  }}
+                >
+                  Sync Free
+                </Button>
+              </div>
             </AlertDescription>
           </Alert>
         )}
