@@ -9,10 +9,12 @@ import { Footer } from "@/components/landing/Footer";
 import { Nav } from "@/components/Nav";
 import { motion, useScroll, useSpring } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 
 export default function LandingPage() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const router = useRouter();
   const [isClient, setIsClient] = useState(false);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
@@ -25,6 +27,11 @@ export default function LandingPage() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Redirect root to dashboard
+  useEffect(() => {
+    router.replace("/dashboard");
+  }, [router]);
 
   // Smooth scroll behavior
   useEffect(() => {
