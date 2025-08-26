@@ -70,6 +70,12 @@ export default function DashboardPage() {
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
+  const [quickStats, setQuickStats] = useState<{
+    total_sessions: number;
+    monthly_sessions: number;
+    average_score: number | null;
+    improvement_percentage: number | null;
+  } | null>(null);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -97,6 +103,15 @@ export default function DashboardPage() {
           const sessionsData = await sessionsResponse.json();
           const sessions = sessionsData.sessions || [];
           setRecentSessions(Array.isArray(sessions) ? sessions.slice(0, 3) : []);
+        }
+
+        // Fetch quick stats from Supabase RPC
+        const quickStatsResponse = await fetch('/api/dashboard/quick-stats');
+        if (quickStatsResponse.ok) {
+          const quickStatsData = await quickStatsResponse.json();
+          if (quickStatsData.success) {
+            setQuickStats(quickStatsData.stats);
+          }
         }
 
       } catch (error) {
@@ -341,7 +356,9 @@ export default function DashboardPage() {
                       <Target className="h-4 w-4 text-blue-600" />
                       <span className="text-sm font-medium">Total Sessions</span>
                     </div>
-                    <p className="text-2xl font-bold">{recentSessions.length}</p>
+                    <p className="text-2xl font-bold">
+                      {quickStats ? quickStats.total_sessions : '...'}
+                    </p>
                   </div>
                   
                   <div className="space-y-2">
@@ -349,7 +366,9 @@ export default function DashboardPage() {
                       <Zap className="h-4 w-4 text-green-600" />
                       <span className="text-sm font-medium">This Month</span>
                     </div>
-                    <p className="text-2xl font-bold">{recentSessions.length}</p>
+                    <p className="text-2xl font-bold">
+                      {quickStats ? quickStats.monthly_sessions : '...'}
+                    </p>
                   </div>
                   
                   <div className="space-y-2">
@@ -357,7 +376,9 @@ export default function DashboardPage() {
                       <Star className="h-4 w-4 text-yellow-600" />
                       <span className="text-sm font-medium">Avg. Score</span>
                     </div>
-                    <p className="text-2xl font-bold">8.5/10</p>
+                    <p className="text-2xl font-bold">
+                      {quickStats?.average_score ? `${quickStats.average_score}/100` : 'No data'}
+                    </p>
                   </div>
                   
                   <div className="space-y-2">
@@ -365,7 +386,18 @@ export default function DashboardPage() {
                       <Users className="h-4 w-4 text-purple-600" />
                       <span className="text-sm font-medium">Improvement</span>
                     </div>
-                    <p className="text-2xl font-bold text-green-600">+15%</p>
+                    <p className={`text-2xl font-bold ${
+                      quickStats?.improvement_percentage !== null && quickStats?.improvement_percentage !== undefined
+                        ? quickStats.improvement_percentage >= 0 
+                          ? 'text-green-600' 
+                          : 'text-red-600'
+                        : 'text-gray-500'
+                    }`}>
+                      {quickStats?.improvement_percentage !== null && quickStats?.improvement_percentage !== undefined
+                        ? `${quickStats.improvement_percentage >= 0 ? '+' : ''}${quickStats.improvement_percentage}%`
+                        : 'No data'
+                      }
+                    </p>
                   </div>
                 </div>
               </CardContent>
