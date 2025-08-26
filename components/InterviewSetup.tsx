@@ -143,7 +143,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       // Calculate filtered interviewers count for the check
       const filteredCount = interviewers.filter(interviewer => {
         const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
-        const matchesSeniority = seniorityFilter === "all" || interviewer.seniority === seniorityFilter;
+        const matchesSeniority = seniorityFilter === "all" || interviewer.role === seniorityFilter;
         return matchesCompany && matchesSeniority;
       }).length;
       
@@ -159,7 +159,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       // Calculate current filtered count for resize check
       const filteredCount = interviewers.filter(interviewer => {
         const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
-        const matchesSeniority = seniorityFilter === "all" || interviewer.seniority === seniorityFilter;
+        const matchesSeniority = seniorityFilter === "all" || interviewer.role === seniorityFilter;
         return matchesCompany && matchesSeniority;
       }).length;
       
