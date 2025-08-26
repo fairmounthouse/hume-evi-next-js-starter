@@ -5,8 +5,9 @@ yarn-error.log
 
 # Next.js
 /.next/
+**/.next/
 /out/
-/landing-site/.next/
+landing-site/.next/
 
 # Build files
 /.build/
