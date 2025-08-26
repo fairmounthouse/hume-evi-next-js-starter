@@ -1,0 +1,7 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@layer base {
+  body { @apply bg-white text-gray-900; }
+}
+

@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Star, TrendingUp, Users, Award, ArrowRight, Quote, AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
 const testimonials = [
   {
     title: "The Ceiling-Starer",
@@ -230,7 +232,7 @@ export function Results() {
                 </div>
               </div>
               
-              <Link href="/sign-in?redirect=/dashboard">
+              <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
                 <Button
                   size="lg"
                   className="h-14 px-8 text-lg font-semibold bg-white text-blue-600 hover:bg-gray-100 shadow-xl hover:shadow-2xl transition-all duration-200 transform hover:-translate-y-0.5"
@@ -238,7 +240,7 @@ export function Results() {
                   See Your Blind Spots Now
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </Link>
+              </a>
               
               <div className="mt-6 p-4 rounded-lg bg-amber-500/20 backdrop-blur border border-amber-400/30">
                 <p className="text-white font-semibold flex items-center justify-center gap-2">
@@ -270,14 +272,14 @@ export function Results() {
             <span className="block mt-2 text-blue-600">And fix it before it costs you an offer.</span>
           </p>
           
-          <Link href="/sign-in?redirect=/dashboard">
+          <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
             <Button
               size="lg"
               className="h-14 px-8 text-lg font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
             >
               Start Your Interview →
             </Button>
-          </Link>
+          </a>
           
         </motion.div>
       </div>

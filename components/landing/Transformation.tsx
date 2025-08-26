@@ -225,12 +225,12 @@ export function Transformation() {
             </div>
             
             <div className="text-center">
-              <Link href="/sign-in?redirect=/dashboard">
+              <a href={`${process.env.NEXT_PUBLIC_APP_URL}/sign-in?redirect=/dashboard`}>
                 <Button className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md">
                   Start Your Transformation
                   <Zap className="ml-2 h-4 w-4" />
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
         </motion.div>
