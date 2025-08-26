@@ -1,10 +1,8 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useUser } from '@clerk/nextjs';
+import { useUser, useAuth } from '@clerk/nextjs';
 import { useClerkSync } from '@/hooks/useClerkSync';
-import { usePlan } from '@/hooks/usePlan';
-import { formatPrice } from '@/utils/plan-config';
 import { 
   Play,
   BarChart3,
@@ -39,18 +37,27 @@ interface UsageSummary {
   period_end: string;
 }
 
-// SubscriptionInfo interface removed - using Clerk directly for plan info
+interface SubscriptionInfo {
+  plan_name: string;
+  plan_key: string;
+  plan_price_cents: number;
+  subscription_status: string;
+  current_period_end: string;
+}
 
 export default function DashboardPage() {
   const { user } = useUser();
+  const { has } = useAuth();
   
-  // 🎯 Usage-based plan management - Clerk infers plan, we map to usage limits!
-  const { 
-    plan: userPlan,
-    limits,
-    features: { hasAdvancedAnalytics, canUseVideoReview, hasUnlimitedSessions },
-    unlimited
-  } = usePlan();
+  // Check user's plan directly with Clerk Billing (same as original)
+  const userPlan = has?.({ plan: 'premium' }) ? 'premium' : 
+                   has?.({ plan: 'professional' }) ? 'professional' :
+                   has?.({ plan: 'starter' }) ? 'starter' : 'free';
+  
+  // Check specific features (same as original)
+  const hasAdvancedAnalytics = has?.({ feature: 'advanced_analytics' }) || false;
+  const hasVideoReview = has?.({ feature: 'video_review' }) || false;
+  const hasUnlimitedSessions = has?.({ feature: 'unlimited_sessions' }) || false;
   
   // Auto-sync with Clerk on page load only (reduced frequency)
   const { syncUser, lastSync, isUserLoaded } = useClerkSync({
@@ -60,6 +67,7 @@ export default function DashboardPage() {
     debug: false // Reduced logging
   });
   const [usageData, setUsageData] = useState<UsageSummary[]>([]);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [quickStats, setQuickStats] = useState<{
@@ -82,8 +90,12 @@ export default function DashboardPage() {
           setUsageData(usage);
         }
 
-        // Note: Subscription info now comes directly from Clerk
-        // No need to fetch from Supabase - use userPlan from Clerk has() method
+        // Fetch subscription info (now uses our clean backend)
+        const subResponse = await fetch('/api/billing/subscription-info');
+        if (subResponse.ok) {
+          const sub = await subResponse.json();
+          setSubscriptionInfo(sub);
+        }
 
         // Fetch recent sessions
         const sessionsResponse = await fetch('/api/sessions/list');
@@ -289,25 +301,37 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{userPlan.name}</span>
-                  <Badge variant={userPlan.isFree ? 'secondary' : 'default'}>
-                    active
+                  <span className="font-medium">{subscriptionInfo?.plan_name || userPlan}</span>
+                  <Badge variant={userPlan === 'free' ? 'secondary' : 'default'}>
+                    {subscriptionInfo?.subscription_status || 'active'}
                   </Badge>
                 </div>
                 <div className="text-2xl font-bold">
-                  {formatPrice(userPlan)}
+                  {subscriptionInfo ? `$${(subscriptionInfo.plan_price_cents / 100).toFixed(2)}` : '$0.00'}
                   <span className="text-sm font-normal text-muted-foreground">/month</span>
                 </div>
-                {userPlan.description && (
-                  <p className="text-sm text-muted-foreground">{userPlan.description}</p>
-                )}
-                {userPlan.isFree && (
+                <p className="text-sm text-muted-foreground">
+                  {userPlan === 'free' && 'Get started with basic interview practice'}
+                  {userPlan === 'starter' && 'Perfect for regular practice'}
+                  {userPlan === 'professional' && 'For serious interview preparation'}
+                  {userPlan === 'premium' && 'Complete interview mastery suite'}
+                </p>
+                {userPlan === 'free' && (
                   <Button 
                     className="w-full"
                     onClick={() => window.location.href = '/pricing'}
                   >
                     Upgrade Plan
                     <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                )}
+                {userPlan !== 'free' && (
+                  <Button 
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => window.location.href = '/pricing'}
+                  >
+                    Manage Subscription
                   </Button>
                 )}
                 
@@ -319,7 +343,7 @@ export default function DashboardPage() {
                       {hasAdvancedAnalytics ? '✅' : '❌'} Advanced Analytics
                     </div>
                     <div className="flex items-center gap-2 text-sm">
-                      {canUseVideoReview ? '✅' : '❌'} Video Review
+                      {hasVideoReview ? '✅' : '❌'} Video Review
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       {hasUnlimitedSessions ? '✅' : '❌'} Unlimited Sessions
