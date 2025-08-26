@@ -1,18 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles } from "lucide-react";
+import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
 import DocumentUpload from "./DocumentUpload";
-
-import { useRouter } from "next/navigation";
 
 interface InterviewCase {
   id: string;
@@ -66,13 +65,26 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
+  const [industryFilter, setIndustryFilter] = useState<string>("all");
+  const [formatFilter, setFormatFilter] = useState<string>("all");
+  
+  // Interviewer filters
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [seniorityFilter, setSeniorityFilter] = useState<string>("all");
   
   const [loading, setLoading] = useState(true);
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Configuration
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [documentSessionId, setDocumentSessionId] = useState<string>("");
+  
+  // Scroll detection state
+  const [isCasesScrollable, setIsCasesScrollable] = useState(false);
+  const [isInterviewersScrollable, setIsInterviewersScrollable] = useState(false);
+  const [isCasesAtBottom, setIsCasesAtBottom] = useState(false);
+  const [isInterviewersAtBottom, setIsInterviewersAtBottom] = useState(false);
+  const casesGridRef = useRef<HTMLDivElement>(null);
+  const interviewersGridRef = useRef<HTMLDivElement>(null);
 
   
   // Handle session selection from SessionSelector
@@ -80,10 +92,106 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     router.push(`/interview/session?sessionId=${sessionId}`);
   };
 
+  // Check if content is scrollable
+  const checkScrollable = (interviewerCount?: number) => {
+    if (casesGridRef.current) {
+      const isScrollable = casesGridRef.current.scrollHeight > casesGridRef.current.clientHeight;
+      setIsCasesScrollable(isScrollable);
+    }
+    
+    if (interviewersGridRef.current) {
+      const element = interviewersGridRef.current;
+      const isScrollable = element.scrollHeight > element.clientHeight;
+      
+      // For interviewers, also check if we have 3+ items (since 2x2 grid fits 4 perfectly)
+      const currentCount = interviewerCount || 0;
+      const hasEnoughItems = currentCount >= 3;
+      const shouldShowFade = isScrollable || hasEnoughItems;
+      
+      setIsInterviewersScrollable(shouldShowFade);
+    }
+  };
+
+  // Check scroll position to determine if at bottom
+  const checkScrollPosition = (element: HTMLDivElement, setAtBottom: (atBottom: boolean) => void) => {
+    const { scrollTop, scrollHeight, clientHeight } = element;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
+    setAtBottom(isAtBottom);
+  };
+
+  // Handle scroll events
+  const handleCasesScroll = useCallback(() => {
+    if (casesGridRef.current) {
+      checkScrollPosition(casesGridRef.current, setIsCasesAtBottom);
+    }
+  }, []);
+
+  const handleInterviewersScroll = useCallback(() => {
+    if (interviewersGridRef.current) {
+      checkScrollPosition(interviewersGridRef.current, setIsInterviewersAtBottom);
+    }
+  }, []);
+
   // Fetch all data on component mount
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  // Check scrollable state when data or filters change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      // Calculate filtered interviewers count for the check
+      const filteredCount = interviewers.filter(interviewer => {
+        const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
+        const matchesSeniority = seniorityFilter === "all" || interviewer.seniority === seniorityFilter;
+        return matchesCompany && matchesSeniority;
+      }).length;
+      
+      checkScrollable(filteredCount);
+    }, 100); // Small delay to ensure DOM is updated
+    
+    return () => clearTimeout(timer);
+  }, [cases, interviewers, companyFilter, seniorityFilter, currentPage]);
+
+  // Also check on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      // Calculate current filtered count for resize check
+      const filteredCount = interviewers.filter(interviewer => {
+        const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
+        const matchesSeniority = seniorityFilter === "all" || interviewer.seniority === seniorityFilter;
+        return matchesCompany && matchesSeniority;
+      }).length;
+      
+      checkScrollable(filteredCount);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [interviewers, companyFilter, seniorityFilter]);
+
+  // Attach scroll listeners
+  useEffect(() => {
+    const casesElement = casesGridRef.current;
+    const interviewersElement = interviewersGridRef.current;
+
+    if (casesElement) {
+      casesElement.addEventListener('scroll', handleCasesScroll);
+    }
+    
+    if (interviewersElement) {
+      interviewersElement.addEventListener('scroll', handleInterviewersScroll);
+    }
+
+    return () => {
+      if (casesElement) {
+        casesElement.removeEventListener('scroll', handleCasesScroll);
+      }
+      if (interviewersElement) {
+        interviewersElement.removeEventListener('scroll', handleInterviewersScroll);
+      }
+    };
+  }, [handleCasesScroll, handleInterviewersScroll]); // Re-attach when handlers change
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -109,18 +217,63 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   // Filter cases based on search and filters
   const filteredCases = cases.filter(case_ => {
     const matchesSearch = case_.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         case_.overview.toLowerCase().includes(searchQuery.toLowerCase());
+                         case_.overview.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         case_.industry?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         case_.stretch_area?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesType = typeFilter === "all" || case_.type === typeFilter;
-    const matchesIndustry = industryFilter === "all" || case_.industry === industryFilter;
     const matchesDifficulty = difficultyFilter === "all" || case_.difficulty === difficultyFilter;
+    const matchesIndustry = industryFilter === "all" || case_.industry === industryFilter;
+    const matchesFormat = formatFilter === "all" || case_.format === formatFilter;
     
-    return matchesSearch && matchesType && matchesIndustry && matchesDifficulty;
+    return matchesSearch && matchesType && matchesDifficulty && matchesIndustry && matchesFormat;
   });
 
   // Get unique filter options
   const typeOptions = [...new Set(cases.map(c => c.type).filter(Boolean))];
-  const industryOptions = [...new Set(cases.map(c => c.industry).filter(Boolean))];
   const difficultyOptions = [...new Set(cases.map(c => c.difficulty).filter(Boolean))];
+  const industryOptions = [...new Set(cases.map(c => c.industry).filter(Boolean))];
+  const formatOptions = [...new Set(cases.map(c => c.format).filter(Boolean))];
+  
+  // Interviewer filter options
+  const companyOptions = [...new Set(interviewers.map(i => i.company).filter(Boolean))];
+  const seniorityOptions = [...new Set(interviewers.map(i => i.role).filter(Boolean))];
+  
+  // Filter interviewers
+  const filteredInterviewers = interviewers.filter(interviewer => {
+    const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
+    const matchesSeniority = seniorityFilter === "all" || interviewer.role === seniorityFilter;
+    return matchesCompany && matchesSeniority;
+  });
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery("");
+    setTypeFilter("all");
+    setDifficultyFilter("all");
+    setIndustryFilter("all");
+    setFormatFilter("all");
+  };
+  
+  // Clear interviewer filters
+  const clearInterviewerFilters = () => {
+    setCompanyFilter("all");
+    setSeniorityFilter("all");
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = searchQuery || typeFilter !== "all" || difficultyFilter !== "all" || industryFilter !== "all" || formatFilter !== "all";
+  const hasActiveInterviewerFilters = companyFilter !== "all" || seniorityFilter !== "all";
+
+  // Navigation functions
+  const goToPage2 = () => {
+    if (selectedCase) {
+      setCurrentPage(2);
+    }
+  };
+
+  const goBackToPage1 = () => {
+    setCurrentPage(1);
+  };
 
   const canProceed = selectedCase && selectedInterviewer && selectedDifficulty;
 
@@ -146,6 +299,31 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       }
     }
   };
+
+  // Get selected case data for display
+  const selectedCaseData = cases.find(c => c.id === selectedCase);
+  const selectedInterviewerData = interviewers.find(i => i.id === selectedInterviewer);
+  const selectedDifficultyData = difficulties.find(d => d.id === selectedDifficulty);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (currentPage === 2) {
+          goBackToPage1();
+        }
+      }
+      if (e.key === 'Enter' && selectedCase && currentPage === 1) {
+        goToPage2();
+      }
+      if (e.key === 'Enter' && canProceed && currentPage === 2) {
+        handleStartInterview();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentPage, selectedCase, canProceed]);
 
   // Handle document upload completion
   const handleDocumentUploadComplete = () => {
@@ -206,306 +384,516 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto px-5 pt-16 pb-7">
-        {/* Session Selector - positioned separately */}
-        <div className="flex justify-end mb-6">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-16">
+        <div className="container mx-auto px-6 h-full flex items-center justify-between">
+          {/* Left: Back button and Title */}
+          <div className="flex items-center gap-4">
+            {/* Page Back Button - Only on Page 2 */}
+            {currentPage === 2 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={goBackToPage1}
+                className="flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </Button>
+            )}
+            
+            <h1 className="text-xl font-bold text-gray-900">
+              Interview Setup
+            </h1>
+          </div>
+
+          {/* Center: Progress bar */}
+          <div className="hidden md:flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="w-32 h-1 bg-gray-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-blue-500 transition-all duration-300"
+                  style={{ width: `${(currentPage / 2) * 100}%` }}
+                />
+              </div>
+              <span className="text-sm text-gray-500">
+                Step {currentPage} of 2
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Session selector and Dashboard button */}
+          <div className="flex items-center gap-3">
             <SessionSelector 
               onSelectSession={handleSessionSelect}
               currentSessionId=""
             />
-          </motion.div>
-        </div>
-
-        {/* Main Header - centered */}
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
-        >
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-            Set Up Your Interview
-          </h1>
-          <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            Choose your interview case, interviewer, and difficulty level for a personalized experience
-          </p>
-        </motion.div>
-
-        {/* Usage Limit Check */}
-
-
-        {/* Progress Steps */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex justify-center mb-12"
-        >
-          <div className="flex items-center space-x-4">
-            {["Case", "Interviewer", "Difficulty"].map((step, index) => (
-              <div key={step} className="flex items-center">
-                <div className={cn(
-                  "flex items-center justify-center w-8 h-8 rounded-full text-sm font-semibold",
-                  currentStep > index + 1 ? "bg-green-500 text-white" :
-                  currentStep === index + 1 ? "bg-blue-500 text-white" :
-                  "bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400"
-                )}>
-                  {index + 1}
-                </div>
-                <span className={cn(
-                  "ml-2 text-sm font-medium",
-                  currentStep >= index + 1 ? "text-gray-900 dark:text-white" : "text-gray-500 dark:text-gray-400"
-                )}>
-                  {step}
-                </span>
-                {index < 2 && (
-                  <ChevronRight className="ml-4 w-4 h-4 text-gray-400" />
-                )}
-              </div>
-            ))}
+            
+            {/* Dashboard Back Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <Home className="w-4 h-4" />
+              Dashboard
+            </Button>
           </div>
-        </motion.div>
+        </div>
+      </header>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Cases Section */}
+      {/* Page 1: Case Selection */}
+      <AnimatePresence mode="wait">
+        {currentPage === 1 && (
           <motion.div
+            key="page1"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.3 }}
-            className="lg:col-span-2 space-y-6"
+            exit={{ opacity: 0, x: -20 }}
+            className="container mx-auto px-6 py-8"
           >
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5" />
-                  Select Interview Case
-                </CardTitle>
-                <CardDescription>
-                  Choose from our curated collection of real interview cases
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Search and Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      placeholder="Search cases..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  
-                  <Select value={typeFilter} onValueChange={setTypeFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      {typeOptions.map(type => (
-                        <SelectItem key={type} value={type}>{type}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={industryFilter} onValueChange={setIndustryFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Industry" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Industries</SelectItem>
-                      {industryOptions.map(industry => (
-                        <SelectItem key={industry} value={industry}>{industry}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Difficulty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Levels</SelectItem>
-                      {difficultyOptions.map(difficulty => (
-                        <SelectItem key={difficulty} value={difficulty}>{difficulty}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            {/* Clean Single-Row Filter Bar */}
+            <div className="sticky top-16 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 -mx-6 px-6 py-6 mb-8">
+              <div className="flex items-center gap-4">
+                {/* Search */}
+                <div className="relative flex-1 max-w-lg">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search cases, industries, skills..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 border-gray-200 focus:border-blue-300 focus:ring-blue-100"
+                  />
                 </div>
 
-                {/* Cases Grid */}
-                <div className="grid gap-4 max-h-96 overflow-y-auto">
-                  <AnimatePresence>
-                    {filteredCases.map((case_, index) => (
-                      <motion.div
-                        key={case_.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <Card 
-                          className={cn(
-                            "cursor-pointer transition-all hover:shadow-lg",
-                            selectedCase === case_.id ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950" : ""
-                          )}
-                          onClick={() => {
-                            setSelectedCase(case_.id);
-                            setCurrentStep(2);
-                          }}
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start mb-3">
-                              <h3 className="font-semibold text-lg">{case_.title}</h3>
-                              <div className="flex gap-2">
-                                {case_.requires_documents && (
-                                  <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                                    📄 Requires Documents
-                                  </Badge>
-                                )}
-                                {case_.type && (
-                                  <Badge className={getTypeColor(case_.type)}>
-                                    {case_.type}
-                                  </Badge>
-                                )}
-                                {case_.difficulty && (
-                                  <Badge className={getDifficultyColor(case_.difficulty)}>
-                                    {case_.difficulty}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                            
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                              {case_.overview}
-                            </p>
-                            
-                            <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
-                              <div className="flex items-center gap-4">
-                                {case_.industry && (
-                                  <div className="flex items-center gap-1">
-                                    <Building className="w-4 h-4" />
-                                    {case_.industry}
-                                  </div>
-                                )}
-                                {case_.total_time && (
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="w-4 h-4" />
-                                    {case_.total_time}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-xs text-blue-600 dark:text-blue-400">
-                                {case_.format}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
+                {/* All Filters in One Row */}
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-32 border-gray-200">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {typeOptions.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
-                  </AnimatePresence>
-                </div>
-                
-                {filteredCases.length === 0 && (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <Filter className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    No cases match your filters. Try adjusting your search criteria.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
+                  </SelectContent>
+                </Select>
 
-          {/* Selection Panel */}
+                <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                  <SelectTrigger className="w-32 border-gray-200">
+                    <SelectValue placeholder="Level" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    {difficultyOptions.map(difficulty => (
+                      <SelectItem key={difficulty} value={difficulty}>{difficulty}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={industryFilter} onValueChange={setIndustryFilter}>
+                  <SelectTrigger className="w-36 border-gray-200">
+                    <SelectValue placeholder="Industry" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Industries</SelectItem>
+                    {industryOptions.map(industry => (
+                      <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={formatFilter} onValueChange={setFormatFilter}>
+                  <SelectTrigger className="w-36 border-gray-200">
+                    <SelectValue placeholder="Format" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Formats</SelectItem>
+                    {formatOptions.map(format => (
+                      <SelectItem key={format} value={format}>{format}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Clear & Results */}
+                <div className="flex items-center gap-3 ml-auto">
+                  {hasActiveFilters && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearFilters}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                  <div className="text-sm text-gray-500 font-medium">
+                    {filteredCases.length} cases
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Cases Grid */}
+            <div className="relative">
+              <div 
+                ref={casesGridRef}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[70vh] overflow-y-auto pr-4 pt-2 pb-1 px-1"
+              >
+                <AnimatePresence>
+                  {filteredCases.map((case_, index) => (
+                  <motion.div
+                    key={case_.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <Card 
+                      className={cn(
+                        "h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
+                        selectedCase === case_.id 
+                          ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+                          : "hover:border-blue-200"
+                      )}
+                      onClick={() => setSelectedCase(case_.id)}
+                    >
+                      <CardContent className="p-6 h-full flex flex-col">
+                        {/* Clean Header - Only Priority Info */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex gap-2">
+                            {case_.difficulty && (
+                              <Badge className={getDifficultyColor(case_.difficulty)} variant="secondary">
+                                {case_.difficulty}
+                              </Badge>
+                            )}
+                            {case_.requires_documents && (
+                              <Badge variant="outline" className="text-xs">
+                                📄
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-400 font-medium">
+                            {case_.type}
+                          </div>
+                        </div>
+
+                        {/* Title & Enhanced Meta */}
+                        <div className="mb-4">
+                          <h3 className="font-semibold text-lg leading-tight mb-3 line-clamp-2">
+                            {case_.title}
+                          </h3>
+                          
+                          {/* Primary Meta Row */}
+                          <div className="flex items-center gap-3 text-sm text-gray-500 mb-2">
+                            {case_.industry && (
+                              <>
+                                <span>{case_.industry}</span>
+                                <span>•</span>
+                              </>
+                            )}
+                            <span>{case_.total_time || "30 min"}</span>
+                          </div>
+                          
+                          {/* Secondary Meta Row - Format */}
+                          {case_.format && (
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-200 bg-blue-50/50">
+                                {case_.format}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Description */}
+                        <p className="text-sm text-gray-600 mb-6 flex-grow line-clamp-3 leading-relaxed">
+                          {case_.overview}
+                        </p>
+
+                        {/* Clean Footer */}
+                        <div className="flex items-center justify-between">
+                          {case_.stretch_area && (
+                            <div className="text-xs text-gray-400 flex items-center gap-1">
+                              <Target className="w-3 h-3" />
+                              {case_.stretch_area}
+                            </div>
+                          )}
+                          <div className="flex-1" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+              
+              {/* Fade effect overlay - only show if scrollable and not at bottom */}
+              {isCasesScrollable && !isCasesAtBottom && (
+                <div className="absolute bottom-0 left-1 right-4 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
+              )}
+            </div>
+
+            {/* No Results */}
+            {filteredCases.length === 0 && (
+              <div className="text-center py-16">
+                <Filter className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No cases found</h3>
+                <p className="text-gray-500 mb-4">
+                  Try adjusting your search criteria or clearing filters
+                </p>
+                {hasActiveFilters && (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Clear all filters
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Floating Action Button - Continue */}
+            {selectedCase && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="fixed bottom-8 right-8 z-50"
+              >
+                <Button
+                  size="lg"
+                  onClick={goToPage2}
+                  className="rounded-full h-14 px-6 bg-blue-600 hover:bg-blue-700 shadow-lg"
+                >
+                  Continue
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </motion.div>
+            )}
+
+          </motion.div>
+        )}
+
+        {/* Page 2: Configuration */}
+        {currentPage === 2 && (
           <motion.div
+            key="page2"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-            className="space-y-6"
+            exit={{ opacity: 0, x: 20 }}
+            className="container mx-auto px-6 py-8"
           >
-            {/* Interviewer Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Select Interviewer
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {interviewers.map((interviewer) => (
-                  <Card
-                    key={interviewer.id}
-                    className={cn(
-                      "cursor-pointer transition-all hover:shadow-md p-3",
-                      selectedInterviewer === interviewer.id ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950" : ""
-                    )}
-                    onClick={() => {
-                      setSelectedInterviewer(interviewer.id);
-                      setCurrentStep(3);
-                    }}
-                  >
-                    <div>
-                      <h4 className="font-semibold">{interviewer.name}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">{interviewer.role}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-500">{interviewer.company}</p>
-                    </div>
-                  </Card>
-                ))}
-              </CardContent>
-            </Card>
 
-            {/* Difficulty Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5" />
-                  Select Difficulty
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {difficulties.map((difficulty) => (
-                  <Card
-                    key={difficulty.id}
-                    className={cn(
-                      "cursor-pointer transition-all hover:shadow-md p-3",
-                      selectedDifficulty === difficulty.id ? "ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-950" : ""
-                    )}
-                    onClick={() => setSelectedDifficulty(difficulty.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold">{difficulty.display_name}</h4>
-                      <Badge className={getDifficultyColor(difficulty.level)}>
-                        {difficulty.level}
-                      </Badge>
-                    </div>
-                  </Card>
-                ))}
-              </CardContent>
-            </Card>
 
-            {/* Start Button */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Button
-                onClick={handleStartInterview}
-                disabled={!canProceed}
-                className="w-full h-12 text-lg font-semibold bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50"
-              >
-                {canProceed ? "Start Interview" : "Select All Options"}
-              </Button>
-            </motion.div>
+            {/* Two Column Layout */}
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* Left: Interviewer Selection */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Choose Interview Style</CardTitle>
+                  <CardDescription>
+                    Select an AI interviewer personality that matches your preparation goals
+                  </CardDescription>
+                  
+                  {/* Interviewer Filters */}
+                  <div className="flex gap-3 mt-4">
+                    <Select value={companyFilter} onValueChange={setCompanyFilter}>
+                      <SelectTrigger className="w-48">
+                        <SelectValue placeholder="Company" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Companies</SelectItem>
+                        {companyOptions.map(company => (
+                          <SelectItem key={company} value={company}>{company}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    <Select value={seniorityFilter} onValueChange={setSeniorityFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="Seniority" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Levels</SelectItem>
+                        {seniorityOptions.map(role => (
+                          <SelectItem key={role} value={role}>{role}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {hasActiveInterviewerFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearInterviewerFilters}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                  
+                  <div className="text-xs text-gray-500 mt-2">
+                    {filteredInterviewers.length} interviewers
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="relative">
+                    <div 
+                      ref={interviewersGridRef}
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-6 pt-2 pb-1 pl-1"
+                    >
+                    {filteredInterviewers.map((interviewer) => (
+                      <Card
+                        key={interviewer.id}
+                        data-interviewer-card="true"
+                        className={cn(
+                          "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative",
+                          selectedInterviewer === interviewer.id 
+                            ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+                            : "hover:border-blue-200"
+                        )}
+                        onClick={() => setSelectedInterviewer(interviewer.id)}
+                      >
+                        <CardContent className="p-6 text-center">
+                          {selectedInterviewer === interviewer.id && (
+                            <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-500" />
+                          )}
+                          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+                            {interviewer.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                          <h4 className="font-semibold text-gray-900 mb-1">{interviewer.name}</h4>
+                          <p className="text-sm text-gray-600 mb-1">{interviewer.role}</p>
+                          <p className="text-xs text-gray-500">{interviewer.company}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                    </div>
+                    
+                    {/* Fade effect overlay - only show if scrollable and not at bottom */}
+                    {isInterviewersScrollable && !isInterviewersAtBottom && (
+                      <div className="absolute bottom-0 left-1 right-6 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Right: Difficulty Selection */}
+              <Card className="h-full flex flex-col">
+                <CardHeader>
+                  <CardTitle className="text-lg">Select Difficulty Level</CardTitle>
+                  <CardDescription>
+                    Choose the challenge level that matches your experience
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex-1 flex flex-col justify-center">
+                  <div className={cn(
+                    "space-y-2 flex flex-col",
+                    difficulties.length <= 2 ? "gap-6" : 
+                    difficulties.length <= 4 ? "gap-3" : "gap-2"
+                  )}>
+                    {difficulties.map((difficulty) => (
+                      <Card
+                        key={difficulty.id}
+                        className={cn(
+                          "cursor-pointer transition-all duration-200 hover:shadow-md hover:translate-x-1 flex-1",
+                          selectedDifficulty === difficulty.id 
+                            ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+                            : "hover:border-blue-200"
+                        )}
+                        onClick={() => setSelectedDifficulty(difficulty.id)}
+                      >
+                        <CardContent className={cn(
+                          "flex items-center gap-3",
+                          difficulties.length <= 2 ? "p-5" :
+                          difficulties.length <= 4 ? "p-4" : "p-3"
+                        )}>
+                          <div className={cn(
+                            "rounded-xl flex items-center justify-center transition-all duration-200",
+                            difficulties.length <= 2 ? "w-14 h-14" :
+                            difficulties.length <= 4 ? "w-12 h-12" : "w-10 h-10",
+                            difficulty.level === "entry" ? "bg-emerald-100 text-emerald-600" :
+                            difficulty.level === "mid" ? "bg-amber-100 text-amber-600" :
+                            difficulty.level === "senior" ? "bg-rose-100 text-rose-600" :
+                            difficulty.level === "principal" ? "bg-violet-100 text-violet-600" :
+                            difficulty.level === "custom" ? "bg-indigo-100 text-indigo-600" :
+                            "bg-gray-100 text-gray-600"
+                          )}>
+                            {difficulty.level === "entry" ? <Star className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
+                             difficulty.level === "mid" ? <Zap className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
+                             difficulty.level === "senior" ? <Target className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
+                             difficulty.level === "principal" ? <Crown className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
+                             difficulty.level === "custom" ? <Settings className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> : 
+                             <Star className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className={cn(
+                              "font-semibold text-gray-900 truncate",
+                              difficulties.length <= 2 ? "text-lg" :
+                              difficulties.length <= 4 ? "text-base" : "text-sm"
+                            )}>{difficulty.display_name}</h4>
+                            <p className={cn(
+                              "text-gray-600 capitalize truncate",
+                              difficulties.length <= 2 ? "text-base" :
+                              difficulties.length <= 4 ? "text-sm" : "text-xs"
+                            )}>{difficulty.level} Level</p>
+                          </div>
+                          {selectedDifficulty === difficulty.id && (
+                            <CheckCircle className="w-5 h-5 text-green-500" />
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Bottom Action Bar */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-6 z-40">
+              <div className="container mx-auto flex items-center justify-between">
+                {/* Left: Summary Pills */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    Case Selected
+                  </div>
+                  {selectedInterviewerData && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      {selectedInterviewerData.name}
+                    </div>
+                  )}
+                  {selectedDifficultyData && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
+                      <CheckCircle className="w-4 h-4" />
+                      {selectedDifficultyData.display_name}
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Action Buttons */}
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={goBackToPage1}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    onClick={handleStartInterview}
+                    disabled={!canProceed}
+                    className="bg-blue-600 hover:bg-blue-700 px-8"
+                  >
+                    Start Interview
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Spacer for fixed bottom bar */}
+            <div className="h-24" />
           </motion.div>
-        </div>
-      </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
