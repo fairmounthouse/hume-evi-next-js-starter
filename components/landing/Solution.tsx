@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 const features = [
   {
     id: "visual",
@@ -309,7 +310,7 @@ export function Solution() {
             viewport={{ once: true }}
             className="text-center mt-16"
           >
-            <Link href="/sign-in?redirect=/dashboard">
+            <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
               <Button
                 size="lg"
                 className="bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm hover:shadow-md transition-all duration-200"
@@ -317,7 +318,7 @@ export function Solution() {
                 Experience Real Pressure Testing
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
-            </Link>
+            </a>
           </motion.div>
         </div>
       </div>

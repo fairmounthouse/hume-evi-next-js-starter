@@ -4,9 +4,10 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Play, Eye } from "lucide-react";
 import Link from "next/link";
-import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
 export function Hero() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
 
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden bg-white">
@@ -113,30 +114,26 @@ export function Hero() {
             </Link>
             <div className="flex items-center gap-3">
               <SignedOut>
-                <SignInButton mode="modal" fallbackRedirectUrl="/">
-                  <button className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign in</button>
-                </SignInButton>
-                <SignUpButton mode="modal" fallbackRedirectUrl="/">
-                  <button className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign up</button>
-                </SignUpButton>
+                <a href={`${appUrl}/sign-in?redirect=/dashboard`} className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign in</a>
+                <a href={`${appUrl}/sign-up?redirect=/dashboard`} className="text-sm font-medium text-gray-600 hover:text-gray-900">Sign up</a>
               </SignedOut>
               <SignedIn>
                 <UserButton afterSignOutUrl="/" />
               </SignedIn>
             </div>
             <SignedIn>
-              <Link href="/dashboard">
+              <a href={`${appUrl}/dashboard`}>
                 <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
                   Go to Dashboard
                 </Button>
-              </Link>
+              </a>
             </SignedIn>
             <SignedOut>
-              <Link href="/sign-in?redirect=/dashboard">
+              <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
                 <Button className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 shadow-md hover:shadow-lg transition-all">
                   Start Mock Interview
                 </Button>
-              </Link>
+              </a>
             </SignedOut>
           </div>
         </div>
@@ -188,7 +185,7 @@ export function Hero() {
               className="flex flex-col sm:flex-row gap-4 mb-12"
             >
               <SignedIn>
-                <Link href="/dashboard">
+                <a href={`${appUrl}/dashboard`}>
                   <Button
                     size="lg"
                     className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
@@ -196,10 +193,10 @@ export function Hero() {
                     <Eye className="mr-2 h-4 w-4" />
                     Go to Dashboard
                   </Button>
-                </Link>
+                </a>
               </SignedIn>
               <SignedOut>
-                <Link href="/sign-in?redirect=/dashboard">
+                <a href={`${appUrl}/sign-in?redirect=/dashboard`}>
                   <Button
                     size="lg"
                     className="h-12 px-8 text-base font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all duration-200"
@@ -207,10 +204,10 @@ export function Hero() {
                     <Eye className="mr-2 h-4 w-4" />
                     Start Your Reality Check
                   </Button>
-                </Link>
+                </a>
               </SignedOut>
               <SignedIn>
-                <Link href="/interview/setup">
+                <a href={`${appUrl}/interview/setup`}>
                   <Button
                     size="lg"
                     variant="outline"
@@ -219,7 +216,7 @@ export function Hero() {
                     <Play className="mr-2 h-4 w-4" />
                     5-Minute Live Mock
                   </Button>
-                </Link>
+                </a>
               </SignedIn>
             </motion.div>
 
@@ -314,12 +311,12 @@ export function Hero() {
                 </div>
 
                 {/* Start button */}
-                <Link href="/sign-in" className="block">
+                <a href={`${appUrl}/sign-in?redirect=/dashboard`} className="block">
                   <Button className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm transition-colors text-base">
                     See Your Blind Spots Now
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
-                </Link>
+                </a>
             </div>
           </motion.div>
         </div>

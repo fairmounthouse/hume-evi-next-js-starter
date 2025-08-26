@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { SignedIn, SignedOut } from "@clerk/nextjs";
 
 export default function LandingPage() {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
   const [isClient, setIsClient] = useState(false);
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
@@ -95,7 +96,7 @@ export default function LandingPage() {
         >
           <SignedIn>
             <motion.a
-              href="/dashboard"
+              href={`${appUrl}/dashboard`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -108,7 +109,7 @@ export default function LandingPage() {
           </SignedIn>
           <SignedOut>
             <motion.a
-              href="/sign-in?redirect=/dashboard"
+              href={`${appUrl}/sign-in?redirect=/dashboard`}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold shadow-lg hover:shadow-xl transition-shadow duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

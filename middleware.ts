@@ -24,18 +24,31 @@ const isProtectedRoute = createRouteMatcher([
 
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const reqHost = req.nextUrl.host;
+  const appHost = appUrl ? new URL(appUrl).host : null;
   
   // Note: User sync is now handled by components to avoid redundant calls
   // Middleware only handles routing logic
   
-  // If user is authenticated and trying to access root, redirect to dashboard
-  if (userId && req.nextUrl.pathname === "/") {
-    return Response.redirect(new URL("/dashboard", req.url));
-  }
-  
-  // If user is authenticated and trying to access auth pages, redirect to dashboard
-  if (userId && (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up"))) {
-    return Response.redirect(new URL("/dashboard", req.url));
+  // Cross-domain routing: if on landing domain (host !== app host)
+  if (appHost && reqHost !== appHost) {
+    // Redirect any auth routes to the app domain auth
+    if (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up")) {
+      return Response.redirect(`${appUrl}${req.nextUrl.pathname}${req.nextUrl.search}`);
+    }
+    // If authenticated and on landing root, send to app dashboard
+    if (userId && req.nextUrl.pathname === "/") {
+      return Response.redirect(`${appUrl}/dashboard`);
+    }
+  } else {
+    // On app domain: local redirects
+    if (userId && req.nextUrl.pathname === "/") {
+      return Response.redirect(new URL("/dashboard", req.url));
+    }
+    if (userId && (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up"))) {
+      return Response.redirect(new URL("/dashboard", req.url));
+    }
   }
   
   // Protect all authenticated routes
