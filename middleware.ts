@@ -3,13 +3,12 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
-  "/", // Landing page
-  "/pricing", // Public pricing page
+  "/pricing",
   "/about",
   "/contact",
   "/privacy",
   "/terms",
-  "/api/webhooks(.*)", // Webhook endpoints
+  "/api/webhooks(.*)",
 ]);
 
 const isProtectedRoute = createRouteMatcher([
@@ -37,14 +36,17 @@ export default clerkMiddleware(async (auth, req) => {
     if (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up")) {
       return Response.redirect(`${appUrl}${req.nextUrl.pathname}${req.nextUrl.search}`);
     }
-    // If authenticated and on landing root, send to app dashboard
-    if (userId && req.nextUrl.pathname === "/") {
-      return Response.redirect(`${appUrl}/dashboard`);
+    // If landing domain root, send to app root where redirect logic lives
+    if (req.nextUrl.pathname === "/") {
+      return Response.redirect(`${appUrl}/`);
     }
   } else {
     // On app domain: local redirects
-    if (userId && req.nextUrl.pathname === "/") {
-      return Response.redirect(new URL("/dashboard", req.url));
+    if (req.nextUrl.pathname === "/") {
+      if (userId) {
+        return Response.redirect(new URL("/dashboard", req.url));
+      }
+      return Response.redirect(new URL("/sign-in", req.url));
     }
     if (userId && (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up"))) {
       return Response.redirect(new URL("/dashboard", req.url));
