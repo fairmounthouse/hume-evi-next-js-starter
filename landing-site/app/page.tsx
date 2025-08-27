@@ -1,26 +1,25 @@
-"use client";
+import Navigation from '@/components/Navigation'
+import Hero from '@/components/Hero'
+import Stats from '@/components/Stats'
+import WhatWeOffer from '@/components/WhatWeOffer'
+import WhoWeBuiltFor from '@/components/WhoWeBuiltFor'
+import Testimonials from '@/components/Testimonials'
+import Pricing from '@/components/Pricing'
+import Team from '@/components/Team'
+import Footer from '@/components/Footer'
 
-import { Hero } from "../components/landing/Hero";
-import { WhatWeOffer } from "../components/landing/WhatWeOffer";
-import { WhoWeBuiltFor } from "../components/landing/WhoWeBuiltFor";
-import { Testimonials } from "../components/landing/Testimonials";
-import { Pricing } from "../components/landing/Pricing";
-import { Team } from "../components/landing/Team";
-import { Footer } from "../components/landing/Footer";
-import ThemePalette from "../components/ThemePalette";
-
-export default function Landing() {
+export default function Home() {
   return (
-    <main className="relative">
+    <main>
+      <Navigation />
       <Hero />
+      <Stats />
       <WhatWeOffer />
       <WhoWeBuiltFor />
       <Testimonials />
       <Pricing />
       <Team />
       <Footer />
-      <ThemePalette />
     </main>
-  );
+  )
 }
-
