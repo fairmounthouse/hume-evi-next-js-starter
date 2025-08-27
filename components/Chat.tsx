@@ -16,7 +16,8 @@ import { Button } from "./ui/button";
 import { Toggle } from "./ui/toggle";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { GraduationCap, FileText, Download, User, Maximize2, X, Eye, EyeOff } from "lucide-react";
+import { GraduationCap, FileText, Download, User, Maximize2, X, Eye, EyeOff, Settings, Home } from "lucide-react";
+import DeviceSetup from "./DeviceSetup";
 import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
 import TranscriptEvaluator from "@/utils/transcriptEvaluator";
@@ -68,6 +69,8 @@ function ChatInterface({
   onShowExhibitFromSidebar,
   onExpandExhibit,
   onCloseModal,
+  selectedDevices,
+  onOpenDeviceSetup,
 }: any) {
   const { messages, sendSessionSettings, status, sendToolMessage } = useVoice();
   
@@ -1048,6 +1051,16 @@ function ChatInterface({
                <Button 
                 variant="outline" 
                 onClick={() => {
+                  // Navigate to dashboard
+                  window.location.href = "/dashboard";
+                }}
+              >
+                <Home className="w-4 h-4 mr-2" />
+                Dashboard
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
                   // Navigate to setup page for new interview
                   window.location.href = "/interview/setup";
                 }}
@@ -1287,7 +1300,11 @@ function ChatInterface({
           <div className="right-column w-full flex-shrink-0 p-4 pt-12 space-y-4 flex flex-col max-h-full overflow-y-auto">
             {/* Video Input */}
             <div className="flex-shrink-0">
-              <VideoInput ref={videoRef} autoStart={isCallActive} />
+              <VideoInput 
+                ref={videoRef} 
+                autoStart={isCallActive} 
+                preferredDeviceId={selectedDevices?.cameraId}
+              />
             </div>
 
 
@@ -1467,7 +1484,21 @@ function ChatInterface({
       )}
 
       {/* Voice Controls - Fixed at bottom */}
-      {!showEndScreen && <Controls />}
+      {!showEndScreen && (
+        <div className="relative">
+          <Controls />
+          {/* Device Setup Button - Floating */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenDeviceSetup}
+            className="absolute -top-12 right-4 bg-white/90 backdrop-blur-sm border-gray-200 hover:bg-white shadow-sm"
+          >
+            <Settings className="w-4 h-4 mr-2" />
+            Devices
+          </Button>
+        </div>
+      )}
 
       {/* Hidden Recording System - No UI, just functionality */}
       {(isCallActive || forceShowRecording) && (
@@ -1590,6 +1621,14 @@ export default function ClientComponent({
   const [transcript, setTranscript] = useState<any[]>([]);
   const [showEndScreen, setShowEndScreen] = useState(false);
 
+  // Device preferences from device setup
+  const [selectedDevices, setSelectedDevices] = useState<{
+    cameraId: string;
+    microphoneId: string;
+    speakerId: string;
+  } | null>(null);
+  const [showDeviceSetup, setShowDeviceSetup] = useState(false);
+
   // Exhibit state for ClientComponent level
   const [currentCaseId, setCurrentCaseId] = useState<string | null>(null);
   const [unlockedExhibits, setUnlockedExhibits] = useState<any[]>([]);
@@ -1608,6 +1647,41 @@ export default function ClientComponent({
 
   // optional: use configId from environment variable
   const configId = process.env['NEXT_PUBLIC_HUME_CONFIG_ID'];
+
+  // Load device preferences from sessionStorage
+  useEffect(() => {
+    const storedDevices = sessionStorage.getItem('selectedDevices');
+    if (storedDevices) {
+      try {
+        const devices = JSON.parse(storedDevices);
+        setSelectedDevices(devices);
+        console.log("🎥 Loaded device preferences:", devices);
+      } catch (error) {
+        console.error("Failed to parse stored device preferences:", error);
+      }
+    }
+  }, []);
+
+  // Device setup handlers
+  const handleDeviceSetupComplete = (devices: {
+    cameraId: string;
+    microphoneId: string;
+    speakerId: string;
+  }) => {
+    setSelectedDevices(devices);
+    sessionStorage.setItem('selectedDevices', JSON.stringify(devices));
+    setShowDeviceSetup(false);
+    console.log("🎥 Device preferences updated:", devices);
+    toast.success("Device settings updated successfully!");
+  };
+
+  const handleOpenDeviceSetup = () => {
+    setShowDeviceSetup(true);
+  };
+
+  const handleCloseDeviceSetup = () => {
+    setShowDeviceSetup(false);
+  };
 
   // Tool call handler for exhibit display
   const handleToolCall = useCallback(async (toolCallMessage: any) => {
@@ -1911,6 +1985,8 @@ export default function ClientComponent({
           assistantBus={assistantBus}
           timeout={timeout}
           messagesRef={ref}
+          selectedDevices={selectedDevices}
+          onOpenDeviceSetup={handleOpenDeviceSetup}
         />
         {!showEndScreen && (
           <StartCall 
@@ -1929,6 +2005,15 @@ export default function ClientComponent({
               // Also try to set call active
               setIsCallActive(true);
             }}
+          />
+        )}
+
+        {/* Device Setup Modal */}
+        {showDeviceSetup && (
+          <DeviceSetup
+            onContinue={handleDeviceSetupComplete}
+            onClose={handleCloseDeviceSetup}
+            isModal={true}
           />
         )}
       </VoiceProvider>

@@ -14,9 +14,10 @@ export interface VideoInputRef {
 
 interface VideoInputProps {
   autoStart?: boolean;
+  preferredDeviceId?: string;
 }
 
-const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = false }, ref) => {
+const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = false, preferredDeviceId }, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [isVideoOn, setIsVideoOn] = useState(false);
@@ -30,12 +31,19 @@ const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = fal
       
       try {
         // Try to get real camera
+        const videoConstraints: MediaTrackConstraints = { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "user"
+        };
+        
+        // Use preferred device if specified
+        if (preferredDeviceId) {
+          videoConstraints.deviceId = { exact: preferredDeviceId };
+        }
+        
         stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-            facingMode: "user"
-          } 
+          video: videoConstraints
         });
         console.log("✅ Got real camera stream:", stream);
         setUsingFallback(false);

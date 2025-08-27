@@ -30,7 +30,7 @@ export default function InterviewSetupPage() {
       difficultyId: selections.difficultyId,
     });
     
-    router.push(`/interview/session?${params.toString()}`);
+    router.push(`/interview/device-setup?${params.toString()}`);
   };
 
   return (
