@@ -16,6 +16,7 @@ module.exports = {
         // Supporting colors
         'blue-accent': '#3B82F6',
         'blue-light': '#DBEAFE',
+        'green-light': '#D1FAE5',
         'orange-accent': '#FB923C',
         'pink-accent': '#EC4899',
       },
