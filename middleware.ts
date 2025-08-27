@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -22,41 +23,28 @@ const isProtectedRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  const { userId } = await auth();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  const reqHost = req.nextUrl.host;
-  const appHost = appUrl ? new URL(appUrl).host : null;
-  
-  // Note: User sync is now handled by components to avoid redundant calls
-  // Middleware only handles routing logic
-  
-  // Cross-domain routing: if on landing domain (host !== app host)
-  if (appHost && reqHost !== appHost) {
-    // Redirect any auth routes to the app domain auth
-    if (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up")) {
-      return Response.redirect(`${appUrl}${req.nextUrl.pathname}${req.nextUrl.search}`);
-    }
-    // If landing domain root, send to app root where redirect logic lives
-    if (req.nextUrl.pathname === "/") {
-      return Response.redirect(`${appUrl}/`);
-    }
-  } else {
-    // On app domain: local redirects
+  try {
+    const { userId } = await auth();
+    
+    // Local redirects only; do not attempt cross-domain logic here
     if (req.nextUrl.pathname === "/") {
       if (userId) {
-        return Response.redirect(new URL("/dashboard", req.url));
+        return NextResponse.redirect(new URL("/dashboard", req.url));
       }
-      return Response.redirect(new URL("/sign-in", req.url));
+      return NextResponse.redirect(new URL("/sign-in", req.url));
     }
     if (userId && (req.nextUrl.pathname.startsWith("/sign-in") || req.nextUrl.pathname.startsWith("/sign-up"))) {
-      return Response.redirect(new URL("/dashboard", req.url));
+      return NextResponse.redirect(new URL("/dashboard", req.url));
     }
-  }
-  
-  // Protect all authenticated routes
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-    return;
+    
+    // Protect all authenticated routes
+    if (isProtectedRoute(req)) {
+      await auth.protect();
+      return;
+    }
+  } catch {
+    // Failsafe to avoid middleware crashes in production
+    return NextResponse.redirect(new URL("/sign-in", req.url));
   }
 });
 
