@@ -1084,7 +1084,7 @@ function ChatInterface({
                 <span>🎥</span>
                 Interview Recording
               </h3>
-              <div className="flex-grow flex flex-col bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <div className="flex-grow flex flex-col rounded-lg">
                 {finalVideoUrl ? (
                   <div className="w-full flex-grow flex flex-col">
                     {/* Video Player */}
@@ -1109,8 +1109,8 @@ function ChatInterface({
                       )}
                     </div>
                     
-                    {/* Session Summary moved here */}
-                    <div className="bg-white dark:bg-gray-900 rounded-lg p-4 space-y-3">
+                    {/* Session Summary - Simple Design without Background */}
+                    <div className="rounded-lg p-4 space-y-3">
                       <h4 className="font-semibold text-sm flex items-center gap-2">
                         <User className="w-4 h-4" />
                         Session Summary

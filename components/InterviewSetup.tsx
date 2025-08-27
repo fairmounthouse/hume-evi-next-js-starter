@@ -89,7 +89,8 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   
   // Handle session selection from SessionSelector
   const handleSessionSelect = (sessionId: string) => {
-    router.push(`/interview/session?sessionId=${sessionId}`);
+    // Redirect to the session viewer page, not the interview session page
+    router.push(`/sessions/${sessionId}`);
   };
 
   // Check if content is scrollable

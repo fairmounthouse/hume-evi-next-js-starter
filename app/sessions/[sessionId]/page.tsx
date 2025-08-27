@@ -242,8 +242,8 @@ export default function SessionViewerPage() {
                 )}
               </div>
               
-              {/* Session Summary (exact same as end screen) */}
-              <div className="bg-white dark:bg-gray-900 rounded-lg p-4 space-y-3 mt-4">
+              {/* Session Summary - Simple Design without Background */}
+              <div className="rounded-lg p-4 space-y-3 mt-4">
                 <h4 className="font-semibold text-sm flex items-center gap-2">
                   <User className="w-4 h-4" />
                   Session Summary

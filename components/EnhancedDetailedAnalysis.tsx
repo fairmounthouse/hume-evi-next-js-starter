@@ -160,31 +160,28 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
   const [selectedExample, setSelectedExample] = useState<any>(null);
   const [selectedFactorIndex, setSelectedFactorIndex] = useState<number>(0);
 
-  // Dynamic height matching effect
+  // Fixed height - no dynamic recalculation to prevent layout shifts
   useEffect(() => {
-    const matchHeights = () => {
+    const setFixedHeights = () => {
       const container = document.querySelector('.detailed-factors-container') as HTMLElement;
       const nav = document.querySelector('.factor-nav') as HTMLElement;
       const details = document.querySelector('.factor-details') as HTMLElement;
       
       if (container && nav && details) {
-        const containerHeight = container.getBoundingClientRect().height;
-        nav.style.height = `${containerHeight}px`;
-        details.style.height = `${containerHeight}px`;
+        // Set fixed height to prevent expansion/contraction
+        const fixedHeight = '350px';
+        container.style.height = fixedHeight;
+        nav.style.height = fixedHeight;
+        details.style.height = fixedHeight;
       }
     };
 
-    // Match heights on mount and when content changes
-    const timer = setTimeout(matchHeights, 50);
-    
-    // Also match on window resize
-    window.addEventListener('resize', matchHeights);
-    
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('resize', matchHeights);
-    };
-  }, [activeTab, selectedFactorIndex]);
+    // Only run once when tab becomes active, not on factor changes
+    if (activeTab === 'detailed') {
+      const timer = setTimeout(setFixedHeights, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab]); // Removed selectedFactorIndex to prevent recalculation
 
 
 
@@ -209,7 +206,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
 
   return (
     <>
-      <Card className="p-6 flex flex-col max-h-[600px]">
+      <Card className="detailed-analysis-card p-6 flex flex-col h-[600px] max-h-[600px]">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5" />
           Detailed Analysis
@@ -268,11 +265,12 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
 
         {/* Tab Content */}
         <div 
-          className="flex-grow pr-1 pb-5" 
+          className="tab-content-container flex-grow pr-1 pb-5" 
           style={{ 
             scrollBehavior: 'smooth',
-            height: 'calc(100vh - 250px)',
-            minHeight: '400px',
+            height: 'auto', // Let it size naturally within the card
+            minHeight: '300px', // Reduced to account for header space
+            maxHeight: '350px', // Reduced to fit within 600px card (header ~70px + score ~70px + tabs ~50px + padding ~50px = ~240px used)
             overflow: 'hidden'
           }}
         >
@@ -414,9 +412,9 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
                   className="detailed-factors-container flex"
                   style={{
                     display: 'flex',
-                    height: 'calc(100vh - 250px)',
-                    minHeight: '400px',
-                    maxHeight: '600px'
+                    height: '350px', // Fixed height to prevent expansion
+                    minHeight: '350px',
+                    maxHeight: '350px'
                   }}
                 >
                   {/* Left Side - Factor Navigation List */}
@@ -488,7 +486,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
                     className="factor-details"
                     style={{
                       flex: '1',
-                      height: '100%',
+                      height: '350px', // Fixed height to prevent expansion
                       overflow: 'hidden',
                       background: '#fafafa'
                     }}
