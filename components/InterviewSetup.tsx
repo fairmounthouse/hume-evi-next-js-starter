@@ -74,9 +74,14 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const [seniorityFilter, setSeniorityFilter] = useState<string>("all");
   
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Configuration
+  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Configuration, 3 = Documents (optional), 4 = Device Setup
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [documentSessionId, setDocumentSessionId] = useState<string>("");
+  
+  // Get selected case data to determine if documents are required
+  const selectedCaseData = cases.find(c => c.id === selectedCase);
+  const requiresDocuments = selectedCaseData?.requires_documents || false;
+  const totalSteps = requiresDocuments ? 4 : 3;
   
   // Scroll detection state
   const [isCasesScrollable, setIsCasesScrollable] = useState(false);
@@ -266,43 +271,57 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const hasActiveInterviewerFilters = companyFilter !== "all" || seniorityFilter !== "all";
 
   // Navigation functions
-  const goToPage2 = () => {
-    if (selectedCase) {
+  const goToNextPage = () => {
+    if (currentPage === 1 && selectedCase) {
       setCurrentPage(2);
-    }
-  };
-
-  const goBackToPage1 = () => {
-    setCurrentPage(1);
-  };
-
-  const canProceed = selectedCase && selectedInterviewer && selectedDifficulty;
-
-  const handleStartInterview = () => {
-    if (canProceed) {
-      // Check if the selected case requires documents
-      const selectedCaseData = cases.find(c => c.id === selectedCase);
-      const requiresDocuments = selectedCaseData?.requires_documents || false;
-      
+    } else if (currentPage === 2 && selectedInterviewer && selectedDifficulty) {
       if (requiresDocuments) {
-        console.log("📋 Case requires documents - showing document upload screen");
-        // Generate session ID once for document upload and interview
+        // Go to documents page (step 3)
+        setCurrentPage(3);
+        // Generate session ID for document upload
         const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         setDocumentSessionId(sessionId);
         setShowDocumentUpload(true);
       } else {
-        console.log("📋 Case doesn't require documents - proceeding directly to interview");
-        onStartInterview({
-          caseId: selectedCase,
-          interviewerId: selectedInterviewer,
-          difficultyId: selectedDifficulty
-        });
+        // Skip documents, go directly to device setup or start interview
+        proceedToInterview();
       }
+    } else if (currentPage === 3) {
+      // From documents to device setup or interview
+      proceedToInterview();
     }
   };
 
-  // Get selected case data for display
-  const selectedCaseData = cases.find(c => c.id === selectedCase);
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      if (currentPage === 3) {
+        setShowDocumentUpload(false);
+      }
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const proceedToInterview = () => {
+    console.log("🚀 Proceeding to interview with configuration:", {
+      caseId: selectedCase,
+      interviewerId: selectedInterviewer,
+      difficultyId: selectedDifficulty,
+      sessionId: documentSessionId,
+      hasDocuments: requiresDocuments
+    });
+    
+    onStartInterview({
+      caseId: selectedCase,
+      interviewerId: selectedInterviewer,
+      difficultyId: selectedDifficulty,
+      sessionId: requiresDocuments ? documentSessionId : undefined
+    });
+  };
+
+  const canProceedFromPage1 = selectedCase;
+  const canProceedFromPage2 = selectedInterviewer && selectedDifficulty;
+
+  // Get selected data for display
   const selectedInterviewerData = interviewers.find(i => i.id === selectedInterviewer);
   const selectedDifficultyData = difficulties.find(d => d.id === selectedDifficulty);
 
@@ -310,21 +329,21 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (currentPage === 2) {
-          goBackToPage1();
+        if (currentPage > 1) {
+          goToPreviousPage();
         }
       }
-      if (e.key === 'Enter' && selectedCase && currentPage === 1) {
-        goToPage2();
+      if (e.key === 'Enter' && canProceedFromPage1 && currentPage === 1) {
+        goToNextPage();
       }
-      if (e.key === 'Enter' && canProceed && currentPage === 2) {
-        handleStartInterview();
+      if (e.key === 'Enter' && canProceedFromPage2 && currentPage === 2) {
+        goToNextPage();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentPage, selectedCase, canProceed]);
+  }, [currentPage, canProceedFromPage1, canProceedFromPage2]);
 
   // Handle document upload completion
   const handleDocumentUploadComplete = () => {
@@ -391,12 +410,12 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
         <div className="container mx-auto px-6 h-full flex items-center justify-between">
           {/* Left: Back button and Title */}
           <div className="flex items-center gap-4">
-            {/* Page Back Button - Only on Page 2 */}
-            {currentPage === 2 && (
+            {/* Page Back Button - Show on pages 2+ */}
+            {currentPage > 1 && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={goBackToPage1}
+                onClick={goToPreviousPage}
                 className="flex items-center gap-2"
               >
                 <ArrowLeft className="w-4 h-4" />
@@ -415,11 +434,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               <div className="w-32 h-1 bg-gray-200 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${(currentPage / 2) * 100}%` }}
+                  style={{ width: `${(currentPage / totalSteps) * 100}%` }}
                 />
               </div>
               <span className="text-sm text-gray-500">
-                Step {currentPage} of 2
+                Step {currentPage} of {totalSteps}
               </span>
             </div>
           </div>
@@ -662,7 +681,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               >
                 <Button
                   size="lg"
-                  onClick={goToPage2}
+                  onClick={goToNextPage}
                   className="rounded-full h-14 px-6 bg-blue-600 hover:bg-blue-700 shadow-lg"
                 >
                   Continue
@@ -877,13 +896,13 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 <div className="flex items-center gap-4">
                   <Button
                     variant="outline"
-                    onClick={goBackToPage1}
+                    onClick={goToPreviousPage}
                   >
                     Back
                   </Button>
                   <Button
-                    onClick={handleStartInterview}
-                    disabled={!canProceed}
+                    onClick={goToNextPage}
+                    disabled={!canProceedFromPage2}
                     className="bg-blue-600 hover:bg-blue-700 px-8"
                   >
                     Start Interview

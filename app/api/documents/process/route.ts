@@ -80,8 +80,112 @@ export async function POST(request: NextRequest) {
         processed_at: result.processed_at
       });
 
-      // Store the analysis in Supabase Storage as JSON file (accessible from anywhere)
+      // Extract and store text content in user_documents table
       const { supabase } = await import("@/utils/supabase-client");
+      
+      // Save extracted text as .txt files and update database with file paths
+      if (result.analysis) {
+        const updates = [];
+        
+        // Extract resume text if available
+        if (result.analysis.resume_markdown && resume_url) {
+          try {
+            // Save resume text as .txt file
+            const resumeTextBlob = new Blob([result.analysis.resume_markdown], { type: 'text/plain' });
+            const resumeTextPath = `${session_id}/resume_extracted.txt`;
+            
+            const { error: resumeStorageError } = await supabase.storage
+              .from('documents')
+              .upload(resumeTextPath, resumeTextBlob, {
+                cacheControl: 'max-age=3600',
+                upsert: true
+              });
+            
+            if (!resumeStorageError) {
+              // Get public URL for the text file
+              const { data: resumeUrlData } = supabase.storage
+                .from('documents')
+                .getPublicUrl(resumeTextPath);
+              
+              updates.push(
+                supabase
+                  .from('user_documents')
+                  .update({ 
+                    extracted_text_file_path: resumeTextPath,
+                    extracted_text_file_url: resumeUrlData.publicUrl,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('session_id', session_id)
+                  .eq('document_type', 'resume')
+                  .eq('is_active', true)
+              );
+              
+              console.log(`📄 Saved resume text to file: ${resumeTextPath}`);
+            } else {
+              console.error('❌ Failed to save resume text file:', resumeStorageError);
+            }
+          } catch (error) {
+            console.error('❌ Error saving resume text file:', error);
+          }
+        }
+        
+        // Extract job description text if available
+        if (result.analysis.job_description_markdown && job_description_url) {
+          try {
+            // Save job description text as .txt file
+            const jobDescTextBlob = new Blob([result.analysis.job_description_markdown], { type: 'text/plain' });
+            const jobDescTextPath = `${session_id}/job_description_extracted.txt`;
+            
+            const { error: jobDescStorageError } = await supabase.storage
+              .from('documents')
+              .upload(jobDescTextPath, jobDescTextBlob, {
+                cacheControl: 'max-age=3600',
+                upsert: true
+              });
+            
+            if (!jobDescStorageError) {
+              // Get public URL for the text file
+              const { data: jobDescUrlData } = supabase.storage
+                .from('documents')
+                .getPublicUrl(jobDescTextPath);
+              
+              updates.push(
+                supabase
+                  .from('user_documents')
+                  .update({ 
+                    extracted_text_file_path: jobDescTextPath,
+                    extracted_text_file_url: jobDescUrlData.publicUrl,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('session_id', session_id)
+                  .eq('document_type', 'job_description')
+                  .eq('is_active', true)
+              );
+              
+              console.log(`📄 Saved job description text to file: ${jobDescTextPath}`);
+            } else {
+              console.error('❌ Failed to save job description text file:', jobDescStorageError);
+            }
+          } catch (error) {
+            console.error('❌ Error saving job description text file:', error);
+          }
+        }
+        
+        // Execute all updates
+        if (updates.length > 0) {
+          const updateResults = await Promise.all(updates);
+          const successfulUpdates = updateResults.filter(result => !result.error);
+          console.log(`📝 Updated ${successfulUpdates.length}/${updates.length} documents with text file paths`);
+          
+          // Log any errors
+          updateResults.forEach((result, index) => {
+            if (result.error) {
+              const docType = index === 0 ? 'resume' : 'job_description';
+              console.error(`❌ Failed to update ${docType} text file path:`, result.error);
+            }
+          });
+        }
+      }
       
       const analysisData = {
         session_id,

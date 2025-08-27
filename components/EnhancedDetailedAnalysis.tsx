@@ -160,28 +160,8 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
   const [selectedExample, setSelectedExample] = useState<any>(null);
   const [selectedFactorIndex, setSelectedFactorIndex] = useState<number>(0);
 
-  // Fixed height - no dynamic recalculation to prevent layout shifts
-  useEffect(() => {
-    const setFixedHeights = () => {
-      const container = document.querySelector('.detailed-factors-container') as HTMLElement;
-      const nav = document.querySelector('.factor-nav') as HTMLElement;
-      const details = document.querySelector('.factor-details') as HTMLElement;
-      
-      if (container && nav && details) {
-        // Set fixed height to prevent expansion/contraction
-        const fixedHeight = '350px';
-        container.style.height = fixedHeight;
-        nav.style.height = fixedHeight;
-        details.style.height = fixedHeight;
-      }
-    };
-
-    // Only run once when tab becomes active, not on factor changes
-    if (activeTab === 'detailed') {
-      const timer = setTimeout(setFixedHeights, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTab]); // Removed selectedFactorIndex to prevent recalculation
+  // Remove fixed height restrictions to allow responsive expansion
+  // Component will now expand based on content
 
 
 
@@ -206,7 +186,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
 
   return (
     <>
-      <Card className="detailed-analysis-card p-6 flex flex-col h-[600px] max-h-[600px]">
+      <Card className="detailed-analysis-card p-6 flex flex-col min-h-[600px]">
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <FileText className="w-5 h-5" />
           Detailed Analysis
@@ -269,9 +249,9 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
           style={{ 
             scrollBehavior: 'smooth',
             height: 'auto', // Let it size naturally within the card
-            minHeight: '300px', // Reduced to account for header space
-            maxHeight: '350px', // Reduced to fit within 600px card (header ~70px + score ~70px + tabs ~50px + padding ~50px = ~240px used)
-            overflow: 'hidden'
+            minHeight: '300px', // Minimum height for consistency
+            maxHeight: 'none', // Remove height constraint to prevent cutoff
+            overflow: 'visible' // Allow content to be fully visible
           }}
         >
           <AnimatePresence mode="wait">
@@ -281,16 +261,17 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="h-full"
+                className="w-full"
               >
                 {/* Two Column Layout */}
                 <div 
-                  className="grid h-full gap-5 p-4"
+                  className="grid gap-5 p-4"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '65% 35%',
                     gap: '20px',
-                    padding: '16px'
+                    padding: '16px',
+                    alignItems: 'start' // Align items to start instead of stretching
                   }}
                 >
                   {/* Left Column (60%) */}
@@ -407,27 +388,19 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
                 exit={{ opacity: 0, y: -10 }}
                 className="h-full"
               >
-                {/* Fixed Layout Container */}
+                {/* Responsive Layout Container */}
                 <div 
-                  className="detailed-factors-container flex"
+                  className="detailed-factors-container flex flex-col lg:flex-row gap-4"
                   style={{
                     display: 'flex',
-                    height: '350px', // Fixed height to prevent expansion
-                    minHeight: '350px',
-                    maxHeight: '350px'
+                    minHeight: '400px' // Minimum height, but can expand
                   }}
                 >
                   {/* Left Side - Factor Navigation List */}
                   <div 
-                    className="factor-nav"
+                    className="factor-nav w-full lg:w-1/4 flex flex-col border-b lg:border-b-0 lg:border-r border-gray-200 dark:border-gray-700 p-2"
                     style={{
-                      width: '25%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      borderRight: '1px solid #e5e7eb',
-                      padding: '4px',
-                      overflow: 'hidden',
-                      height: '100%'
+                      minHeight: '200px'
                     }}
                   >
                     {evaluation.factors.map((factor, index) => (
@@ -483,42 +456,24 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
 
                   {/* Right Side - Factor Details Panel */}
                   <div 
-                    className="factor-details"
+                    className="factor-details flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg p-4"
                     style={{
-                      flex: '1',
-                      height: '350px', // Fixed height to prevent expansion
-                      overflow: 'hidden',
-                      background: '#fafafa'
+                      minHeight: '300px' // Minimum height, can expand
                     }}
                   >
                     {evaluation.factors[selectedFactorIndex] && (
                       <div 
-                        className="factor-content-wrapper"
+                        className="factor-content-wrapper flex flex-col lg:flex-row gap-4 p-4"
                         style={{
-                          display: 'flex',
-                          height: '100%',
-                          gap: '20px',
-                          padding: '16px'
+                          minHeight: '300px'
                         }}
                       >
                         {/* Column 1 - Strengths & Improvements Combined */}
                         <div 
-                          className="content-column column-strengths-improvements"
-                          style={{
-                            flex: '1',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            height: '100%'
-                          }}
+                          className="content-column column-strengths-improvements flex-1 flex flex-col space-y-4"
                         >
                           {/* Strengths Section */}
-                          <div 
-                            className="strengths-section"
-                            style={{
-                              flex: '0 1 auto',
-                              marginBottom: '12px'
-                            }}
-                          >
+                          <div className="strengths-section">
                             <div 
                               className="section-label"
                               style={{
@@ -546,15 +501,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
                           </div>
 
                           {/* Improvements Section */}
-                          <div 
-                            className="improvements-section"
-                            style={{
-                              flex: '1',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              minHeight: '0'
-                            }}
-                          >
+                          <div className="improvements-section flex-1 flex flex-col">
                             <div 
                               className="section-label"
                               style={{
@@ -609,15 +556,7 @@ export default function EnhancedDetailedAnalysis({ evaluation, confidence }: Enh
                         </div>
 
                         {/* Column 2 - Recommendations */}
-                        <div 
-                          className="content-column column-recommendations"
-                          style={{
-                            flex: '1',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            height: '100%'
-                          }}
-                        >
+                        <div className="content-column column-recommendations flex-1 flex flex-col space-y-4">
                           <div 
                             className="section-label"
                             style={{

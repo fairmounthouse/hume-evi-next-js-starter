@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertCircle, Type } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertCircle, Type, ChevronDown, Plus, History } from "lucide-react";
 import { Textarea } from "./ui/textarea";
+import { Input } from "./ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 
@@ -23,6 +25,22 @@ interface UploadedFile {
   error?: string;
 }
 
+interface UserDocument {
+  id: string;
+  title: string;
+  document_type: 'resume' | 'job_description';
+  original_filename: string;
+  file_size_bytes: number;
+  mime_type: string;
+  created_at: string;
+  file_url: string;
+  signed_url?: string;
+  extracted_text_file_path?: string; // Path to .txt file in storage
+  extracted_text_file_url?: string; // Public URL to .txt file
+  alias?: string;
+  last_used_at?: string;
+}
+
 export default function DocumentUpload({ sessionId, onContinue }: DocumentUploadProps) {
   const [uploadedFiles, setUploadedFiles] = useState<{
     resume?: UploadedFile;
@@ -35,12 +53,183 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
   const [resumeText, setResumeText] = useState("");
   const [jobDescText, setJobDescText] = useState("");
   const [inputMode, setInputMode] = useState<{
-    resume: 'file' | 'text';
-    job_description: 'file' | 'text';
+    resume: 'file' | 'text' | 'existing';
+    job_description: 'file' | 'text' | 'existing';
   }>({
-    resume: 'file',
-    job_description: 'file'
+    resume: 'file', // Will be updated after documents load
+    job_description: 'file' // Will be updated after documents load
   });
+  
+  // Track if initial setup is complete to prevent UI flashing
+  const [initialSetupComplete, setInitialSetupComplete] = useState(false);
+
+  // User documents states
+  const [userDocuments, setUserDocuments] = useState<{
+    resumes: UserDocument[];
+    job_descriptions: UserDocument[];
+  }>({
+    resumes: [],
+    job_descriptions: []
+  });
+  const [selectedDocuments, setSelectedDocuments] = useState<{
+    resume?: string;
+    job_description?: string;
+  }>({});
+  const [loadingDocuments, setLoadingDocuments] = useState(true);
+  
+  // Save new document states
+  const [saveTitle, setSaveTitle] = useState<{
+    resume: string;
+    job_description: string;
+  }>({
+    resume: '',
+    job_description: ''
+  });
+
+  // Alias states for new documents
+  const [documentAlias, setDocumentAlias] = useState<{
+    resume: string;
+    job_description: string;
+  }>({
+    resume: '',
+    job_description: ''
+  });
+
+  // Track if existing document text has been modified (to ask for alias)
+  const [textModified, setTextModified] = useState<{
+    resume: boolean;
+    job_description: boolean;
+  }>({
+    resume: false,
+    job_description: false
+  });
+
+  // Store original text to detect modifications
+  const [originalText, setOriginalText] = useState<{
+    resume: string;
+    job_description: string;
+  }>({
+    resume: '',
+    job_description: ''
+  });
+
+  // Fetch user documents on component mount
+  useEffect(() => {
+    fetchUserDocuments();
+  }, []);
+
+  const fetchUserDocuments = async () => {
+    setLoadingDocuments(true);
+    try {
+      const [resumesRes, jobDescsRes] = await Promise.all([
+        fetch('/api/user-documents/list?type=resume'),
+        fetch('/api/user-documents/list?type=job_description')
+      ]);
+
+      if (resumesRes.ok && jobDescsRes.ok) {
+        const resumesData = await resumesRes.json();
+        const jobDescsData = await jobDescsRes.json();
+        
+        const resumes = resumesData.documents || [];
+        const jobDescriptions = jobDescsData.documents || [];
+        
+        setUserDocuments({
+          resumes,
+          job_descriptions: jobDescriptions
+        });
+
+        // Auto-set input mode based on available documents
+        setInputMode({
+          resume: resumes.length > 0 ? 'existing' : 'file',
+          job_description: jobDescriptions.length > 0 ? 'existing' : 'file'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user documents:', error);
+    } finally {
+      setLoadingDocuments(false);
+      setInitialSetupComplete(true);
+    }
+  };
+
+  // Handle existing document selection
+  const handleExistingDocumentSelect = async (documentId: string, type: 'resume' | 'job_description') => {
+    const documents = type === 'resume' ? userDocuments.resumes : userDocuments.job_descriptions;
+    const selectedDoc = documents.find(doc => doc.id === documentId);
+    
+    if (selectedDoc) {
+      console.log(`📋 Selected existing ${type}:`, {
+        id: selectedDoc.id,
+        title: selectedDoc.title,
+        hasExtractedText: !!(selectedDoc.extracted_text_file_url || selectedDoc.extracted_text_file_path)
+      });
+
+      // Update selected documents
+      setSelectedDocuments(prev => ({
+        ...prev,
+        [type]: documentId
+      }));
+
+      // Update last_used_at timestamp
+      try {
+        await fetch('/api/user-documents/update-last-used', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ documentId })
+        });
+        console.log(`📅 Updated last_used_at for ${type} document`);
+      } catch (error) {
+        console.warn('Failed to update last_used_at:', error);
+        // Don't block the user flow for this non-critical update
+      }
+
+      // If the document has extracted text file, auto-populate the text field
+      if (selectedDoc.extracted_text_file_url) {
+        // Fetch text from .txt file
+        console.log(`📄 Fetching ${type} text from file:`, selectedDoc.extracted_text_file_url);
+        try {
+          const response = await fetch(selectedDoc.extracted_text_file_url);
+          const textContent = await response.text();
+          
+          if (type === 'resume') {
+            setResumeText(textContent);
+            setOriginalText(prev => ({ ...prev, resume: textContent }));
+            setTextModified(prev => ({ ...prev, resume: false }));
+          } else {
+            setJobDescText(textContent);
+            setOriginalText(prev => ({ ...prev, job_description: textContent }));
+            setTextModified(prev => ({ ...prev, job_description: false }));
+          }
+          console.log(`✅ Loaded ${type} text from file (${textContent.length} chars)`);
+        } catch (error) {
+          console.error(`❌ Failed to fetch ${type} text from file:`, error);
+          // Clear text if file fetch fails
+          if (type === 'resume') {
+            setResumeText('');
+            setOriginalText(prev => ({ ...prev, resume: '' }));
+            setTextModified(prev => ({ ...prev, resume: false }));
+          } else {
+            setJobDescText('');
+            setOriginalText(prev => ({ ...prev, job_description: '' }));
+            setTextModified(prev => ({ ...prev, job_description: false }));
+          }
+        }
+      } else {
+        // Clear text if no extracted text available
+        if (type === 'resume') {
+          setResumeText('');
+          setOriginalText(prev => ({ ...prev, resume: '' }));
+          setTextModified(prev => ({ ...prev, resume: false }));
+        } else {
+          setJobDescText('');
+          setOriginalText(prev => ({ ...prev, job_description: '' }));
+          setTextModified(prev => ({ ...prev, job_description: false }));
+        }
+      }
+    }
+  };
 
   // Handle file drops
   const onDropResume = useCallback((acceptedFiles: File[]) => {
@@ -65,7 +254,9 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
       'text/plain': ['.txt']
     },
     maxFiles: 1,
-    maxSize: 10 * 1024 * 1024 // 10MB
+    maxSize: 10 * 1024 * 1024, // 10MB
+    multiple: false,
+    disabled: isProcessing || !!uploadedFiles.resume
   });
 
   const jobDescriptionDropzone = useDropzone({
@@ -77,7 +268,9 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
       'text/plain': ['.txt']
     },
     maxFiles: 1,
-    maxSize: 10 * 1024 * 1024 // 10MB
+    maxSize: 10 * 1024 * 1024, // 10MB
+    multiple: false,
+    disabled: isProcessing || !!uploadedFiles.job_description
   });
 
   // Upload text and return URL directly (for processing)
@@ -93,6 +286,12 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
       formData.append('file', textFile);
       formData.append('sessionId', sessionId);
       formData.append('documentType', type);
+      
+      // Add alias if provided
+      const alias = documentAlias[type];
+      if (alias && alias.trim()) {
+        formData.append('alias', alias.trim());
+      }
 
       const response = await fetch('/api/documents/upload', {
         method: 'POST',
@@ -194,6 +393,12 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
       formData.append('file', file);
       formData.append('sessionId', sessionId);
       formData.append('documentType', type);
+      
+      // Add alias if provided
+      const alias = documentAlias[type];
+      if (alias && alias.trim()) {
+        formData.append('alias', alias.trim());
+      }
 
       const response = await fetch('/api/documents/upload', {
         method: 'POST',
@@ -230,6 +435,48 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
     }
   };
 
+  // Link existing documents to session via references table
+  const linkDocumentsToSession = async () => {
+    const references = [];
+    
+    // Add resume reference if selected
+    if (inputMode.resume === 'existing' && selectedDocuments.resume && !textModified.resume) {
+      references.push({
+        session_id: sessionId,
+        document_id: selectedDocuments.resume
+      });
+    }
+    
+    // Add job description reference if selected
+    if (inputMode.job_description === 'existing' && selectedDocuments.job_description && !textModified.job_description) {
+      references.push({
+        session_id: sessionId,
+        document_id: selectedDocuments.job_description
+      });
+    }
+    
+    if (references.length > 0) {
+      try {
+        const response = await fetch('/api/sessions/link-documents', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ references })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Linked ${result.linkedCount} existing documents to session`);
+        } else {
+          console.warn('Failed to link existing documents:', response.statusText);
+        }
+      } catch (error) {
+        console.warn('Error linking existing documents:', error);
+      }
+    }
+  };
+
   // Process documents with external API
   const handleProcessDocuments = async () => {
     setIsProcessing(true);
@@ -238,6 +485,45 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
     try {
       let resumeUrl = uploadedFiles.resume?.url || null;
       let jobDescUrl = uploadedFiles.job_description?.url || null;
+
+      // Handle existing documents - check if modified
+      if (inputMode.resume === 'existing' && selectedDocuments.resume) {
+        const selectedResume = userDocuments.resumes.find(doc => doc.id === selectedDocuments.resume);
+        if (selectedResume) {
+          if (textModified.resume) {
+            // Text was modified - upload as new .txt file for processing
+            console.log("📝 Resume text modified - uploading as new .txt file");
+            resumeUrl = await uploadTextAndGetUrl(resumeText, 'resume');
+          } else if (selectedResume.extracted_text_file_url) {
+            // Use existing .txt file URL (most efficient - no LLM conversion needed)
+            resumeUrl = selectedResume.extracted_text_file_url;
+            console.log("📄 Using existing resume .txt file:", selectedResume.extracted_text_file_url);
+          } else {
+            // Use original document URL (will need LLM conversion)
+            resumeUrl = selectedResume.signed_url || selectedResume.file_url;
+            console.log("📋 Using existing resume (needs conversion):", selectedResume.title);
+          }
+        }
+      }
+
+      if (inputMode.job_description === 'existing' && selectedDocuments.job_description) {
+        const selectedJobDesc = userDocuments.job_descriptions.find(doc => doc.id === selectedDocuments.job_description);
+        if (selectedJobDesc) {
+          if (textModified.job_description) {
+            // Text was modified - upload as new .txt file for processing
+            console.log("📝 Job description text modified - uploading as new .txt file");
+            jobDescUrl = await uploadTextAndGetUrl(jobDescText, 'job_description');
+          } else if (selectedJobDesc.extracted_text_file_url) {
+            // Use existing .txt file URL (most efficient - no LLM conversion needed)
+            jobDescUrl = selectedJobDesc.extracted_text_file_url;
+            console.log("📄 Using existing job description .txt file:", selectedJobDesc.extracted_text_file_url);
+          } else {
+            // Use original document URL (will need LLM conversion)
+            jobDescUrl = selectedJobDesc.signed_url || selectedJobDesc.file_url;
+            console.log("📋 Using existing job description (needs conversion):", selectedJobDesc.title);
+          }
+        }
+      }
 
       // Handle text inputs by uploading them first and getting URLs directly
       if (inputMode.resume === 'text' && resumeText.trim() && !uploadedFiles.resume) {
@@ -252,9 +538,33 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
 
       console.log("📋 Processing with URLs:", {
         resume_url: resumeUrl,
-        job_description_url: jobDescUrl
+        job_description_url: jobDescUrl,
+        resume_mode: inputMode.resume,
+        job_desc_mode: inputMode.job_description
       });
 
+      // Check if we can skip external API processing (only for unmodified existing documents with text files)
+      const resumeDoc = userDocuments.resumes.find(doc => doc.id === selectedDocuments.resume);
+      const jobDescDoc = userDocuments.job_descriptions.find(doc => doc.id === selectedDocuments.job_description);
+      
+      const resumeHasTextFile = inputMode.resume === 'existing' && 
+        !textModified.resume &&
+        resumeDoc?.extracted_text_file_url;
+      const jobDescHasTextFile = inputMode.job_description === 'existing' && 
+        !textModified.job_description &&
+        jobDescDoc?.extracted_text_file_url;
+
+      if ((resumeUrl && resumeHasTextFile) || (jobDescUrl && jobDescHasTextFile)) {
+        console.log("⚡ Using existing unmodified text content - skipping external API processing for efficiency");
+        
+        // Link existing documents to the session
+        await linkDocumentsToSession();
+        
+        onContinue();
+        return;
+      }
+
+      // Otherwise, process with external API as usual
       const response = await fetch('/api/documents/process', {
         method: 'POST',
         headers: {
@@ -297,11 +607,15 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
     }
   };
 
+
+
   // Check if we can proceed
   const hasUploadedFiles = uploadedFiles.resume || uploadedFiles.job_description;
   const hasTextInput = (inputMode.resume === 'text' && resumeText.trim()) || 
                        (inputMode.job_description === 'text' && jobDescText.trim());
-  const hasAnyContent = hasUploadedFiles || hasTextInput;
+  const hasExistingDocs = (inputMode.resume === 'existing' && selectedDocuments.resume) ||
+                          (inputMode.job_description === 'existing' && selectedDocuments.job_description);
+  const hasAnyContent = hasUploadedFiles || hasTextInput || hasExistingDocs;
   
   // Only check upload status for actual uploaded files
   const uploadedFilesList = Object.values(uploadedFiles).filter(Boolean);
@@ -322,6 +636,22 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
     }
   };
 
+  // Show loading state until initial setup is complete
+  if (!initialSetupComplete) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="container mx-auto px-5 pt-16 pb-7">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-600" />
+              <p className="text-gray-600 dark:text-gray-400">Loading document options...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="container mx-auto px-5 pt-16 pb-7">
@@ -339,14 +669,15 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
           </p>
         </motion.div>
 
-        <div className="max-w-4xl mx-auto space-y-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:items-start">
           {/* Resume Upload */}
           <motion.div
-            initial={{ opacity: 0, x: -20 }}
+            initial={{ opacity: 0, x: -50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card>
+            <Card className="h-full min-h-[500px] flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
@@ -358,7 +689,18 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                 </CardDescription>
                 
                 {/* Toggle buttons for input mode */}
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {userDocuments.resumes.length > 0 && (
+                    <Button
+                      variant={inputMode.resume === 'existing' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setInputMode(prev => ({ ...prev, resume: 'existing' }))}
+                      disabled={loadingDocuments}
+                    >
+                      <History className="w-4 h-4 mr-1" />
+                      Use Existing ({userDocuments.resumes.length})
+                    </Button>
+                  )}
                   <Button
                     variant={inputMode.resume === 'file' ? 'default' : 'outline'}
                     size="sm"
@@ -377,8 +719,157 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                {inputMode.resume === 'file' ? (
+              <CardContent className="flex-1">
+                {inputMode.resume === 'existing' ? (
+                  <div className="space-y-4">
+                    {loadingDocuments ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                        <span className="ml-2 text-gray-600">Loading your documents...</span>
+                      </div>
+                    ) : userDocuments.resumes.length > 0 ? (
+                      <>
+                        <Select
+                          value={selectedDocuments.resume || ''}
+                          onValueChange={(value) => handleExistingDocumentSelect(value, 'resume')}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a resume from your library" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userDocuments.resumes.map((doc) => (
+                              <SelectItem key={doc.id} value={doc.id}>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">
+                                      {doc.alias || doc.title}
+                                    </span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {doc.last_used_at 
+                                        ? new Date(doc.last_used_at).toLocaleDateString()
+                                        : new Date(doc.created_at).toLocaleDateString()
+                                      }
+                                    </span>
+                                  </div>
+                                  {doc.alias && doc.alias !== doc.title && (
+                                    <span className="text-xs text-gray-400">
+                                      File: {doc.original_filename}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        
+                        {selectedDocuments.resume && (
+                          <div className="space-y-4">
+                            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center gap-2 text-green-700">
+                                <CheckCircle className="w-4 h-4" />
+                                <span className="font-medium">Resume selected</span>
+                              </div>
+                              {resumeText && (
+                                <div className="mt-2 text-sm text-green-600">
+                                  ⚡ Text content loaded for review
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* PDF/DOC Viewer for visual reference */}
+                            {selectedDocuments.resume && (() => {
+                              const selectedDoc = userDocuments.resumes.find(doc => doc.id === selectedDocuments.resume);
+                              const isPdf = selectedDoc?.mime_type === 'application/pdf';
+                              const isViewable = isPdf && selectedDoc?.signed_url;
+                              
+                              return isViewable ? (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">
+                                    Original Document (for reference)
+                                  </label>
+                                  <div className="border rounded-lg overflow-hidden bg-white">
+                                    <iframe
+                                      src={selectedDoc.signed_url}
+                                      className="w-full h-96"
+                                      title="Resume PDF Preview"
+                                    />
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    Visual reference - text version below will be used for processing
+                                  </p>
+                                </div>
+                              ) : null;
+                            })()}
+                            
+                            {/* Show extracted text for review or message if no text */}
+                            {resumeText ? (
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Resume Content (for review)
+                                </label>
+                                <Textarea
+                                  value={resumeText}
+                                  onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    setResumeText(newValue);
+                                    // Check if text has been modified from original
+                                    const isModified = newValue !== originalText.resume;
+                                    setTextModified(prev => ({ ...prev, resume: isModified }));
+                                  }}
+                                  className="min-h-[200px] max-h-[400px] resize-none"
+                                  style={{
+                                    height: Math.min(Math.max(200, (resumeText.split('\n').length + 1) * 24), 400) + 'px'
+                                  }}
+                                  placeholder="Resume content will appear here..."
+                                />
+                                <p className="text-xs text-gray-500">
+                                  You can edit this content if needed before proceeding
+                                </p>
+                                
+                                {/* Show alias input when text is modified */}
+                                {textModified.resume && (
+                                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
+                                    <div className="flex items-center gap-2 text-yellow-700">
+                                      <AlertCircle className="w-4 h-4" />
+                                      <span className="text-sm font-medium">Content Modified</span>
+                                    </div>
+                                    <p className="text-xs text-yellow-600">
+                                      Since you've modified the content, this will be saved as a new document. Please provide an alias:
+                                    </p>
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="e.g., 'Modified Software Engineer Resume 2024'"
+                                        value={documentAlias.resume}
+                                        onChange={(e) => setDocumentAlias(prev => ({ ...prev, resume: e.target.value }))}
+                                        className="text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center gap-2 text-blue-700">
+                                  <FileText className="w-4 h-4" />
+                                  <span className="text-sm">
+                                    This document will be processed to extract text content during the interview setup.
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No resumes found in your library</p>
+                        <p className="text-sm">Upload a new resume to get started</p>
+                      </div>
+                    )}
+                  </div>
+                ) : inputMode.resume === 'file' ? (
+                  <div className="space-y-4">
                   <div
                     {...resumeDropzone.getRootProps()}
                     className={cn(
@@ -410,6 +901,23 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                         </p>
                       </div>
                     )}
+                    </div>
+                    
+                    {/* Alias input for file mode - moved outside dropzone */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Alias (optional)
+                      </label>
+                      <Input
+                        placeholder="e.g., 'Software Engineer Resume 2024'"
+                        value={documentAlias.resume}
+                        onChange={(e) => setDocumentAlias(prev => ({ ...prev, resume: e.target.value }))}
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Give this resume a memorable name for easy selection later
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -417,10 +925,30 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                       placeholder="Paste your resume content here..."
                       value={resumeText}
                       onChange={(e) => setResumeText(e.target.value)}
-                      className="min-h-[200px]"
+                      className="min-h-[200px] max-h-[400px] resize-none"
+                      style={{
+                        height: Math.min(Math.max(200, (resumeText.split('\n').length + 1) * 24), 400) + 'px'
+                      }}
                     />
+                    
+                    {/* Alias input for text mode */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Alias (optional)
+                      </label>
+                      <Input
+                        placeholder="e.g., 'Software Engineer Resume 2024'"
+                        value={documentAlias.resume}
+                        onChange={(e) => setDocumentAlias(prev => ({ ...prev, resume: e.target.value }))}
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Give this resume a memorable name for easy selection later
+                      </p>
+                    </div>
+                    
                     {resumeText.trim() && (
-                      <div className="flex items-center gap-2 text-sm text-green-600">
+                      <div className="flex items-center gap-2 text-sm text-green-600 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <CheckCircle className="w-4 h-4" />
                         Resume text ready ({resumeText.trim().split('\n').length} lines)
                       </div>
@@ -433,11 +961,11 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
 
           {/* Job Description Upload */}
           <motion.div
-            initial={{ opacity: 0, x: 20 }}
+            initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
           >
-            <Card>
+            <Card className="h-full min-h-[500px] flex flex-col">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="w-5 h-5" />
@@ -449,7 +977,18 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                 </CardDescription>
                 
                 {/* Toggle buttons for input mode */}
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 flex-wrap">
+                  {userDocuments.job_descriptions.length > 0 && (
+                    <Button
+                      variant={inputMode.job_description === 'existing' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setInputMode(prev => ({ ...prev, job_description: 'existing' }))}
+                      disabled={loadingDocuments}
+                    >
+                      <History className="w-4 h-4 mr-1" />
+                      Use Existing ({userDocuments.job_descriptions.length})
+                    </Button>
+                  )}
                   <Button
                     variant={inputMode.job_description === 'file' ? 'default' : 'outline'}
                     size="sm"
@@ -468,8 +1007,157 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
-                {inputMode.job_description === 'file' ? (
+              <CardContent className="flex-1">
+                {inputMode.job_description === 'existing' ? (
+                  <div className="space-y-4">
+                    {loadingDocuments ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+                        <span className="ml-2 text-gray-600">Loading your documents...</span>
+                      </div>
+                    ) : userDocuments.job_descriptions.length > 0 ? (
+                      <>
+                        <Select
+                          value={selectedDocuments.job_description || ''}
+                          onValueChange={(value) => handleExistingDocumentSelect(value, 'job_description')}
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select a job description from your library" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {userDocuments.job_descriptions.map((doc) => (
+                              <SelectItem key={doc.id} value={doc.id}>
+                                <div className="flex flex-col gap-1 w-full">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">
+                                      {doc.alias || doc.title}
+                                    </span>
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      {doc.last_used_at 
+                                        ? new Date(doc.last_used_at).toLocaleDateString()
+                                        : new Date(doc.created_at).toLocaleDateString()
+                                      }
+                                    </span>
+                                  </div>
+                                  {doc.alias && doc.alias !== doc.title && (
+                                    <span className="text-xs text-gray-400">
+                                      File: {doc.original_filename}
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        
+                        {selectedDocuments.job_description && (
+                          <div className="space-y-4">
+                            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                              <div className="flex items-center gap-2 text-green-700">
+                                <CheckCircle className="w-4 h-4" />
+                                <span className="font-medium">Job description selected</span>
+                              </div>
+                              {jobDescText && (
+                                <div className="mt-2 text-sm text-green-600">
+                                  ⚡ Text content loaded for review
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* PDF/DOC Viewer for visual reference */}
+                            {selectedDocuments.job_description && (() => {
+                              const selectedDoc = userDocuments.job_descriptions.find(doc => doc.id === selectedDocuments.job_description);
+                              const isPdf = selectedDoc?.mime_type === 'application/pdf';
+                              const isViewable = isPdf && selectedDoc?.signed_url;
+                              
+                              return isViewable ? (
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">
+                                    Original Document (for reference)
+                                  </label>
+                                  <div className="border rounded-lg overflow-hidden bg-white">
+                                    <iframe
+                                      src={selectedDoc.signed_url}
+                                      className="w-full h-96"
+                                      title="Job Description PDF Preview"
+                                    />
+                                  </div>
+                                  <p className="text-xs text-gray-500">
+                                    Visual reference - text version below will be used for processing
+                                  </p>
+                                </div>
+                              ) : null;
+                            })()}
+                            
+                            {/* Show extracted text for review or message if no text */}
+                            {jobDescText ? (
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Job Description Content (for review)
+                                </label>
+                                <Textarea
+                                  value={jobDescText}
+                                  onChange={(e) => {
+                                    const newValue = e.target.value;
+                                    setJobDescText(newValue);
+                                    // Check if text has been modified from original
+                                    const isModified = newValue !== originalText.job_description;
+                                    setTextModified(prev => ({ ...prev, job_description: isModified }));
+                                  }}
+                                  className="min-h-[200px] max-h-[400px] resize-none"
+                                  style={{
+                                    height: Math.min(Math.max(200, (jobDescText.split('\n').length + 1) * 24), 400) + 'px'
+                                  }}
+                                  placeholder="Job description content will appear here..."
+                                />
+                                <p className="text-xs text-gray-500">
+                                  You can edit this content if needed before proceeding
+                                </p>
+                                
+                                {/* Show alias input when text is modified */}
+                                {textModified.job_description && (
+                                  <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg space-y-3">
+                                    <div className="flex items-center gap-2 text-yellow-700">
+                                      <AlertCircle className="w-4 h-4" />
+                                      <span className="text-sm font-medium">Content Modified</span>
+                                    </div>
+                                    <p className="text-xs text-yellow-600">
+                                      Since you've modified the content, this will be saved as a new document. Please provide an alias:
+                                    </p>
+                                    <div className="space-y-2">
+                                      <Input
+                                        placeholder="e.g., 'Modified Senior Developer Role 2024'"
+                                        value={documentAlias.job_description}
+                                        onChange={(e) => setDocumentAlias(prev => ({ ...prev, job_description: e.target.value }))}
+                                        className="text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center gap-2 text-blue-700">
+                                  <FileText className="w-4 h-4" />
+                                  <span className="text-sm">
+                                    This document will be processed to extract text content during the interview setup.
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 text-gray-500">
+                        <FileText className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                        <p>No job descriptions found in your library</p>
+                        <p className="text-sm">Upload a new job description to get started</p>
+                      </div>
+                    )}
+                  </div>
+                ) : inputMode.job_description === 'file' ? (
+                  <div className="space-y-4">
                   <div
                     {...jobDescriptionDropzone.getRootProps()}
                     className={cn(
@@ -501,6 +1189,23 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                         </p>
                       </div>
                     )}
+                    </div>
+                    
+                    {/* Alias input for file mode - moved outside dropzone */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Alias (optional)
+                      </label>
+                      <Input
+                        placeholder="e.g., 'Senior Developer Role 2024'"
+                        value={documentAlias.job_description}
+                        onChange={(e) => setDocumentAlias(prev => ({ ...prev, job_description: e.target.value }))}
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Give this job description a memorable name for easy selection later
+                      </p>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -508,10 +1213,30 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
                       placeholder="Paste the job description here..."
                       value={jobDescText}
                       onChange={(e) => setJobDescText(e.target.value)}
-                      className="min-h-[200px]"
+                      className="min-h-[200px] max-h-[400px] resize-none"
+                      style={{
+                        height: Math.min(Math.max(200, (jobDescText.split('\n').length + 1) * 24), 400) + 'px'
+                      }}
                     />
+                    
+                    {/* Alias input for text mode */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Alias (optional)
+                      </label>
+                      <Input
+                        placeholder="e.g., 'Senior Developer Role 2024'"
+                        value={documentAlias.job_description}
+                        onChange={(e) => setDocumentAlias(prev => ({ ...prev, job_description: e.target.value }))}
+                        className="text-sm"
+                      />
+                      <p className="text-xs text-gray-500">
+                        Give this job description a memorable name for easy selection later
+                      </p>
+                    </div>
+                    
                     {jobDescText.trim() && (
-                      <div className="flex items-center gap-2 text-sm text-green-600">
+                      <div className="flex items-center gap-2 text-sm text-green-600 mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                         <CheckCircle className="w-4 h-4" />
                         Job description ready ({jobDescText.trim().split('\n').length} lines)
                       </div>
@@ -521,8 +1246,10 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
               </CardContent>
             </Card>
           </motion.div>
+          </div>
 
           {/* Processing Error */}
+          <div className="mt-6">
           <AnimatePresence>
             {processingError && (
               <motion.div
@@ -542,13 +1269,14 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
               </motion.div>
             )}
           </AnimatePresence>
+          </div>
 
           {/* Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="flex gap-4 justify-center"
+            className="flex gap-4 justify-center mt-6"
           >
             <Button
               variant="outline"
@@ -575,41 +1303,7 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
             </Button>
           </motion.div>
 
-          {/* Status Summary */}
-          {hasAnyContent && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span>Resume:</span>
-                      <Badge variant={
-                        uploadedFiles.resume ? "default" : 
-                        (inputMode.resume === 'text' && resumeText.trim()) ? "default" : "secondary"
-                      }>
-                        {uploadedFiles.resume ? uploadedFiles.resume.status : 
-                         (inputMode.resume === 'text' && resumeText.trim()) ? "text ready" : "not uploaded"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span>Job Description:</span>
-                      <Badge variant={
-                        uploadedFiles.job_description ? "default" : 
-                        (inputMode.job_description === 'text' && jobDescText.trim()) ? "default" : "secondary"
-                      }>
-                        {uploadedFiles.job_description ? uploadedFiles.job_description.status : 
-                         (inputMode.job_description === 'text' && jobDescText.trim()) ? "text ready" : "not uploaded"}
-                      </Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          )}
+          
         </div>
       </div>
     </div>

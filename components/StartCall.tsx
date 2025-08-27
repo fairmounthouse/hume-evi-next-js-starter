@@ -279,6 +279,7 @@ export default function StartCall({
                 }
 
                 console.log("✅ Session record created successfully");
+                console.log("📋 Documents are already linked via session_id - no additional linking needed!");
 
                 // Initialize session settings cache (fetch once from Supabase)
                 console.log("🔄 Initializing session settings cache...");

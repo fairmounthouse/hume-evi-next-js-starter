@@ -33,6 +33,7 @@ import AnalysisFeedbackForm from "./AnalysisFeedbackForm";
 import PostInterviewUsageWarning from "./PostInterviewUsageWarning";
 import { submitSessionFeedback, submitAnalysisFeedback } from "@/utils/supabase-client";
 import RecordingControls from "./RecordingControls";
+import SessionDocuments from "./SessionDocuments";
 
 // Chat interface component with voice interaction capabilities
 function ChatInterface({
@@ -1018,28 +1019,19 @@ function ChatInterface({
               <h2 className="text-2xl font-bold">Interview Complete</h2>
               <p className="text-sm text-muted-foreground">Session ID: {sessionId}</p>
             </div>
-            <div className="flex gap-2">
-              <div className="flex gap-1">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => downloadTranscript('txt')}
-                  disabled={storedTranscript.length === 0}
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  TXT
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => downloadTranscript('json')}
-                  disabled={storedTranscript.length === 0}
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  JSON
-                </Button>
-              </div>
-
+            <div className="flex gap-2 items-center">
+              {/* Session Documents - Compact buttons in header */}
+              <SessionDocuments sessionId={sessionId} />
+              
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => downloadTranscript('txt')}
+                disabled={storedTranscript.length === 0}
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Transcript
+              </Button>
 
                {/* Only show session selector on main interview page, not when viewing a specific session */}
                {!urlSessionId && (
@@ -1087,97 +1079,102 @@ function ChatInterface({
               className={cn(
                 "h-full grid gap-4 transition-all duration-300",
                 isTranscriptDrawerOpen 
-                  ? "grid-cols-1 lg:grid-cols-[25%_45%_30%]" 
-                  : "grid-cols-1 lg:grid-cols-[30%_70%]"
+                  ? "grid-cols-1 lg:grid-cols-[20%_35%_45%]" 
+                  : "grid-cols-1 lg:grid-cols-[25%_75%]"
               )}
             >
-            {/* Video Preview with Direct Seeking */}
-            <Card className="p-6 flex flex-col" style={{ minWidth: '280px' }}>
-              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <span>🎥</span>
-                Interview Recording
-              </h3>
-              <div className="flex-grow flex flex-col rounded-lg">
-                {finalVideoUrl ? (
-                  <div className="w-full flex-grow flex flex-col">
-                    {/* Video Player */}
-                    <div className="relative bg-black rounded-lg overflow-hidden mb-3">
-                      {isVideoProcessing ? (
-                        <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
-                          <div className="text-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                            <p className="text-white text-sm">Processing video...</p>
-                            <p className="text-gray-400 text-xs mt-2">This usually takes 30-60 seconds</p>
+              {/* Left Column - Video and Transcript */}
+              <div className="flex flex-col gap-4">
+                {/* Video Preview with Direct Seeking */}
+                <Card className="p-6 flex flex-col" style={{ minWidth: '280px' }}>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <span>🎥</span>
+                    Interview Recording
+                  </h3>
+                  <div className="flex-grow flex flex-col rounded-lg">
+                    {finalVideoUrl ? (
+                      <div className="w-full flex-grow flex flex-col">
+                        {/* Video Player */}
+                        <div className="relative bg-black rounded-lg overflow-hidden mb-3">
+                          {isVideoProcessing ? (
+                            <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
+                              <div className="text-center">
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                                <p className="text-white text-sm">Processing video...</p>
+                                <p className="text-gray-400 text-xs mt-2">This usually takes 30-60 seconds</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <iframe
+                              src={finalVideoUrl.replace('/watch', '/iframe')}
+                              className="w-full aspect-video"
+                              style={{ border: "none" }}
+                              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                              allowFullScreen
+                              title="Interview Recording"
+                            />
+                          )}
+                        </div>
+                        
+                        {/* Session Summary - Simple Design without Background */}
+                        <div className="rounded-lg p-4 space-y-3">
+                          <h4 className="font-semibold text-sm flex items-center gap-2">
+                            <User className="w-4 h-4" />
+                            Session Summary
+                          </h4>
+                          <div className="space-y-2 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Duration:</span>
+                              <span className="font-medium">
+                                {Math.floor((Date.now() - (storedTranscript[0]?.timestamp * 1000 || Date.now())) / 60000)} minutes
+                              </span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Messages:</span>
+                              <span className="font-medium">{storedTranscript.length} exchanges</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Recording:</span>
+                              <span className="font-medium">✅ Available</span>
+                            </div>
                           </div>
                         </div>
-                      ) : (
-                        <iframe
-                          src={finalVideoUrl.replace('/watch', '/iframe')}
-                          className="w-full aspect-video"
-                          style={{ border: "none" }}
-                          allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                          allowFullScreen
-                          title="Interview Recording"
-                        />
-                      )}
-                    </div>
-                    
-                    {/* Session Summary - Simple Design without Background */}
-                    <div className="rounded-lg p-4 space-y-3">
-                      <h4 className="font-semibold text-sm flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        Session Summary
-                      </h4>
-                      <div className="space-y-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Duration:</span>
-                          <span className="font-medium">
-                            {Math.floor((Date.now() - (storedTranscript[0]?.timestamp * 1000 || Date.now())) / 60000)} minutes
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Messages:</span>
-                          <span className="font-medium">{storedTranscript.length} exchanges</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Recording:</span>
-                          <span className="font-medium">✅ Available</span>
-                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-sm text-muted-foreground">Processing video...</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+
+
+              </div>
+
+              {/* Right Column - Detailed Analysis */}
+              <div className="flex flex-col">
+                {finalEvaluation ? (
+                  <EnhancedDetailedAnalysis 
+                    evaluation={finalEvaluation} 
+                    confidence={finalEvaluation.confidence}
+                  />
+                ) : (
+                  <Card className="p-6 flex flex-col h-full">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Detailed Analysis
+                    </h3>
+                    <div className="flex-grow flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Generating detailed analysis...</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">This may take 30-90 seconds</p>
                       </div>
                     </div>
-                    
-
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-sm text-muted-foreground">Processing video...</p>
-                  </div>
+                  </Card>
                 )}
               </div>
-            </Card>
-
-            {/* Enhanced Detailed Analysis */}
-            {finalEvaluation ? (
-              <EnhancedDetailedAnalysis 
-                evaluation={finalEvaluation} 
-                confidence={finalEvaluation.confidence}
-              />
-            ) : (
-              <Card className="p-6 flex flex-col">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Detailed Analysis
-                </h3>
-                <div className="flex-grow flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Generating detailed analysis...</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">This may take 30-90 seconds</p>
-                  </div>
-                </div>
-              </Card>
-            )}
             </div>
           </div>
           
@@ -1346,16 +1343,7 @@ function ChatInterface({
                         className="text-xs px-2"
                       >
                         <Download className="w-3 h-3 mr-1" />
-                        TXT
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadTranscript('json')}
-                        className="text-xs px-2"
-                      >
-                        <Download className="w-3 h-3 mr-1" />
-                        JSON
+                        Transcript
                       </Button>
                     </>
                   )}
@@ -1472,6 +1460,7 @@ function ChatInterface({
                 </div>
               </div>
             )}
+
 
 
           </div>
@@ -1620,6 +1609,7 @@ export default function ClientComponent({
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<any[]>([]);
   const [showEndScreen, setShowEndScreen] = useState(false);
+  const [isCheckingSessionState, setIsCheckingSessionState] = useState(true);
 
   // Device preferences from device setup
   const [selectedDevices, setSelectedDevices] = useState<{
@@ -1639,6 +1629,10 @@ export default function ClientComponent({
   const selectedCaseId = searchParams.get('caseId');
   const selectedInterviewerId = searchParams.get('interviewerId');
   const selectedDifficultyId = searchParams.get('difficultyId');
+  const urlSessionId = searchParams.get('sessionId');
+  
+  // Check if we have the required parameters for an interview session
+  const hasRequiredParams = selectedCaseId && selectedInterviewerId && selectedDifficultyId && urlSessionId;
   
   // Create ONE AudioContext for the entire chat session
   const audioCtx = useMemo(() => new (window.AudioContext || (window as any).webkitAudioContext)(), []);
@@ -1647,6 +1641,59 @@ export default function ClientComponent({
 
   // optional: use configId from environment variable
   const configId = process.env['NEXT_PUBLIC_HUME_CONFIG_ID'];
+
+  // Redirect to setup if required parameters are missing
+  useEffect(() => {
+    if (!hasRequiredParams && !showEndScreen) {
+      console.log("❌ Missing required parameters, redirecting to setup:", {
+        selectedCaseId,
+        selectedInterviewerId,
+        selectedDifficultyId,
+        urlSessionId
+      });
+      window.location.href = '/interview/setup';
+      return;
+    }
+  }, [hasRequiredParams, showEndScreen, selectedCaseId, selectedInterviewerId, selectedDifficultyId, urlSessionId]);
+
+  // Check if session is already completed and should show end screen
+  useEffect(() => {
+    const checkSessionState = async () => {
+      if (!urlSessionId) {
+        setIsCheckingSessionState(false);
+        return;
+      }
+
+      try {
+        console.log("🔍 Checking if session is already completed:", urlSessionId);
+        const response = await fetch(`/api/sessions/status?sessionId=${urlSessionId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.isCompleted) {
+            console.log("✅ Session is already completed, showing end screen");
+            setShowEndScreen(true);
+            
+            // Load any existing transcript/video data
+            if (data.transcript) {
+              setTranscript(data.transcript);
+            }
+            if (data.videoUrl) {
+              setFinalVideoUrl(data.videoUrl);
+            }
+          }
+        } else {
+          console.log("📝 Session not found or not completed, starting fresh");
+        }
+      } catch (error) {
+        console.error("❌ Error checking session state:", error);
+      } finally {
+        setIsCheckingSessionState(false);
+      }
+    };
+
+    checkSessionState();
+  }, [urlSessionId]);
 
   // Load device preferences from sessionStorage
   useEffect(() => {
@@ -1829,7 +1876,6 @@ export default function ClientComponent({
   }, [assistantBus]);
   
   // Get sessionId from URL params or generate one as fallback
-  const urlSessionId = searchParams.get('sessionId');
   const [sessionId] = useState(() => {
     return urlSessionId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   });
@@ -1880,6 +1926,30 @@ export default function ClientComponent({
       console.error("Failed saving video url", e);
     }
   };
+
+  // Show loading state if parameters are missing and we're redirecting
+  if (!hasRequiredParams && !showEndScreen) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Redirecting to interview setup...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while checking session state
+  if (isCheckingSessionState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading interview session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

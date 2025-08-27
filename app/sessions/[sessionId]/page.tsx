@@ -12,6 +12,7 @@ import Link from 'next/link';
 import VideoTranscriptPlayer from '@/components/VideoTranscriptPlayer';
 import EnhancedDetailedAnalysis from '@/components/EnhancedDetailedAnalysis';
 import TranscriptDrawer from '@/components/TranscriptDrawer';
+import SessionDocuments from '@/components/SessionDocuments';
 import { Protect } from '@clerk/nextjs';
 
 export default function SessionViewerPage() {
@@ -342,6 +343,16 @@ export default function SessionViewerPage() {
             </Card>
           </motion.div>
         </div>
+
+        {/* Session Documents */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="mt-8"
+        >
+          <SessionDocuments sessionId={sessionId} />
+        </motion.div>
 
         {/* Bottom Section - Detailed Analysis */}
         {finalEvaluation && (
