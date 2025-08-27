@@ -1,8 +1,20 @@
 'use client'
 
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
 
 export default function Navigation() {
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY
+      setIsScrolled(scrollPosition > 50) // Change background after 50px scroll
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
   const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault()
     const targetElement = document.getElementById(targetId)
@@ -16,7 +28,11 @@ export default function Navigation() {
     }
   }
   return (
-    <header className="bg-white border-b-4 border-black fixed top-0 left-0 right-0 z-50 shadow-[0_4px_0_rgba(0,0,0,0.1)]">
+    <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      isScrolled 
+        ? 'bg-white shadow-[0_4px_0_rgba(0,0,0,0.1)]' 
+        : 'bg-transparent'
+    }`}>
       <nav className="max-w-7xl mx-auto px-8 py-5 flex justify-between items-center">
         <Link href="/" className="text-2xl font-black text-black">
           skillflo

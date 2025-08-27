@@ -3,11 +3,11 @@
 export default function Testimonials() {
   const testimonials = [
     {
-      quote: "Skillflo's case coaching felt lifelike from day one. It boosted my confidence for peer mocks and nailed McKinsey.",
+      quote: "skillflo's case coaching felt lifelike from day one. It boosted my confidence for peer mocks and nailed McKinsey.",
       author: "Tyson C., INSEAD MBA '25"
     },
     {
-      quote: "Shy about practicing with classmates, I started with Skillflo. The real interview feel gave me a big head start for Bain.",
+      quote: "Shy about practicing with classmates, I started with skillflo. The real interview feel gave me a big head start for Bain.",
       author: "Jennifer K., UCLA Econ BA '25"
     },
     {
@@ -15,13 +15,14 @@ export default function Testimonials() {
       author: "Josh C., MIT Sloan MBA '25"
     },
     {
-      quote: "As an ex-McKinsey coach, Skillflo delivers pro-level cases with precise feedback. Perfect for newbies or experts.",
+      quote: "As an ex-McKinsey coach, skillflo delivers pro-level cases with precise feedback. Perfect for newbies or experts.",
       author: "A.C.G., Ex-McKinsey/INSEAD '19"
     }
   ]
 
   return (
-    <section id="testimonials" className="section-padding max-w-7xl mx-auto">
+    <section id="testimonials" className="section-padding" style={{backgroundColor: '#FEBB69'}}>
+      <div className="max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight font-poppins">From Our Users</h2>
       </div>
@@ -46,6 +47,7 @@ export default function Testimonials() {
         >
           Join Them - Free Session Included
         </button>
+      </div>
       </div>
     </section>
   )

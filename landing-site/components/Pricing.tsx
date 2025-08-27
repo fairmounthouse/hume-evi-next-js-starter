@@ -29,7 +29,8 @@ export default function Pricing() {
   ]
 
   return (
-    <section id="pricing" className="section-padding max-w-7xl mx-auto">
+    <section id="pricing" className="section-padding" style={{backgroundColor: '#FFF9E6'}}>
+      <div className="max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight font-poppins">Straightforward Pricing</h2>
         <p className="text-xl font-semibold text-black mb-4">
@@ -75,6 +76,7 @@ export default function Pricing() {
         >
           Start Free - Get Your Session
         </button>
+      </div>
       </div>
     </section>
   )

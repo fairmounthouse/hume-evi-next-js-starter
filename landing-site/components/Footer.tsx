@@ -2,16 +2,16 @@ import Link from 'next/link'
 
 export default function Footer() {
   return (
-    <footer className="bg-white border-t-3 border-black py-12">
+    <footer className="py-12" style={{backgroundColor: '#0A0B1E'}}>
       <div className="max-w-6xl mx-auto px-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex flex-col md:flex-row gap-8 list-none">
-            <Link href="#" className="text-black font-semibold hover:text-blue-accent transition-colors">Privacy</Link>
-            <Link href="#" className="text-black font-semibold hover:text-blue-accent transition-colors">Terms</Link>
-            <Link href="mailto:support@skillflo.ai" className="text-black font-semibold hover:text-blue-accent transition-colors">Contact: support@skillflo.ai</Link>
+            <Link href="#" className="text-white font-semibold hover:text-yellow-primary transition-colors">Privacy</Link>
+            <Link href="#" className="text-white font-semibold hover:text-yellow-primary transition-colors">Terms</Link>
+            <Link href="mailto:support@skillflo.ai" className="text-white font-semibold hover:text-yellow-primary transition-colors">Contact: support@skillflo.ai</Link>
           </div>
-          <div className="text-black opacity-70 font-medium text-center md:text-right">
-            Skillflo.ai © 2025
+          <div className="text-white opacity-70 font-medium text-center md:text-right">
+            skillflo.ai © 2025
           </div>
         </div>
         

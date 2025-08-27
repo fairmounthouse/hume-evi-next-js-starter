@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Skillflo.ai - AI-Powered Mock Interviews',
+  title: 'skillflo.ai - AI-Powered Mock Interviews',
   description: 'Practice interviews. Get hired. That simple. AI mock interviews that actually prepare you for the real thing.',
 }
 
