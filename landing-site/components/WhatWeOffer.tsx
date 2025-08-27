@@ -4,7 +4,7 @@ import { Mic, MessageCircle, BarChart3, Book, Puzzle } from 'lucide-react'
 
 export default function WhatWeOffer() {
   return (
-    <section className="section-padding max-w-7xl mx-auto">
+    <section id="features" className="section-padding max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-4 tracking-tight font-poppins">What Skillflo Delivers</h2>
         <p className="text-xl lg:text-2xl text-black opacity-70">Powerful features that help you prepare, practice, and perform</p>
@@ -78,7 +78,10 @@ export default function WhatWeOffer() {
         <p className="text-xl font-semibold text-black mb-8">
           Not sure? Try one mock interview and coaching session now!
         </p>
-        <button className="btn-neubrutalist btn-secondary text-lg px-8 py-4">
+        <button 
+          className="btn-neubrutalist btn-secondary text-lg px-8 py-4"
+          onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+        >
           Start Free Session
         </button>
       </div>

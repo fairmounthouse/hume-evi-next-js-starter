@@ -1,3 +1,5 @@
+'use client'
+
 export default function Pricing() {
   const plans = [
     {
@@ -53,7 +55,10 @@ export default function Pricing() {
             </div>
             <p className="text-lg text-black mb-2">{plan.description}</p>
             <p className="text-base text-black opacity-80 mb-6">{plan.subtitle}</p>
-            <button className="btn-neubrutalist btn-secondary w-full">
+            <button 
+              className="btn-neubrutalist btn-secondary w-full"
+              onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+            >
               Select
             </button>
           </div>
@@ -64,7 +69,10 @@ export default function Pricing() {
         <p className="text-lg text-black mb-6">
           <strong>Top up:</strong> $10/60 mins or $100/660 mins.
         </p>
-        <button className="btn-neubrutalist btn-primary text-lg px-8 py-4">
+        <button 
+          className="btn-neubrutalist btn-primary text-lg px-8 py-4"
+          onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+        >
           Start Free - Get Your Session
         </button>
       </div>

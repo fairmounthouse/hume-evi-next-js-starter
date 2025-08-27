@@ -1,3 +1,5 @@
+'use client'
+
 export default function Testimonials() {
   const testimonials = [
     {
@@ -19,7 +21,7 @@ export default function Testimonials() {
   ]
 
   return (
-    <section className="section-padding max-w-7xl mx-auto">
+    <section id="testimonials" className="section-padding max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight font-poppins">From Our Users</h2>
       </div>
@@ -38,7 +40,10 @@ export default function Testimonials() {
       </div>
       
       <div className="text-center">
-        <button className="btn-neubrutalist btn-secondary text-lg px-8 py-4">
+        <button 
+          className="btn-neubrutalist btn-secondary text-lg px-8 py-4"
+          onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+        >
           Join Them - Free Session Included
         </button>
       </div>

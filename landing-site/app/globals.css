@@ -16,11 +16,11 @@
   --yellow-light: #FFF9E6;
   --yellow-pale: #FFFCF0;
   /* Supporting colors */
-  --blue-accent: #3B82F6;
+  --blue-accent: #7b8efa;
   --blue-light: #DBEAFE;
   --orange-accent: #FB923C;
   --pink-accent: #EC4899;
-  --black: #000000;
+  --black: #373740;
   --white: #FFFFFF;
   --gray: #F5F5F5;
   --gray-dark: #6B7280;
@@ -169,11 +169,13 @@ body {
 /* Smooth scrolling */
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 100px; /* Account for fixed header height */
 }
 
 /* Section spacing */
 .section-padding {
   padding: 5rem 2rem;
+  scroll-margin-top: 100px; /* Account for fixed header when scrolling to sections */
 }
 
 /* Text gradient */

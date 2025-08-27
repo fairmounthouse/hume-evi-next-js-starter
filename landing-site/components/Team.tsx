@@ -1,3 +1,5 @@
+'use client'
+
 export default function Team() {
   return (
     <section id="team" className="section-padding max-w-7xl mx-auto">
@@ -10,7 +12,10 @@ export default function Team() {
           We're former hiring managers with degrees from MIT, UC Berkeley, and UCLA. We've secured roles at banks, consulting firms, and big tech through hard work and smart prep. Now, we're building Skillflo to give you the same edge—because we've walked in your shoes.
         </p>
         
-        <button className="btn-neubrutalist btn-secondary text-lg px-8 py-4">
+        <button 
+          className="btn-neubrutalist btn-secondary text-lg px-8 py-4"
+          onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+        >
           Get Started - Free Session Awaits
         </button>
       </div>

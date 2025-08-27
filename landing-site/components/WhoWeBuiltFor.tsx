@@ -1,3 +1,5 @@
+'use client'
+
 export default function WhoWeBuiltFor() {
   return (
     <section className="section-padding max-w-7xl mx-auto">
@@ -26,7 +28,10 @@ export default function WhoWeBuiltFor() {
         </ul>
         
         <div className="text-center mt-12">
-          <button className="btn-neubrutalist btn-secondary text-lg px-8 py-4">
+          <button 
+            className="btn-neubrutalist btn-secondary text-lg px-8 py-4"
+            onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+          >
             Get Your Free Session
           </button>
         </div>
