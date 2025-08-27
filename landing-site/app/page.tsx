@@ -1,10 +1,11 @@
 "use client";
 
 import { Hero } from "../components/landing/Hero";
-import { Problem } from "../components/landing/Problem";
-import { Solution } from "../components/landing/Solution";
-import { Transformation } from "../components/landing/Transformation";
-import { Results } from "../components/landing/Results";
+import { WhatWeOffer } from "../components/landing/WhatWeOffer";
+import { WhoWeBuiltFor } from "../components/landing/WhoWeBuiltFor";
+import { Testimonials } from "../components/landing/Testimonials";
+import { Pricing } from "../components/landing/Pricing";
+import { Team } from "../components/landing/Team";
 import { Footer } from "../components/landing/Footer";
 import ThemePalette from "../components/ThemePalette";
 
@@ -12,10 +13,11 @@ export default function Landing() {
   return (
     <main className="relative">
       <Hero />
-      <Problem />
-      <Solution />
-      <Transformation />
-      <Results />
+      <WhatWeOffer />
+      <WhoWeBuiltFor />
+      <Testimonials />
+      <Pricing />
+      <Team />
       <Footer />
       <ThemePalette />
     </main>

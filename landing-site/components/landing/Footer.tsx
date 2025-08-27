@@ -2,58 +2,43 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Twitter, Linkedin, Github, Mail, ArrowUpRight, Brain } from "lucide-react";
+import { Twitter, Linkedin, Github, Mail, ArrowUpRight, Eye } from "lucide-react";
 
 const footerLinks = {
   Product: [
-    { label: "Features", href: "#features" },
+    { label: "What We Offer", href: "#what-we-offer" },
     { label: "Pricing", href: "#pricing" },
-    { label: "Success Stories", href: "#results" },
-    { label: "FAQ", href: "#faq" }
+    { label: "Testimonials", href: "#testimonials" },
+    { label: "Team", href: "#team" }
   ],
   Company: [
     { label: "About", href: "#about" },
     { label: "Blog", href: "#blog" },
     { label: "Careers", href: "#careers" },
-    { label: "Contact", href: "#contact" }
-  ],
-  Resources: [
-    { label: "Interview Guide", href: "#guide" },
-    { label: "Company Research", href: "#research" },
-    { label: "Salary Data", href: "#salary" },
-    { label: "Community", href: "#community" }
-  ],
-  Legal: [
-    { label: "Privacy Policy", href: "#privacy" },
-    { label: "Terms of Service", href: "#terms" },
-    { label: "Cookie Policy", href: "#cookies" },
-    { label: "GDPR", href: "#gdpr" }
+    { label: "Contact", href: "mailto:support@skillflo.ai" }
   ]
 } as const;
 
 const socialLinks = [
-  { icon: Twitter, href: "#", label: "Twitter" },
-  { icon: Linkedin, href: "#", label: "LinkedIn" },
-  { icon: Github, href: "#", label: "GitHub" },
-  { icon: Mail, href: "#", label: "Email" }
+  { icon: Twitter, href: "#", label: "X" },
+  { icon: Linkedin, href: "#", label: "LinkedIn" }
 ];
 
 export function Footer() {
   return (
-    <footer className="relative bg-gray-50 border-t border-gray-200">
+    <footer className="relative" style={{ backgroundColor: "var(--theme-footer)" }}>
       <div className="container mx-auto px-6 py-12">
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 mb-12">
-          <div className="col-span-2">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
+          <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center">
-                <Brain className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 flex items-center justify-center">
+                <Eye className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">AI Interview Coach</span>
+              <span className="text-xl font-bold text-white">Skillflo</span>
             </div>
-            <p className="text-gray-600 mb-6 max-w-xs">Transform your interview skills with AI-powered practice that adapts to you.</p>
             <div className="flex gap-4">
               {socialLinks.map((social) => (
-                <motion.a key={social.label} href={social.href} aria-label={social.label} className="w-10 h-10 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:text-blue-600 hover:border-blue-600 transition-colors duration-200" whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }}>
+                <motion.a key={social.label} href={social.href} aria-label={social.label} className="w-10 h-10 rounded-lg bg-white/10 border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-colors duration-200" whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }}>
                   <social.icon className="w-5 h-5" />
                 </motion.a>
               ))}
@@ -62,11 +47,11 @@ export function Footer() {
 
           {Object.entries(footerLinks).map(([category, links]) => (
             <div key={category}>
-              <h4 className="font-semibold text-gray-900 mb-4">{category}</h4>
+              <h4 className="font-semibold text-white mb-4">{category}</h4>
               <ul className="space-y-3">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <Link href={link.href} className="text-gray-600 hover:text-blue-600 transition-colors duration-200 text-sm flex items-center gap-1 group">
+                    <Link href={link.href} className="text-white/70 hover:text-white transition-colors duration-200 text-sm flex items-center gap-1 group">
                       {link.label}
                       <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
                     </Link>
@@ -77,12 +62,12 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-gray-200">
-          <p className="text-sm text-gray-600">© 2024 AI Interview Coach. All rights reserved.</p>
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-white/20">
+          <p className="text-sm text-white/70">Skillflo.ai © 2025</p>
           <div className="flex items-center gap-6">
-            <Link href="#privacy" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">Privacy</Link>
-            <Link href="#terms" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">Terms</Link>
-            <Link href="#cookies" className="text-sm text-gray-600 hover:text-blue-600 transition-colors duration-200">Cookies</Link>
+            <Link href="#privacy" className="text-sm text-white/70 hover:text-white transition-colors duration-200">Privacy</Link>
+            <Link href="#terms" className="text-sm text-white/70 hover:text-white transition-colors duration-200">Terms</Link>
+            <Link href="mailto:support@skillflo.ai" className="text-sm text-white/70 hover:text-white transition-colors duration-200">Contact: support@skillflo.ai</Link>
           </div>
         </div>
       </div>
