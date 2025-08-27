@@ -16,7 +16,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <Mic className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Personalized Mocks</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Ultra Personalized Mocks</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             Case & behavioral
           </p>
@@ -42,7 +42,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <BarChart3 className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Detailed Feedback</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Actionable Feedback</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed">
             Objective & subjective
           </p>
