@@ -61,6 +61,8 @@ function ChatInterface({
   messagesRef,
   showEndScreen,
   setShowEndScreen,
+  isEndingInterview,
+  setIsEndingInterview,
 
   onToolCall,
   unlockedExhibits,
@@ -142,6 +144,11 @@ function ChatInterface({
       const cachedData = await getEndScreenData(targetSessionId);
       
       if (cachedData) {
+        // Close any open exhibits when loading cached end screen
+        console.log("🔚 [CACHED SESSION] Closing any open exhibits");
+        onCloseModal(); // Close expanded exhibit modal
+        onClosePrimaryExhibit(); // Close primary exhibit
+        
         // Set all the state to rebuild the end screen
         setStoredTranscript(cachedData.transcript);
         setTranscript(cachedData.transcript);
@@ -307,11 +314,19 @@ function ChatInterface({
     }
     
     // Only trigger end interview if we were previously connected and now disconnected
-    if (status.value === "disconnected" && isCallActive && hasBeenConnected) {
+    if (status.value === "disconnected" && isCallActive && hasBeenConnected && !isEndingInterview) {
       console.log("🔚 Call disconnected after being connected, triggering end interview");
       console.log("🔚 Current stored transcript:", storedTranscript.length, "entries");
       console.log("🔚 Current messages:", messages.length, "messages");
       console.log("🔚 Current messagesRef:", currentMessagesRef.current.length, "messages");
+      
+      // Set ending state to prevent multiple triggers
+      setIsEndingInterview(true);
+      
+      // IMMEDIATELY set end screen to prevent Start Call button from showing
+      console.log("🔚 IMMEDIATELY setting showEndScreen=true to prevent UI flicker");
+      setShowEndScreen(true);
+      setIsCallActive(false);
       
       // Immediately close exhibit when call ends
       if (exhibitManager) {
@@ -328,13 +343,11 @@ function ChatInterface({
       
       console.log("🔚 Preserved transcript:", preservedTranscript.length, "entries");
       
-      // Use a slight delay to ensure all state is preserved, but pass the preserved data
-      setTimeout(() => {
-        handleEndInterviewWithData(preservedTranscript);
-        setHasBeenConnected(false); // Reset for next interview
-      }, 100);
+      // Process end interview data immediately (no delay)
+      handleEndInterviewWithData(preservedTranscript);
+      setHasBeenConnected(false); // Reset for next interview
     }
-  }, [status.value, isCallActive, storedTranscript, hasBeenConnected, exhibitManager]);
+  }, [status.value, isCallActive, storedTranscript, hasBeenConnected, exhibitManager, isEndingInterview]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -679,6 +692,12 @@ function ChatInterface({
   const handleEndInterviewWithData = async (preservedTranscript: any[]) => {
     try {
       console.log("📋 [END] Using preserved transcript data:", preservedTranscript.length, "entries");
+      
+      // Close any open exhibits immediately when interview ends
+      console.log("🔚 [END] Closing any open exhibits");
+      onCloseModal(); // Close expanded exhibit modal
+      onClosePrimaryExhibit(); // Close primary exhibit
+      
       setTranscript(preservedTranscript);
       setStoredTranscript(preservedTranscript); // Update stored transcript too
 
@@ -762,12 +781,15 @@ function ChatInterface({
         }
       }
 
-      // End the call and show end screen
-      console.log("🔚 [END] Setting states: isCallActive=false, forceShowRecording=false, showEndScreen=true");
+      // End the call and show end screen (states may already be set for immediate transitions)
+      console.log("🔚 [END] Ensuring final states: isCallActive=false, forceShowRecording=false, showEndScreen=true");
       console.log("🔚 [END] Current finalVideoUrl:", finalVideoUrl);
-      setIsCallActive(false);
+      setIsCallActive(false); // Ensure it's set (may already be set)
       setForceShowRecording(false);
-      setShowEndScreen(true);
+      setShowEndScreen(true); // Ensure it's set (may already be set)
+      
+      // Reset ending state
+      setIsEndingInterview(false);
       
       // Show feedback form if not already submitted for new sessions
       // Add a small delay to let the user see the end screen first
@@ -1610,6 +1632,7 @@ export default function ClientComponent({
   const [transcript, setTranscript] = useState<any[]>([]);
   const [showEndScreen, setShowEndScreen] = useState(false);
   const [isCheckingSessionState, setIsCheckingSessionState] = useState(true);
+  const [isEndingInterview, setIsEndingInterview] = useState(false);
 
   // Device preferences from device setup
   const [selectedDevices, setSelectedDevices] = useState<{
@@ -1624,6 +1647,15 @@ export default function ClientComponent({
   const [unlockedExhibits, setUnlockedExhibits] = useState<any[]>([]);
   const [primaryExhibit, setPrimaryExhibit] = useState<any>(null);
   const [expandedExhibit, setExpandedExhibit] = useState<any>(null);
+  
+  // Function to close all exhibits
+  const closeAllExhibits = () => {
+    console.log("🔚 Closing all exhibits");
+    setExpandedExhibit(null); // Close expanded exhibit modal
+    setPrimaryExhibit(null); // Close primary exhibit
+  };
+
+
   
   // Get interview configuration from URL params
   const selectedCaseId = searchParams.get('caseId');
@@ -1672,6 +1704,10 @@ export default function ClientComponent({
           const data = await response.json();
           if (data.isCompleted) {
             console.log("✅ Session is already completed, showing end screen");
+            
+            // Close any open exhibits when loading completed session
+            closeAllExhibits();
+            
             setShowEndScreen(true);
             
             // Load any existing transcript/video data
@@ -2040,6 +2076,8 @@ export default function ClientComponent({
           handleVideoReady={handleVideoReady}
           showEndScreen={showEndScreen}
           setShowEndScreen={setShowEndScreen}
+          isEndingInterview={isEndingInterview}
+          setIsEndingInterview={setIsEndingInterview}
 
           onToolCall={handleToolCall}
           unlockedExhibits={unlockedExhibits}
@@ -2058,7 +2096,7 @@ export default function ClientComponent({
           selectedDevices={selectedDevices}
           onOpenDeviceSetup={handleOpenDeviceSetup}
         />
-        {!showEndScreen && (
+        {!showEndScreen && !isEndingInterview && (
           <StartCall 
             configId={configId} 
             accessToken={accessToken}
