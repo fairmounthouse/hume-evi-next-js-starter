@@ -135,12 +135,23 @@ export class TranscriptEvaluator {
 
   /**
    * Get entries within the 5-minute rolling window
+   * 
+   * IMPORTANT: This rolling window is ONLY used for real-time feedback evaluation
+   * to improve performance and focus on recent conversation context.
+   * 
+   * The master transcript stored in Chat component is NEVER truncated and
+   * contains the complete conversation history for download.
    */
   private getRollingWindow(): TranscriptEntry[] {
     const cutoffTime = Date.now() - this.ROLLING_WINDOW_MS;
-    return this.transcriptHistory.filter(
+    const rollingEntries = this.transcriptHistory.filter(
       entry => entry.timestamp * 1000 >= cutoffTime
     );
+    
+    console.log(`🕐 [EVALUATOR] Rolling window: ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 5 minutes only)`);
+    console.log(`🕐 [EVALUATOR] Full transcript history preserved separately: ${this.transcriptHistory.length} total entries`);
+    
+    return rollingEntries;
   }
 
   /**
@@ -181,12 +192,17 @@ export class TranscriptEvaluator {
   }
 
   /**
-   * Format transcript entries for API
+   * Format transcript entries for API - USES ROLLING WINDOW (TRUNCATED for feedback only)
+   * NOTE: This is intentionally truncated for real-time feedback performance.
+   * The master transcript is preserved separately and never truncated.
    */
   private formatTranscriptForAPI(entries: TranscriptEntry[]): string {
     if (entries.length === 0) {
       return 'No transcript data available yet.';
     }
+
+    console.log(`📝 [EVALUATOR] Formatting ${entries.length} entries for feedback API (rolling window - last 5 minutes only)`);
+    console.log(`📝 [EVALUATOR] NOTE: Master transcript is preserved separately and not truncated`);
 
     return entries.map(entry => {
       const timeStr = new Date(entry.timestamp * 1000).toLocaleTimeString();

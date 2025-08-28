@@ -68,14 +68,42 @@ export async function createSessionWithBilling(
 
 export async function uploadTranscriptToStorage(sessionId: string, transcript: any[]): Promise<string | null> {
   try {
-    // Create transcript text content
-    const transcriptText = transcript.map(entry => {
+    console.log("📤 [STORAGE] Uploading transcript to storage:", {
+      sessionId,
+      entryCount: transcript.length,
+      userMessages: transcript.filter(e => e.speaker === "user").length,
+      assistantMessages: transcript.filter(e => e.speaker === "assistant").length
+    });
+    
+    // Validate transcript data before upload
+    if (!transcript || transcript.length === 0) {
+      console.warn("⚠️ [STORAGE] Empty transcript provided for upload");
+      return null;
+    }
+    
+    // Create transcript text content with enhanced formatting
+    const transcriptText = transcript.map((entry, index) => {
       const timeStr = new Date(entry.timestamp * 1000).toLocaleTimeString();
       const speaker = entry.speaker === "user" ? "Interviewee" : "AI Interviewer";
-      return `[${timeStr}] ${speaker}: ${entry.text}`;
+      
+      // Include emotions and confidence if available
+      let metadata = "";
+      if (entry.emotions && Object.keys(entry.emotions).length > 0) {
+        const topEmotions = Object.entries(entry.emotions)
+          .sort(([,a], [,b]) => (b as number) - (a as number))
+          .slice(0, 2)
+          .map(([emotion, score]) => `${emotion}:${(score as number).toFixed(2)}`)
+          .join(", ");
+        metadata += ` [Emotions: ${topEmotions}]`;
+      }
+      if (entry.confidence) {
+        metadata += ` [Confidence: ${entry.confidence.toFixed(2)}]`;
+      }
+      
+      return `[${timeStr}] ${speaker}: ${entry.text}${metadata}`;
     }).join('\n');
 
-    // Create transcript JSON with metadata
+    // Create comprehensive transcript JSON with enhanced metadata
     const transcriptData = {
       session_id: sessionId,
       created_at: new Date().toISOString(),
@@ -88,7 +116,14 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
         speakers: {
           user_messages: transcript.filter(e => e.speaker === "user").length,
           assistant_messages: transcript.filter(e => e.speaker === "assistant").length,
-        }
+        },
+        // Enhanced metadata for debugging
+        first_message_timestamp: transcript[0]?.timestamp,
+        last_message_timestamp: transcript[transcript.length - 1]?.timestamp,
+        has_emotions: transcript.some(e => e.emotions && Object.keys(e.emotions).length > 0),
+        has_confidence: transcript.some(e => e.confidence),
+        upload_timestamp: Date.now(),
+        preservation_mode: "COMPLETE_TRANSCRIPT"
       }
     };
 
@@ -108,7 +143,9 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
       });
 
     if (textError) {
-      console.error('Error uploading text transcript:', textError);
+      console.error('❌ [STORAGE] Error uploading text transcript:', textError);
+    } else {
+      console.log('✅ [STORAGE] Text transcript uploaded successfully');
     }
 
     // Upload JSON version
@@ -120,11 +157,14 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
       });
 
     if (jsonError) {
-      console.error('Error uploading JSON transcript:', jsonError);
+      console.error('❌ [STORAGE] Error uploading JSON transcript:', jsonError);
+    } else {
+      console.log('✅ [STORAGE] JSON transcript uploaded successfully');
     }
 
+    // Verify upload success and get public URL
     if (!textError && !jsonError) {
-      console.log('✅ Transcript uploaded to Supabase Storage');
+      console.log('✅ [STORAGE] Both transcript formats uploaded successfully');
       
       // Return complete Supabase URL instead of just internal path
       const { data: urlData } = await supabase.storage
@@ -132,10 +172,42 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
         .getPublicUrl(textPath);
       
       const completeUrl = urlData.publicUrl;
-      console.log('📋 Complete transcript URL:', completeUrl);
+      console.log('📋 [STORAGE] Complete transcript URL:', completeUrl);
+      
+      // Verify the uploaded file is accessible
+      try {
+        const response = await fetch(completeUrl);
+        if (response.ok) {
+          const content = await response.text();
+          console.log('✅ [STORAGE] Upload verification successful, content length:', content.length);
+        } else {
+          console.warn('⚠️ [STORAGE] Upload verification failed, status:', response.status);
+        }
+      } catch (verifyError) {
+        console.warn('⚠️ [STORAGE] Upload verification error:', verifyError);
+      }
+      
       return completeUrl;
     }
 
+    // Handle partial failures
+    if (textError && !jsonError) {
+      console.warn('⚠️ [STORAGE] Text upload failed but JSON succeeded');
+      const { data: urlData } = await supabase.storage
+        .from('interviews')
+        .getPublicUrl(jsonPath);
+      return urlData.publicUrl;
+    }
+    
+    if (!textError && jsonError) {
+      console.warn('⚠️ [STORAGE] JSON upload failed but text succeeded');
+      const { data: urlData } = await supabase.storage
+        .from('interviews')
+        .getPublicUrl(textPath);
+      return urlData.publicUrl;
+    }
+
+    console.error('❌ [STORAGE] Both uploads failed');
     return null;
   } catch (error) {
     console.error('Error uploading transcript to storage:', error);

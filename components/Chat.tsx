@@ -111,6 +111,7 @@ function ChatInterface({
 
   const [evaluationCache, setEvaluationCache] = useState<Map<string, any>>(new Map());
   const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
+  // MASTER TRANSCRIPT - NEVER TRUNCATED - Contains complete conversation history
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
   const currentMessagesRef = useRef<any[]>([]);
 
@@ -195,33 +196,68 @@ function ChatInterface({
 
 
 
-  // Build transcript from messages for evaluation
+  // Build transcript from messages for evaluation - ENHANCED for complete preservation
+  // 
+  // CRITICAL: This function builds the MASTER TRANSCRIPT that is NEVER truncated.
+  // The transcript evaluator uses a separate 5-minute rolling window for real-time feedback,
+  // but this master transcript contains the COMPLETE conversation history for download.
   const buildTranscriptFromMessages = (messages: any[]): any[] => {
-    // Filter for actual conversation messages with content
+    console.log("📋 [TRANSCRIPT] Building transcript from", messages.length, "total messages");
+    
+    // Filter for actual conversation messages with content - be more inclusive to avoid data loss
     const conversationMessages = messages.filter(msg => {
       const hasContent = msg.message?.content && msg.message.content.trim().length > 0;
       const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
       
-      if (isConversation && hasContent) {
-        console.log("✅ [CHAT] Valid message:", msg.type, msg.message.content.substring(0, 50) + "...");
+      // Log all message types for debugging
+      if (!isConversation) {
+        console.log("🔍 [TRANSCRIPT] Skipping non-conversation message:", msg.type);
+      } else if (!hasContent) {
+        console.log("⚠️ [TRANSCRIPT] Skipping empty message:", msg.type, "content:", msg.message?.content);
+      } else {
+        console.log("✅ [TRANSCRIPT] Including message:", msg.type, msg.message.content.substring(0, 50) + "...");
       }
       
       return isConversation && hasContent;
     });
     
-    const transcript = conversationMessages.map((msg, index) => ({
-      id: `msg-${index}`,
-      speaker: msg.type === "user_message" ? "user" : "assistant",
-      text: msg.message?.content || "",
-      timestamp: Math.floor((msg.receivedAt?.getTime() || Date.now()) / 1000),
-      emotions: msg.models?.prosody?.scores || undefined,
-      confidence: msg.models?.language?.confidence || undefined,
-    }));
+    // Build transcript entries with enhanced metadata preservation
+    const transcript = conversationMessages.map((msg, index) => {
+      const entry = {
+        id: `msg-${index}`,
+        speaker: msg.type === "user_message" ? "user" : "assistant",
+        text: msg.message?.content || "",
+        timestamp: Math.floor((msg.receivedAt?.getTime() || Date.now()) / 1000),
+        emotions: msg.models?.prosody?.scores || undefined,
+        confidence: msg.models?.language?.confidence || undefined,
+        // Preserve original message metadata for debugging
+        _originalType: msg.type,
+        _originalTimestamp: msg.receivedAt?.toISOString(),
+        _messageIndex: index
+      };
+      
+      // Validate entry completeness
+      if (!entry.text || entry.text.trim().length === 0) {
+        console.warn("⚠️ [TRANSCRIPT] Empty text in entry:", entry);
+      }
+      
+      return entry;
+    });
     
-    console.log("📋 [CHAT] Built transcript from", messages.length, "total messages,", conversationMessages.length, "conversation messages,", transcript.length, "entries");
+    console.log("📋 [TRANSCRIPT] Transcript build complete:", {
+      totalMessages: messages.length,
+      conversationMessages: conversationMessages.length,
+      transcriptEntries: transcript.length,
+      userMessages: transcript.filter(e => e.speaker === "user").length,
+      assistantMessages: transcript.filter(e => e.speaker === "assistant").length,
+      firstEntry: transcript[0]?.text?.substring(0, 30) + "..." || "none",
+      lastEntry: transcript[transcript.length - 1]?.text?.substring(0, 30) + "..." || "none"
+    });
     
-    if (transcript.length > 0) {
-      console.log("📋 [CHAT] Sample transcript entry:", transcript[0]);
+    // Additional validation
+    if (transcript.length === 0 && messages.length > 0) {
+      console.error("🚨 [TRANSCRIPT] CRITICAL: No transcript entries created from", messages.length, "messages!");
+      console.error("🚨 [TRANSCRIPT] Message types:", messages.map(m => m.type));
     }
     
     return transcript;
@@ -254,7 +290,7 @@ function ChatInterface({
 
   // Update stored transcript whenever messages change
   useEffect(() => {
-    // Always update the ref with current messages
+    // Always update the ref with current messages - CRITICAL for transcript preservation
     currentMessagesRef.current = messages;
     
     console.log("📨 Messages updated:", {
@@ -264,16 +300,61 @@ function ChatInterface({
       lastMessage: messages[messages.length - 1]?.type || "none"
     });
     
-    if (isCallActive && messages.length > 0) {
+    // ALWAYS build and store transcript when we have messages, regardless of call state
+    // This ensures we never lose transcript data even if the call ends unexpectedly
+    if (messages.length > 0) {
       const newTranscript = buildTranscriptFromMessages(messages);
       setStoredTranscript(newTranscript);
       console.log("💾 Updated stored transcript:", {
         messagesProcessed: messages.length,
         transcriptEntries: newTranscript.length,
-        isCallActive
+        isCallActive,
+        preservationMode: "ALWAYS_PRESERVE"
       });
+      
+      // Store in session storage as additional backup
+      try {
+        sessionStorage.setItem(`transcript_backup_${sessionId}`, JSON.stringify(newTranscript));
+        console.log("💾 Backup transcript saved to session storage");
+      } catch (error) {
+        console.warn("Failed to backup transcript to session storage:", error);
+      }
     }
-  }, [messages, isCallActive]);
+  }, [messages, isCallActive, sessionId]);
+
+  // Periodic transcript backup during active interviews
+  useEffect(() => {
+    let backupInterval: NodeJS.Timeout;
+    
+    if (isCallActive && sessionId) {
+      // Backup transcript every 30 seconds during active interview
+      backupInterval = setInterval(async () => {
+        const currentTranscript = storedTranscript.length > 0 
+          ? storedTranscript 
+          : buildTranscriptFromMessages(currentMessagesRef.current);
+        
+        if (currentTranscript.length > 0) {
+          try {
+            const { upsertInterviewSession } = await import("@/utils/supabase-client");
+            await upsertInterviewSession({
+              session_id: sessionId,
+              live_transcript_data: currentTranscript,
+              updated_at: new Date().toISOString()
+            });
+            console.log("💾 Periodic transcript backup completed:", currentTranscript.length, "entries");
+          } catch (error) {
+            console.warn("Failed to backup transcript periodically:", error);
+          }
+        }
+      }, 30000); // Every 30 seconds
+    }
+    
+    return () => {
+      if (backupInterval) {
+        clearInterval(backupInterval);
+      }
+    };
+  }, [isCallActive, sessionId, storedTranscript]);
 
   // Setup transcript evaluation when call starts (only once per call)
   useEffect(() => {
@@ -747,6 +828,14 @@ function ChatInterface({
           });
           console.log("✅ [END] Session data and transcript saved to Supabase");
           
+          // Clean up session storage backup after successful save
+          try {
+            sessionStorage.removeItem(`transcript_backup_${sessionId}`);
+            console.log("🧹 [END] Cleaned up session storage backup");
+          } catch (error) {
+            console.warn("Failed to clean up session storage backup:", error);
+          }
+          
           // Track usage for billing
           try {
             const durationMinutes = Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000 / 60);
@@ -854,12 +943,53 @@ function ChatInterface({
   };
 
   const handleEndInterview = async () => {
-    // This is the fallback version - try to get current data
-    const transcriptData = storedTranscript.length > 0 
-      ? storedTranscript 
-      : currentMessagesRef.current.length > 0 
-        ? buildTranscriptFromMessages(currentMessagesRef.current)
-        : buildTranscriptFromMessages(messages);
+    // Enhanced fallback system to ensure we never lose transcript data
+    console.log("🔚 [END] Starting interview end process with enhanced preservation");
+    
+    let transcriptData: any[] = [];
+    
+    // Try multiple sources in order of preference
+    // 1. Current stored transcript (most up-to-date)
+    if (storedTranscript.length > 0) {
+      transcriptData = storedTranscript;
+      console.log("✅ [END] Using stored transcript:", transcriptData.length, "entries");
+    }
+    // 2. Build from current messages ref (real-time backup)
+    else if (currentMessagesRef.current.length > 0) {
+      transcriptData = buildTranscriptFromMessages(currentMessagesRef.current);
+      console.log("✅ [END] Built from messages ref:", transcriptData.length, "entries");
+    }
+    // 3. Build from messages state (fallback)
+    else if (messages.length > 0) {
+      transcriptData = buildTranscriptFromMessages(messages);
+      console.log("✅ [END] Built from messages state:", transcriptData.length, "entries");
+    }
+    // 4. Try session storage backup
+    else {
+      try {
+        const backupData = sessionStorage.getItem(`transcript_backup_${sessionId}`);
+        if (backupData) {
+          transcriptData = JSON.parse(backupData);
+          console.log("✅ [END] Recovered from session storage backup:", transcriptData.length, "entries");
+        }
+      } catch (error) {
+        console.warn("Failed to recover from session storage backup:", error);
+      }
+    }
+    
+    // Final validation
+    if (transcriptData.length === 0) {
+      console.warn("⚠️ [END] No transcript data found - this should not happen!");
+      // Still proceed but log the issue
+    } else {
+      console.log("✅ [END] Final transcript validation passed:", {
+        totalEntries: transcriptData.length,
+        userMessages: transcriptData.filter(e => e.speaker === "user").length,
+        assistantMessages: transcriptData.filter(e => e.speaker === "assistant").length,
+        firstEntry: transcriptData[0]?.text?.substring(0, 50) + "...",
+        lastEntry: transcriptData[transcriptData.length - 1]?.text?.substring(0, 50) + "..."
+      });
+    }
     
     await handleEndInterviewWithData(transcriptData);
   };
@@ -895,8 +1025,33 @@ function ChatInterface({
       }
       
       if (!downloadUrl) {
-        // Fallback to local download
-        const transcriptData = storedTranscript.length > 0 ? storedTranscript : buildTranscriptFromMessages(messages);
+        // Enhanced fallback to local download with multiple data sources
+        console.log("📥 [DOWNLOAD] Using local fallback with enhanced preservation");
+        
+        let transcriptData: any[] = [];
+        
+        // Try multiple sources in order of preference (same as handleEndInterview)
+        if (storedTranscript.length > 0) {
+          transcriptData = storedTranscript;
+          console.log("✅ [DOWNLOAD] Using stored transcript:", transcriptData.length, "entries");
+        } else if (currentMessagesRef.current.length > 0) {
+          transcriptData = buildTranscriptFromMessages(currentMessagesRef.current);
+          console.log("✅ [DOWNLOAD] Built from messages ref:", transcriptData.length, "entries");
+        } else if (messages.length > 0) {
+          transcriptData = buildTranscriptFromMessages(messages);
+          console.log("✅ [DOWNLOAD] Built from messages state:", transcriptData.length, "entries");
+        } else {
+          // Try session storage backup
+          try {
+            const backupData = sessionStorage.getItem(`transcript_backup_${sessionId}`);
+            if (backupData) {
+              transcriptData = JSON.parse(backupData);
+              console.log("✅ [DOWNLOAD] Recovered from session storage backup:", transcriptData.length, "entries");
+            }
+          } catch (error) {
+            console.warn("Failed to recover from session storage backup:", error);
+          }
+        }
         
         if (format === 'json') {
           const jsonData = {

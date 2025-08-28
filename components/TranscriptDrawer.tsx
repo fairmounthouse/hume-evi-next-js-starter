@@ -59,11 +59,45 @@ export default function TranscriptDrawer({
   };
 
   const downloadTranscript = () => {
-    const transcriptText = transcript.map(entry => 
-      `${entry.speaker === 'user' ? 'Interviewee' : 'AI Interviewer'} ${formatTimestamp(entry.timestamp)}\n${entry.text}\n`
-    ).join('\n');
+    console.log("📥 [DRAWER] Downloading transcript with", transcript.length, "entries");
     
-    const blob = new Blob([transcriptText], { type: 'text/plain' });
+    // Enhanced transcript formatting with metadata preservation
+    const transcriptText = transcript.map((entry, index) => {
+      const timeStr = formatTimestamp(entry.timestamp);
+      const speaker = entry.speaker === 'user' ? 'Interviewee' : 'AI Interviewer';
+      
+      // Include emotions and confidence if available
+      let metadata = "";
+      if (entry.emotions && Object.keys(entry.emotions).length > 0) {
+        const topEmotions = Object.entries(entry.emotions)
+          .sort(([,a], [,b]) => (b as number) - (a as number))
+          .slice(0, 2)
+          .map(([emotion, score]) => `${emotion}:${(score as number).toFixed(2)}`)
+          .join(", ");
+        metadata += ` [Emotions: ${topEmotions}]`;
+      }
+      if (entry.confidence) {
+        metadata += ` [Confidence: ${entry.confidence.toFixed(2)}]`;
+      }
+      
+      return `[${timeStr}] ${speaker}: ${entry.text}${metadata}`;
+    }).join('\n');
+    
+    // Add header with metadata
+    const header = `Interview Transcript
+Generated: ${new Date().toISOString()}
+Total Entries: ${transcript.length}
+User Messages: ${transcript.filter(e => e.speaker === 'user').length}
+Assistant Messages: ${transcript.filter(e => e.speaker === 'assistant').length}
+Duration: ${transcript.length > 0 ? Math.floor((Date.now() - (transcript[0]?.timestamp * 1000 || Date.now())) / 1000 / 60) : 0} minutes
+
+--- TRANSCRIPT ---
+
+`;
+    
+    const fullContent = header + transcriptText;
+    
+    const blob = new Blob([fullContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -72,11 +106,31 @@ export default function TranscriptDrawer({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    console.log("✅ [DRAWER] Transcript download completed");
   };
 
   const downloadJSON = () => {
-    const jsonData = JSON.stringify(transcript, null, 2);
-    const blob = new Blob([jsonData], { type: 'application/json' });
+    console.log("📥 [DRAWER] Downloading JSON transcript with", transcript.length, "entries");
+    
+    // Enhanced JSON format with comprehensive metadata
+    const jsonData = {
+      generated_at: new Date().toISOString(),
+      session_metadata: {
+        total_entries: transcript.length,
+        user_messages: transcript.filter(e => e.speaker === 'user').length,
+        assistant_messages: transcript.filter(e => e.speaker === 'assistant').length,
+        duration_minutes: transcript.length > 0 ? Math.floor((Date.now() - (transcript[0]?.timestamp * 1000 || Date.now())) / 1000 / 60) : 0,
+        has_emotions: transcript.some(e => e.emotions && Object.keys(e.emotions).length > 0),
+        has_confidence: transcript.some(e => e.confidence),
+        first_message_timestamp: transcript[0]?.timestamp,
+        last_message_timestamp: transcript[transcript.length - 1]?.timestamp,
+        preservation_mode: "COMPLETE_TRANSCRIPT_DRAWER"
+      },
+      entries: transcript
+    };
+    
+    const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -85,6 +139,8 @@ export default function TranscriptDrawer({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    
+    console.log("✅ [DRAWER] JSON transcript download completed");
   };
 
   return (
