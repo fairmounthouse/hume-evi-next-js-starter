@@ -174,8 +174,7 @@ export interface InterviewSession {
   
   // FOREIGN KEY REFERENCES
   case_id?: string; // uuid, FK to interview_cases.id
-  interviewer_profile_id?: string; // uuid, FK to interviewer_profiles.id
-  difficulty_profile_id?: string; // uuid, FK to difficulty_profiles.id
+  new_interviewer_profile_id?: string; // uuid, FK to interviewer_profiles_new.id (includes difficulty, seniority, company)
   
   // MEDIA STORAGE (consolidated from session_media table)
   video_url?: string; // Cloudflare Stream URL
@@ -633,8 +632,11 @@ export async function getSessionData(sessionId: string) {
       .select(`
         *,
         interview_cases(title, type, industry, difficulty),
-        interviewer_profiles(name, company, role),
-        difficulty_profiles(display_name, level)
+        interviewer_profiles_new!new_interviewer_profile_id(
+          alias,
+          company_profiles!company_profile_id(display_name),
+          seniority_profiles!seniority_profile_id(display_name)
+        )
       `)
       .eq('session_id', sessionId)
       .single();
@@ -714,9 +716,9 @@ export async function getSessionData(sessionId: string) {
       case_industry: sessionData.interview_cases?.industry || 'Unknown',
       case_difficulty: sessionData.interview_cases?.difficulty || 'Unknown',
       
-      interviewer_name: sessionData.interviewer_profiles?.name || 'Unknown Interviewer',
-      interviewer_company: sessionData.interviewer_profiles?.company || 'Unknown Company',
-      interviewer_role: sessionData.interviewer_profiles?.role || 'Unknown Role',
+      interviewer_name: sessionData.interviewer_profiles_new?.alias || 'Unknown Interviewer',
+      interviewer_company: sessionData.interviewer_profiles_new?.company_profiles?.display_name || 'Unknown Company',
+      interviewer_role: sessionData.interviewer_profiles_new?.seniority_profiles?.display_name || 'Unknown Role',
       
       difficulty_level: sessionData.difficulty_profiles?.display_name || 'Unknown',
       

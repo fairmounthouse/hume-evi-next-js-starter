@@ -6,14 +6,18 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit') || '10');
     
-    // Fetch sessions with related data for meaningful metadata
+    // Fetch sessions with new combined profile system
     const { data: sessions, error } = await supabase
       .from('interview_sessions')
       .select(`
         *,
         interview_cases(title, type, industry, difficulty),
-        interviewer_profiles(name, company, role),
-        difficulty_profiles(display_name, level)
+        interviewer_profiles_new!new_interviewer_profile_id(
+          alias,
+          difficulty_profiles!difficulty_profile_id(display_name, level),
+          seniority_profiles!seniority_profile_id(display_name, level),
+          company_profiles!company_profile_id(display_name, name)
+        )
       `)
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
@@ -42,12 +46,12 @@ export async function GET(request: NextRequest) {
         case_industry: session.interview_cases?.industry || 'Unknown',
         case_difficulty: session.interview_cases?.difficulty || 'Unknown',
         
-        interviewer_name: session.interviewer_profiles?.name || 'Unknown Interviewer',
-        interviewer_company: session.interviewer_profiles?.company || 'Unknown Company',
-        interviewer_role: session.interviewer_profiles?.role || 'Unknown Role',
+        interviewer_alias: session.interviewer_profiles_new?.alias || 'Unknown Profile',
+        interviewer_company: session.interviewer_profiles_new?.company_profiles?.display_name || 'Unknown Company',
+        interviewer_seniority: session.interviewer_profiles_new?.seniority_profiles?.display_name || 'Unknown Seniority',
         
-        difficulty_level: session.difficulty_profiles?.display_name || 'Unknown',
-        difficulty_code: session.difficulty_profiles?.level || 'unknown',
+        difficulty_level: session.interviewer_profiles_new?.difficulty_profiles?.display_name || 'Unknown',
+        difficulty_code: session.interviewer_profiles_new?.difficulty_profiles?.level || 'unknown',
         
         // Extract overall score from detailed analysis (not feedback scores)
         overall_score: (() => {

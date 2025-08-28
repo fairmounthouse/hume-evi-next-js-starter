@@ -13,7 +13,6 @@ export default function StartCall({
   sessionId,
   selectedCaseId,
   selectedInterviewerId,
-  selectedDifficultyId,
   onCallStart,
 }: {
   configId?: string;
@@ -21,7 +20,6 @@ export default function StartCall({
   sessionId: string;
   selectedCaseId?: string | null;
   selectedInterviewerId?: string | null;
-  selectedDifficultyId?: string | null;
   onCallStart?: () => void;
 }) {
   const { status, connect, sendSessionSettings } = useVoice();
@@ -222,18 +220,16 @@ export default function StartCall({
                   console.log("📋 Interview configuration:", {
                     sessionId,
                     selectedCaseId,
-                    selectedInterviewerId, 
-                    selectedDifficultyId,
+                    selectedInterviewerId,
                     configId,
                     hasAccessToken: !!accessToken
                   });
                   
                   // Check if user has selected all required options
-                  if (!selectedCaseId || !selectedInterviewerId || !selectedDifficultyId) {
+                  if (!selectedCaseId || !selectedInterviewerId) {
                     console.error("❌ Missing required selections:", {
                       hasCaseId: !!selectedCaseId,
-                      hasInterviewerId: !!selectedInterviewerId,
-                      hasDifficultyId: !!selectedDifficultyId
+                      hasInterviewerId: !!selectedInterviewerId
                     });
                     toast.error("Please complete interview setup first");
                     window.location.href = "/interview/setup";
@@ -262,8 +258,7 @@ export default function StartCall({
                   status: "in_progress" as const,
                   // Use selected configuration from setup screen
                   case_id: selectedCaseId || undefined,
-                  interviewer_profile_id: selectedInterviewerId || undefined,
-                  difficulty_profile_id: selectedDifficultyId || undefined,
+                  new_interviewer_profile_id: selectedInterviewerId || undefined, // Updated to match new schema
                 };
 
                 console.log("📝 Session data to be created:", sessionData);

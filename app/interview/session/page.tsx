@@ -12,15 +12,14 @@ export default async function InterviewSessionPage({
   const params = await searchParams;
   const sessionId = params?.sessionId;
   const caseId = params?.caseId;
-  const interviewerId = params?.interviewerId;
-  const difficultyId = params?.difficultyId;
+  const interviewerProfileId = params?.interviewerProfileId; // Updated to match setup page
 
   if (!accessToken) {
     throw new Error('Unable to get access token');
   }
 
   // Redirect to setup if required parameters are missing
-  if (!sessionId || !caseId || !interviewerId || !difficultyId) {
+  if (!sessionId || !caseId || !interviewerProfileId) {
     redirect('/interview/setup');
   }
 

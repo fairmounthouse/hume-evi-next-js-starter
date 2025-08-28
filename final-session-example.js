@@ -113,7 +113,6 @@ const sessionSettings = {
     INTERVIEWER_IDENTITY: "Bill Hwang, Senior Partner at McKinsey",
     INTERVIEW_CASE: "Case 7: Race to the Bottom - Airlines profitability case",
     COACHING_PROMPT: "COACHING_MODE: enabled - Provide feedback and guidance",
-    DIFFICULTY_PROMPT: "DIFFICULTY_LEVEL: mid - Balance guidance with independence", 
     TOTAL_ELAPSED_TIME: elapsedTime
   },
   context: {

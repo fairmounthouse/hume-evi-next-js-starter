@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home } from "lucide-react";
+import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
@@ -31,11 +31,19 @@ interface InterviewCase {
   }>;
 }
 
-interface InterviewerProfile {
+// New combined profile interfaces
+interface CompanyProfile {
   id: string;
   name: string;
-  company: string;
-  role: string;
+  display_name: string;
+  description?: string;
+}
+
+interface SeniorityProfile {
+  id: string;
+  level: string;
+  display_name: string;
+  description?: string;
 }
 
 interface DifficultyProfile {
@@ -45,11 +53,20 @@ interface DifficultyProfile {
   description?: string;
 }
 
+interface CombinedInterviewerProfile {
+  id: string;
+  alias: string;
+  name: string; // Human-readable name like "John Doe"
+  user_id?: string | null; // null = default for everyone, UUID = custom for specific user
+  difficulty_profiles: DifficultyProfile;
+  seniority_profiles: SeniorityProfile;
+  company_profiles: CompanyProfile;
+}
+
 interface InterviewSetupProps {
   onStartInterview: (selections: {
     caseId: string;
-    interviewerId: string;
-    difficultyId: string;
+    interviewerProfileId: string; // Updated to use combined profile ID
     sessionId?: string; // NEW: Pass session ID from document upload
   }) => void;
 }
@@ -57,12 +74,108 @@ interface InterviewSetupProps {
 export default function InterviewSetup({ onStartInterview }: InterviewSetupProps) {
   const router = useRouter();
   const [cases, setCases] = useState<InterviewCase[]>([]);
-  const [interviewers, setInterviewers] = useState<InterviewerProfile[]>([]);
-  const [difficulties, setDifficulties] = useState<DifficultyProfile[]>([]);
+  const [combinedProfiles, setCombinedProfiles] = useState<CombinedInterviewerProfile[]>([]);
+  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfile[]>([]);
+  const [seniorityProfiles, setSeniorityProfiles] = useState<SeniorityProfile[]>([]);
+  const [difficultyProfiles, setDifficultyProfiles] = useState<DifficultyProfile[]>([]);
   
   const [selectedCase, setSelectedCase] = useState<string>("");
-  const [selectedInterviewer, setSelectedInterviewer] = useState<string>("");
-  const [selectedDifficulty, setSelectedDifficulty] = useState<string>("");
+  const [selectedProfile, setSelectedProfile] = useState<string>("");
+  
+  // Custom profile creation state
+  const [customProfileName, setCustomProfileName] = useState("John Doe");
+  const [customProfileAlias, setCustomProfileAlias] = useState("");
+  const [customCompanyId, setCustomCompanyId] = useState("");
+  const [customSeniorityId, setCustomSeniorityId] = useState("");
+  const [customDifficultyId, setCustomDifficultyId] = useState("");
+  
+  // Company search state
+  const [companySearchQuery, setCompanySearchQuery] = useState("");
+  const [isCompanyDropdownOpen, setIsCompanyDropdownOpen] = useState(false);
+  
+  // Profile search state
+  const [profileSearchQuery, setProfileSearchQuery] = useState("");
+  const [availableProfilesFilter, setAvailableProfilesFilter] = useState(""); // Separate filter for available profiles sidebar
+  const [suggestedProfile, setSuggestedProfile] = useState<CombinedInterviewerProfile | null>(null);
+  
+  // Fuzzy search function for profiles
+  const fuzzySearchProfiles = (profiles: CombinedInterviewerProfile[], query: string) => {
+    if (!query.trim()) return profiles;
+    
+    const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
+    
+    return profiles.filter(profile => {
+      const searchableText = [
+        profile.name || '',
+        profile.alias || '',
+        profile.company_profiles.display_name || '',
+        profile.company_profiles.name || '',
+        profile.seniority_profiles.display_name || '',
+        profile.seniority_profiles.level || '',
+        profile.difficulty_profiles.display_name || '',
+        profile.difficulty_profiles.level || '',
+        profile.user_id ? 'custom' : 'default'
+      ].join(' ').toLowerCase();
+      
+      return searchTerms.every(term => searchableText.includes(term));
+    });
+  };
+
+  // Filter available profiles based on current form selections AND search query
+  const getFilteredAvailableProfiles = () => {
+    let filtered = combinedProfiles;
+    
+    // Apply search filter first
+    if (availableProfilesFilter.trim()) {
+      filtered = fuzzySearchProfiles(filtered, availableProfilesFilter);
+    }
+    
+    // Apply form-based filtering (show profiles matching current selections)
+    if (customCompanyId || customSeniorityId || customDifficultyId) {
+      filtered = filtered.filter(profile => {
+        const companyMatch = !customCompanyId || profile.company_profiles.id === customCompanyId;
+        const seniorityMatch = !customSeniorityId || profile.seniority_profiles.id === customSeniorityId;
+        const difficultyMatch = !customDifficultyId || profile.difficulty_profiles.id === customDifficultyId;
+        return companyMatch && seniorityMatch && difficultyMatch;
+      });
+    }
+    
+    return filtered;
+  };
+
+  // Check for exact matches when user is creating custom profile
+  const checkForExactMatch = () => {
+    if (!customCompanyId || !customSeniorityId || !customDifficultyId) {
+      setSuggestedProfile(null);
+      return;
+    }
+
+    const exactMatch = combinedProfiles.find(profile => 
+      profile.company_profiles.id === customCompanyId &&
+      profile.seniority_profiles.id === customSeniorityId &&
+      profile.difficulty_profiles.id === customDifficultyId
+    );
+
+    setSuggestedProfile(exactMatch || null);
+  };
+
+  // Populate form fields from selected available profile
+  const populateFormFromProfile = (profile: CombinedInterviewerProfile) => {
+    setCustomProfileName(profile.name || "");
+    setCustomProfileAlias(profile.alias || "");
+    setCustomCompanyId(profile.company_profiles.id);
+    setCustomSeniorityId(profile.seniority_profiles.id);
+    setCustomDifficultyId(profile.difficulty_profiles.id);
+    
+    // Clear any existing selection since we're populating form
+    setSelectedProfile("");
+    setSuggestedProfile(null);
+  };
+
+  // Run exact match check whenever custom selections change
+  useEffect(() => {
+    checkForExactMatch();
+  }, [customCompanyId, customSeniorityId, customDifficultyId, combinedProfiles]);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
@@ -70,19 +183,21 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
   
-  // Interviewer filters
-  const [companyFilter, setCompanyFilter] = useState<string>("all");
-  const [seniorityFilter, setSeniorityFilter] = useState<string>("all");
+  // Profile filters (matching case selection design)
+  const [profileTypeFilter, setProfileTypeFilter] = useState<string>("all"); // "default" or "custom" or "all"
+  const [profileCompanyFilter, setProfileCompanyFilter] = useState<string>("all");
+  const [profileSeniorityFilter, setProfileSeniorityFilter] = useState<string>("all");
+  const [profileDifficultyFilter, setProfileDifficultyFilter] = useState<string>("all");
   
   const [loading, setLoading] = useState(true);
-  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Configuration, 3 = Documents (optional), 4 = Device Setup
+  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Profile Selection, 3 = Custom Profile Creation, 4 = Documents (optional), 5 = Device Setup
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [documentSessionId, setDocumentSessionId] = useState<string>("");
   
   // Get selected case data to determine if documents are required
   const selectedCaseData = cases.find(c => c.id === selectedCase);
   const requiresDocuments = selectedCaseData?.requires_documents || false;
-  const totalSteps = requiresDocuments ? 4 : 3;
+  const totalSteps = requiresDocuments ? 5 : 4; // Case -> Profile -> [Custom Profile] -> [Documents] -> Device
   
   // Scroll detection state
   const [isCasesScrollable, setIsCasesScrollable] = useState(false);
@@ -147,27 +262,27 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   // Check scrollable state when data or filters change
   useEffect(() => {
     const timer = setTimeout(() => {
-      // Calculate filtered interviewers count for the check
-      const filteredCount = interviewers.filter(interviewer => {
-        const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
-        const matchesSeniority = seniorityFilter === "all" || interviewer.role === seniorityFilter;
-        return matchesCompany && matchesSeniority;
+      // Calculate filtered profiles count for the check
+      const filteredCount = combinedProfiles.filter(profile => {
+        if (profileTypeFilter === "default") return profile.user_id === null;
+        if (profileTypeFilter === "custom") return profile.user_id !== null;
+        return true; // "all"
       }).length;
       
       checkScrollable(filteredCount);
     }, 100); // Small delay to ensure DOM is updated
     
     return () => clearTimeout(timer);
-  }, [cases, interviewers, companyFilter, seniorityFilter, currentPage]);
+  }, [cases, combinedProfiles, profileTypeFilter, currentPage]);
 
   // Also check on window resize
   useEffect(() => {
     const handleResize = () => {
       // Calculate current filtered count for resize check
-      const filteredCount = interviewers.filter(interviewer => {
-        const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
-        const matchesSeniority = seniorityFilter === "all" || interviewer.role === seniorityFilter;
-        return matchesCompany && matchesSeniority;
+      const filteredCount = combinedProfiles.filter(profile => {
+        if (profileTypeFilter === "default") return profile.user_id === null;
+        if (profileTypeFilter === "custom") return profile.user_id !== null;
+        return true; // "all"
       }).length;
       
       checkScrollable(filteredCount);
@@ -175,7 +290,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [interviewers, companyFilter, seniorityFilter]);
+  }, [combinedProfiles, profileTypeFilter]);
 
   // Attach scroll listeners
   useEffect(() => {
@@ -205,21 +320,114 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     try {
       const { supabase } = await import("@/utils/supabase-client");
       
-      const [casesRes, interviewersRes, difficultiesRes] = await Promise.all([
-        supabase.from("interview_cases").select("*").eq("active", true),
-        supabase.from("interviewer_profiles").select("*").eq("active", true),
-        supabase.from("difficulty_profiles").select("*").eq("active", true)
+      // Fetch cases from Supabase directly
+      const casesRes = await supabase.from("interview_cases").select("*").eq("active", true);
+      
+      // Fetch profiles from our new API endpoints
+      const [combinedProfilesRes, companyProfilesRes, seniorityProfilesRes, difficultyProfilesRes] = await Promise.all([
+        fetch('/api/profiles/interviewer').then(res => res.json()),
+        fetch('/api/profiles/company').then(res => res.json()),
+        fetch('/api/profiles/seniority').then(res => res.json()),
+        fetch('/api/profiles/difficulty').then(res => res.json()) // Use new difficulty API with prompt content
       ]);
 
       if (!casesRes.error) setCases(casesRes.data || []);
-      if (!interviewersRes.error) setInterviewers(interviewersRes.data || []);
-      if (!difficultiesRes.error) setDifficulties(difficultiesRes.data || []);
+      if (combinedProfilesRes.success) setCombinedProfiles(combinedProfilesRes.profiles || []);
+      if (companyProfilesRes.success) setCompanyProfiles(companyProfilesRes.profiles || []);
+      if (seniorityProfilesRes.success) setSeniorityProfiles(seniorityProfilesRes.profiles || []);
+      if (difficultyProfilesRes.success) setDifficultyProfiles(difficultyProfilesRes.profiles || []);
+      
+      console.log("📊 Loaded profile data:", {
+        combinedProfiles: combinedProfilesRes.profiles?.length || 0,
+        companyProfiles: companyProfilesRes.profiles?.length || 0,
+        seniorityProfiles: seniorityProfilesRes.profiles?.length || 0,
+        difficultyProfiles: difficultyProfilesRes.data?.length || 0
+      });
     } catch (error) {
       console.error("Error fetching interview setup data:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Create custom interviewer profile
+  const createCustomProfile = async () => {
+    if (!customProfileName || !customProfileAlias || !customCompanyId || !customSeniorityId || !customDifficultyId) {
+      alert("Please fill in all fields for the custom profile");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/profiles/interviewer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: customProfileName,
+          alias: customProfileAlias,
+          company_profile_id: customCompanyId,
+          seniority_profile_id: customSeniorityId,
+          difficulty_profile_id: customDifficultyId
+        })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        // Add the new profile to the list
+        setCombinedProfiles(prev => [...prev, result.profile]);
+        
+        // Select the new profile
+        setSelectedProfile(result.profile.id);
+        
+        // Reset form
+        setCustomProfileName("John Doe");
+        setCustomProfileAlias("");
+        setCustomCompanyId("");
+        setCustomSeniorityId("");
+        setCustomDifficultyId("");
+        
+        console.log("✅ Created custom profile:", result.profile.alias);
+        
+        // Directly proceed to interview with the new profile ID
+        if (requiresDocuments) {
+          setCurrentPage(4);
+          const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          setDocumentSessionId(sessionId);
+          setShowDocumentUpload(true);
+        } else {
+          // Directly call onStartInterview with the new profile ID
+          onStartInterview({
+            caseId: selectedCase,
+            interviewerProfileId: result.profile.id, // Use the new profile ID directly
+            sessionId: undefined
+          });
+        }
+      } else {
+        alert(`Failed to create profile: ${result.error}`);
+      }
+    } catch (error) {
+      console.error("Error creating custom profile:", error);
+      alert("Failed to create custom profile");
+    }
+  };
+
+  // Filter profiles based on all filters (matching case selection logic)
+  const filteredProfiles = combinedProfiles.filter(profile => {
+    // Type filter
+    if (profileTypeFilter === "default" && profile.user_id !== null) return false;
+    if (profileTypeFilter === "custom" && profile.user_id === null) return false;
+    
+    // Company filter
+    if (profileCompanyFilter !== "all" && profile.company_profiles.name !== profileCompanyFilter) return false;
+    
+    // Seniority filter
+    if (profileSeniorityFilter !== "all" && profile.seniority_profiles.level !== profileSeniorityFilter) return false;
+    
+    // Difficulty filter
+    if (profileDifficultyFilter !== "all" && profile.difficulty_profiles.level !== profileDifficultyFilter) return false;
+    
+    return true;
+  });
 
   // Filter cases based on search and filters
   const filteredCases = cases.filter(case_ => {
@@ -241,16 +449,10 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const industryOptions = [...new Set(cases.map(c => c.industry).filter(Boolean))];
   const formatOptions = [...new Set(cases.map(c => c.format).filter(Boolean))];
   
-  // Interviewer filter options
-  const companyOptions = [...new Set(interviewers.map(i => i.company).filter(Boolean))];
-  const seniorityOptions = [...new Set(interviewers.map(i => i.role).filter(Boolean))];
-  
-  // Filter interviewers
-  const filteredInterviewers = interviewers.filter(interviewer => {
-    const matchesCompany = companyFilter === "all" || interviewer.company === companyFilter;
-    const matchesSeniority = seniorityFilter === "all" || interviewer.role === seniorityFilter;
-    return matchesCompany && matchesSeniority;
-  });
+  // Profile filter options (no longer needed for filtering, but kept for potential future use)
+  const companyOptions = [...new Set(companyProfiles.map(c => c.display_name).filter(Boolean))];
+  const seniorityOptions = [...new Set(seniorityProfiles.map(s => s.display_name).filter(Boolean))];
+  const difficultyLevelOptions = [...new Set(difficultyProfiles.map(d => d.display_name).filter(Boolean))];
 
   // Clear all filters
   const clearFilters = () => {
@@ -261,24 +463,23 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     setFormatFilter("all");
   };
   
-  // Clear interviewer filters
-  const clearInterviewerFilters = () => {
-    setCompanyFilter("all");
-    setSeniorityFilter("all");
+  // Clear profile filters
+  const clearProfileFilters = () => {
+    setProfileTypeFilter("all");
   };
 
   // Check if any filters are active
   const hasActiveFilters = searchQuery || typeFilter !== "all" || difficultyFilter !== "all" || industryFilter !== "all" || formatFilter !== "all";
-  const hasActiveInterviewerFilters = companyFilter !== "all" || seniorityFilter !== "all";
+  const hasActiveProfileFilters = profileTypeFilter !== "all";
 
   // Navigation functions
   const goToNextPage = () => {
     if (currentPage === 1 && selectedCase) {
       setCurrentPage(2);
-    } else if (currentPage === 2 && selectedInterviewer && selectedDifficulty) {
+    } else if (currentPage === 2 && selectedProfile) {
       if (requiresDocuments) {
-        // Go to documents page (step 3)
-        setCurrentPage(3);
+        // Go to documents page (step 4)
+        setCurrentPage(4);
         // Generate session ID for document upload
         const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         setDocumentSessionId(sessionId);
@@ -288,14 +489,30 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
         proceedToInterview();
       }
     } else if (currentPage === 3) {
+      // From custom profile creation, should not reach here as it handles its own navigation
+      if (requiresDocuments) {
+        setCurrentPage(4);
+        const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        setDocumentSessionId(sessionId);
+        setShowDocumentUpload(true);
+      } else {
+        proceedToInterview();
+      }
+    } else if (currentPage === 4) {
       // From documents to device setup or interview
       proceedToInterview();
     }
   };
 
+  // Reset available profiles filter when entering custom profile creation
+  const goToCustomProfilePage = () => {
+    setCurrentPage(3);
+    setAvailableProfilesFilter(""); // Reset the sidebar filter
+  };
+
   const goToPreviousPage = () => {
     if (currentPage > 1) {
-      if (currentPage === 3) {
+      if (currentPage === 4) {
         setShowDocumentUpload(false);
       }
       setCurrentPage(currentPage - 1);
@@ -303,28 +520,28 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   };
 
   const proceedToInterview = () => {
+    const selectedProfileData = combinedProfiles.find(p => p.id === selectedProfile);
+    
     console.log("🚀 Proceeding to interview with configuration:", {
       caseId: selectedCase,
-      interviewerId: selectedInterviewer,
-      difficultyId: selectedDifficulty,
+      interviewerProfileId: selectedProfile,
+      profileAlias: selectedProfileData?.alias,
       sessionId: documentSessionId,
       hasDocuments: requiresDocuments
     });
     
-    onStartInterview({
-      caseId: selectedCase,
-      interviewerId: selectedInterviewer,
-      difficultyId: selectedDifficulty,
+        onStartInterview({
+          caseId: selectedCase,
+      interviewerProfileId: selectedProfile,
       sessionId: requiresDocuments ? documentSessionId : undefined
     });
   };
 
   const canProceedFromPage1 = selectedCase;
-  const canProceedFromPage2 = selectedInterviewer && selectedDifficulty;
+  const canProceedFromPage2 = selectedProfile;
 
-  // Get selected data for display
-  const selectedInterviewerData = interviewers.find(i => i.id === selectedInterviewer);
-  const selectedDifficultyData = difficulties.find(d => d.id === selectedDifficulty);
+  // Get selected profile data for display
+  const selectedProfileData = combinedProfiles.find(p => p.id === selectedProfile);
 
   // Keyboard navigation
   useEffect(() => {
@@ -357,8 +574,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     // Use the same session ID that was used for document processing
     onStartInterview({
       caseId: selectedCase,
-      interviewerId: selectedInterviewer,
-      difficultyId: selectedDifficulty,
+      interviewerProfileId: selectedProfile,
       sessionId: documentSessionId // Pass the session ID that has the document data
     });
   };
@@ -705,7 +921,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
           </motion.div>
         )}
 
-        {/* Page 2: Configuration */}
+                {/* Page 2: Configuration */}
         {currentPage === 2 && (
           <motion.div
             key="page2"
@@ -714,183 +930,155 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             exit={{ opacity: 0, x: 20 }}
             className="container mx-auto px-6 py-8"
           >
+            {/* Header */}
+            <div className="text-center space-y-2 mb-8">
+              <h2 className="text-3xl font-bold text-gray-900">Choose Interview Style</h2>
+              <p className="text-gray-600 text-lg">Select an AI interviewer personality that matches your preparation goals</p>
+            </div>
 
+            {/* Filters and Create Custom Button */}
+            <div className="flex flex-wrap gap-3 mb-6 items-center">
+              <Select value={profileTypeFilter} onValueChange={setProfileTypeFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="default">Default</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
 
-            {/* Two Column Layout */}
-            <div className="grid lg:grid-cols-2 gap-8">
-              {/* Left: Interviewer Selection */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Choose Interview Style</CardTitle>
-                  <CardDescription>
-                    Select an AI interviewer personality that matches your preparation goals
-                  </CardDescription>
-                  
-                  {/* Interviewer Filters */}
-                  <div className="flex gap-3 mt-4">
-                    <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                      <SelectTrigger className="w-48">
-                        <SelectValue placeholder="Company" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Companies</SelectItem>
-                        {companyOptions.map(company => (
-                          <SelectItem key={company} value={company}>{company}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={seniorityFilter} onValueChange={setSeniorityFilter}>
-                      <SelectTrigger className="w-40">
-                        <SelectValue placeholder="Seniority" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Levels</SelectItem>
-                        {seniorityOptions.map(role => (
-                          <SelectItem key={role} value={role}>{role}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    {hasActiveInterviewerFilters && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={clearInterviewerFilters}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        Clear
-                      </Button>
+              <Select value={profileCompanyFilter} onValueChange={setProfileCompanyFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All Companies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Companies</SelectItem>
+                  {companyProfiles.map(company => (
+                    <SelectItem key={company.id} value={company.name}>{company.display_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={profileSeniorityFilter} onValueChange={setProfileSeniorityFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All Levels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Levels</SelectItem>
+                  {seniorityProfiles.map(seniority => (
+                    <SelectItem key={seniority.id} value={seniority.level}>{seniority.display_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={profileDifficultyFilter} onValueChange={setProfileDifficultyFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All Difficulties" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Difficulties</SelectItem>
+                  {difficultyProfiles.map(difficulty => (
+                    <SelectItem key={difficulty.id} value={difficulty.level}>{difficulty.display_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {(profileTypeFilter !== "all" || profileCompanyFilter !== "all" || profileSeniorityFilter !== "all" || profileDifficultyFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setProfileTypeFilter("all");
+                    setProfileCompanyFilter("all");
+                    setProfileSeniorityFilter("all");
+                    setProfileDifficultyFilter("all");
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+
+              {/* Create Custom Button - Same Height as Filters */}
+              <Button
+                variant="outline"
+                onClick={goToCustomProfilePage}
+                className="border-2 border-dashed border-blue-300 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 hover:border-blue-400 text-blue-700 font-medium"
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Create Custom
+              </Button>
+              
+              <div className="text-sm text-gray-500 flex items-center ml-auto">
+                {filteredProfiles.length} profiles available
+              </div>
+            </div>
+
+            {/* Profiles Grid */}
+            <div className="relative">
+              <div 
+                ref={interviewersGridRef}
+                onScroll={handleInterviewersScroll}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[70vh] overflow-y-auto pr-4 pt-2 pb-1 px-1"
+              >
+                {filteredProfiles.map((profile) => (
+                  <Card
+                    key={profile.id}
+                    data-profile-card="true"
+                    className={cn(
+                      "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative",
+                      selectedProfile === profile.id 
+                        ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+                        : "hover:border-blue-200"
                     )}
-                  </div>
-                  
-                  <div className="text-xs text-gray-500 mt-2">
-                    {filteredInterviewers.length} interviewers
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="relative">
-                    <div 
-                      ref={interviewersGridRef}
-                      onScroll={handleInterviewersScroll}
-                      className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-6 pt-2 pb-1 pl-1"
-                    >
-                    {filteredInterviewers.map((interviewer) => (
-                      <Card
-                        key={interviewer.id}
-                        data-interviewer-card="true"
-                        className={cn(
-                          "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative",
-                          selectedInterviewer === interviewer.id 
-                            ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
-                            : "hover:border-blue-200"
+                    onClick={() => setSelectedProfile(profile.id)}
+                  >
+                    <CardContent className="p-6 text-center">
+                      {selectedProfile === profile.id && (
+                        <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-500" />
+                      )}
+                      
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
+                        {(profile.name || profile.alias).split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </div>
+                      
+                      <h4 className="font-semibold text-gray-900 mb-1">{profile.name || profile.alias}</h4>
+                      <p className="text-sm text-gray-500 mb-2">{profile.alias}</p>
+                      
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-1 justify-center">
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                            <Building className="w-3 h-3 mr-1" />
+                            {profile.company_profiles.display_name}
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                            <Users className="w-3 h-3 mr-1" />
+                            {profile.seniority_profiles.display_name}
+                          </Badge>
+                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                            <Target className="w-3 h-3 mr-1" />
+                            {profile.difficulty_profiles.display_name || profile.difficulty_profiles.level}
+                          </Badge>
+                        </div>
+                        {profile.user_id !== null && (
+                          <Badge variant="default" className="text-xs bg-purple-100 text-purple-800 w-fit mx-auto">
+                            <Crown className="w-3 h-3 mr-1" />
+                            Custom Profile
+                          </Badge>
                         )}
-                        onClick={() => setSelectedInterviewer(interviewer.id)}
-                      >
-                        <CardContent className="p-6 text-center">
-                          {selectedInterviewer === interviewer.id && (
-                            <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-500" />
-                          )}
-                          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                            {interviewer.name.split(' ').map(n => n[0]).join('')}
-                          </div>
-                          <h4 className="font-semibold text-gray-900 mb-1">{interviewer.name}</h4>
-                          <p className="text-sm text-gray-600 mb-1">{interviewer.role}</p>
-                          <p className="text-xs text-gray-500">{interviewer.company}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
-                    </div>
-                    
-                    {/* Fade effect overlay - only show if scrollable and not at bottom */}
-                    {isInterviewersScrollable && !isInterviewersAtBottom && (
-                      <div className="absolute bottom-0 left-1 right-6 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Right: Difficulty Selection */}
-              <Card className="h-full flex flex-col">
-                <CardHeader>
-                  <CardTitle className="text-lg">Select Difficulty Level</CardTitle>
-                  <CardDescription>
-                    Choose the challenge level that matches your experience
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex-1 flex flex-col justify-center">
-                  <div className={cn(
-                    "space-y-2 flex flex-col",
-                    difficulties.length <= 2 ? "gap-6" : 
-                    difficulties.length <= 4 ? "gap-3" : "gap-2"
-                  )}>
-                    {difficulties.map((difficulty) => (
-                      <Card
-                        key={difficulty.id}
-                        className={cn(
-                          "cursor-pointer transition-all duration-200 hover:shadow-md hover:translate-x-1 flex-1",
-                          selectedDifficulty === difficulty.id 
-                            ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
-                            : "hover:border-blue-200"
-                        )}
-                        onClick={() => setSelectedDifficulty(difficulty.id)}
-                      >
-                        <CardContent className={cn(
-                          "flex items-center gap-3",
-                          difficulties.length <= 2 ? "p-5" :
-                          difficulties.length <= 4 ? "p-4" : "p-3"
-                        )}>
-                          <div className={cn(
-                            "rounded-xl flex items-center justify-center transition-all duration-200",
-                            difficulties.length <= 2 ? "w-14 h-14" :
-                            difficulties.length <= 4 ? "w-12 h-12" : "w-10 h-10",
-                            difficulty.level === "entry" ? "bg-emerald-100 text-emerald-600" :
-                            difficulty.level === "mid" ? "bg-amber-100 text-amber-600" :
-                            difficulty.level === "senior" ? "bg-rose-100 text-rose-600" :
-                            difficulty.level === "principal" ? "bg-violet-100 text-violet-600" :
-                            difficulty.level === "custom" ? "bg-indigo-100 text-indigo-600" :
-                            "bg-gray-100 text-gray-600"
-                          )}>
-                            {difficulty.level === "entry" ? <Star className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
-                             difficulty.level === "mid" ? <Zap className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
-                             difficulty.level === "senior" ? <Target className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
-                             difficulty.level === "principal" ? <Crown className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> :
-                             difficulty.level === "custom" ? <Settings className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} /> : 
-                             <Star className={difficulties.length <= 2 ? "w-7 h-7" : difficulties.length <= 4 ? "w-6 h-6" : "w-5 h-5"} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className={cn(
-                              "font-semibold text-gray-900 truncate",
-                              difficulties.length <= 2 ? "text-lg" :
-                              difficulties.length <= 4 ? "text-base" : "text-sm"
-                            )}>{difficulty.display_name}</h4>
-                            <p className={cn(
-                              "text-gray-600 capitalize truncate",
-                              difficulties.length <= 2 ? "text-base" :
-                              difficulties.length <= 4 ? "text-sm" : "text-xs"
-                            )}>{difficulty.level} Level</p>
-                            {difficulty.description && (
-                              <p className={cn(
-                                "text-gray-500 line-clamp-2",
-                                difficulties.length <= 2 ? "text-sm" :
-                                difficulties.length <= 4 ? "text-xs" : "text-[11px]"
-                              )}>
-                                {summarizeDescription(
-                                  difficulty.description,
-                                  difficulties.length <= 2 ? 3 : 2
-                                )}
-                              </p>
-                            )}
-                          </div>
-                          {selectedDifficulty === difficulty.id && (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                          )}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              {/* Fade effect overlay - only show if scrollable and not at bottom */}
+              {isInterviewersScrollable && !isInterviewersAtBottom && (
+                <div className="absolute bottom-0 left-1 right-4 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
+              )}
             </div>
 
             {/* Bottom Action Bar */}
@@ -902,16 +1090,10 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                     <CheckCircle className="w-4 h-4" />
                     Case Selected
                   </div>
-                  {selectedInterviewerData && (
+                  {selectedProfileData && (
                     <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
                       <CheckCircle className="w-4 h-4" />
-                      {selectedInterviewerData.name}
-                    </div>
-                  )}
-                  {selectedDifficultyData && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                      <CheckCircle className="w-4 h-4" />
-                      {selectedDifficultyData.display_name}
+                      {selectedProfileData.name || selectedProfileData.alias}
                     </div>
                   )}
                 </div>
@@ -937,6 +1119,446 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
             {/* Spacer for fixed bottom bar */}
             <div className="h-24" />
+          </motion.div>
+        )}
+
+        {/* Page 3: Custom Profile Creation */}
+        {currentPage === 3 && (
+          <motion.div
+            key="page3"
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -50 }}
+            transition={{ duration: 0.3 }}
+            className="bg-gray-50 min-h-screen"
+          >
+            {/* Header */}
+            <div className="bg-white border-b border-gray-200 px-8 py-8 text-center">
+              <h1 className="text-2xl font-semibold text-gray-900 mb-2">Create Custom Interviewer Profile</h1>
+              <p className="text-gray-600 text-sm">Design your perfect interviewer by combining company culture, seniority level, and difficulty</p>
+            </div>
+
+            {/* Main Content - Split Layout */}
+            <div className="flex h-[calc(100vh-280px)]">
+              
+              {/* Left Panel - Form */}
+              <div className="flex-1 bg-white overflow-y-auto p-8">
+                
+                {/* Interviewer Details Section */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-3">
+                    <User className="w-4 h-4 text-indigo-600" />
+                    <h2 className="text-sm font-semibold text-gray-700">Interviewer Details</h2>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Name</label>
+                      <Input
+                        placeholder="John Doe"
+                        value={customProfileName}
+                        onChange={(e) => setCustomProfileName(e.target.value)}
+                        className="w-full h-10"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Alias</label>
+                      <Input
+                        placeholder="My Google Interview Style"
+                        value={customProfileAlias}
+                        onChange={(e) => setCustomProfileAlias(e.target.value)}
+                        className="w-full h-10"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">A memorable name for this interviewer style</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Company Culture Section */}
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Building className="w-4 h-4 text-indigo-600" />
+                      <h2 className="text-sm font-semibold text-gray-700">Company Culture</h2>
+                    </div>
+                    <div className="w-48 relative">
+                      <div className="relative">
+                        <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400" />
+                        <Input
+                          placeholder="Search companies..."
+                          value={companySearchQuery}
+                          onChange={(e) => setCompanySearchQuery(e.target.value)}
+                          onFocus={() => setIsCompanyDropdownOpen(true)}
+                          onBlur={() => setTimeout(() => setIsCompanyDropdownOpen(false), 200)}
+                          className="h-9 text-sm pl-8 pr-3"
+                        />
+                      </div>
+                      {isCompanyDropdownOpen && (
+                        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg z-10">
+                          {companyProfiles
+                            .filter(company => 
+                              company.display_name.toLowerCase().includes(companySearchQuery.toLowerCase()) ||
+                              company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
+                            )
+                            .map(company => (
+                              <div
+                                key={company.id}
+                                className="p-3 hover:bg-indigo-50 cursor-pointer text-sm"
+                                onClick={() => {
+                                  setCustomCompanyId(company.id);
+                                  setCompanySearchQuery(company.display_name);
+                                  setIsCompanyDropdownOpen(false);
+                                }}
+                              >
+                                {company.display_name}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-48 overflow-y-auto">
+                    {companyProfiles.slice(0, 12).map(company => {
+                      // Get description from database or fallback to default descriptions
+                      const getCompanyDescription = (companyName: string) => {
+                        const descriptions: Record<string, string> = {
+                          'google': "Technical excellence, scalability, innovation",
+                          'amazon': "Customer obsession, leadership principles", 
+                          'microsoft': "Collaboration, growth mindset, inclusive",
+                          'apple': "Attention to detail, user experience",
+                          'meta': "Moving fast, being bold, social impact",
+                          'startup': "Versatility, ownership, problem-solving",
+                          'netflix': "Culture of freedom and responsibility",
+                          'spotify': "Music-first, data-driven innovation",
+                          'uber': "Move fast, scale globally, solve problems",
+                          'airbnb': "Belong anywhere, create experiences",
+                          'tesla': "Accelerate sustainable transport",
+                          'linkedin': "Connect professionals, create opportunity",
+                          'twitter': "Real-time information, global conversation",
+                          'adobe': "Creativity, digital experiences",
+                          'salesforce': "Customer success, equality, innovation"
+                        };
+                        return descriptions[companyName.toLowerCase()] || company.description || "Innovation and excellence";
+                      };
+
+                      return (
+                        <div
+                          key={company.id}
+                          className={cn(
+                            "p-4 border-2 rounded-lg cursor-pointer transition-all duration-200",
+                            customCompanyId === company.id 
+                              ? "border-indigo-500 bg-indigo-50" 
+                              : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25"
+                          )}
+                          onClick={() => {
+                            setCustomCompanyId(company.id);
+                            setCompanySearchQuery(company.display_name);
+                          }}
+                        >
+                          <div className="font-semibold text-gray-900 text-sm mb-2">{company.display_name}</div>
+                          <div className="text-sm text-gray-600 leading-relaxed">
+                            {getCompanyDescription(company.name)}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Show "More companies available" hint if there are more than 12 */}
+                  {companyProfiles.length > 12 && (
+                    <div className="mt-3 text-center">
+                      <div className="text-xs text-gray-500 bg-gray-50 rounded-lg py-2 px-3 inline-flex items-center gap-2">
+                        <Search className="w-3 h-3" />
+                        {companyProfiles.length - 12} more companies available in search
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Seniority & Difficulty Levels */}
+                <div className="space-y-4">
+                  
+                  {/* Seniority Level */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Users className="w-4 h-4 text-indigo-600" />
+                      <h2 className="text-sm font-semibold text-gray-700">Seniority Level</h2>
+                    </div>
+                    <div className="grid grid-cols-5 gap-3">
+                      {seniorityProfiles.map((seniority, index) => (
+                        <div
+                          key={seniority.id}
+                          className={cn(
+                            "p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 text-center",
+                            customSeniorityId === seniority.id 
+                              ? "border-indigo-500 bg-indigo-50" 
+                              : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25"
+                          )}
+                          onClick={() => setCustomSeniorityId(seniority.id)}
+                        >
+                          <div className="text-sm text-gray-700 mb-2">{seniority.display_name}</div>
+                          <div className="flex gap-1 justify-center">
+                            {[...Array(5)].map((_, dotIndex) => (
+                              <div
+                                key={dotIndex}
+                                className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  dotIndex <= index ? "bg-indigo-600" : "bg-gray-300"
+                                )}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Difficulty Level */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Target className="w-4 h-4 text-indigo-600" />
+                      <h2 className="text-sm font-semibold text-gray-700">Difficulty Level</h2>
+                    </div>
+                    <div className="grid grid-cols-5 gap-3">
+                      {difficultyProfiles.map((difficulty, index) => {
+                        const colors = [
+                          "bg-green-500", // Easy
+                          "bg-yellow-500", // Medium  
+                          "bg-red-500", // Hard
+                          "bg-red-600", // Expert
+                          "bg-red-800" // Extreme
+                        ];
+                        return (
+                          <div
+                            key={difficulty.id}
+                            className={cn(
+                              "p-3 border-2 rounded-lg cursor-pointer transition-all duration-200 text-center",
+                              customDifficultyId === difficulty.id 
+                                ? "border-indigo-500 bg-indigo-50" 
+                                : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25"
+                            )}
+                            onClick={() => setCustomDifficultyId(difficulty.id)}
+                          >
+                            <div className="text-sm text-gray-700 mb-2">{difficulty.display_name}</div>
+                            <div className="flex gap-1 justify-center">
+                              {[...Array(5)].map((_, dotIndex) => (
+                                <div
+                                  key={dotIndex}
+                                  className={cn(
+                                    "w-1.5 h-1.5 rounded-full",
+                                    dotIndex <= index ? colors[index] : "bg-gray-300"
+                                  )}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Panel - Available Profiles */}
+              <div className="w-96 bg-gray-50 border-l border-gray-200 flex flex-col">
+                <div className="p-5 border-b border-gray-200 bg-white">
+                  <div className="text-base font-semibold text-gray-700 mb-1">Available Profiles</div>
+                  <div className="text-sm text-gray-600">
+                    {selectedProfile ? "Profile selected - click Continue to use it" : "Or choose from existing profiles"}
+                  </div>
+                </div>
+
+                {/* Exact Match Suggestion Banner */}
+                {suggestedProfile && !selectedProfile && (
+                  <div className="mx-5 mt-5 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                        {(suggestedProfile.name || suggestedProfile.alias).split(' ').map(n => n[0]).join('').toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold text-blue-900 mb-1">Exact Match Found!</div>
+                        <div className="text-xs text-blue-700 mb-2">
+                          "{suggestedProfile.name || suggestedProfile.alias}" has the same settings
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedProfile(suggestedProfile.id);
+                              setSuggestedProfile(null);
+                            }}
+                            className="text-xs bg-blue-600 text-white px-3 py-1 rounded-md hover:bg-blue-700"
+                          >
+                            Use Existing
+                          </button>
+                          <button
+                            onClick={() => setSuggestedProfile(null)}
+                            className="text-xs bg-white text-blue-600 border border-blue-300 px-3 py-1 rounded-md hover:bg-blue-50"
+                          >
+                            Create New
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="p-5 border-b border-gray-200 bg-white">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Search: easy amazon, hard google..."
+                      value={availableProfilesFilter}
+                      onChange={(e) => setAvailableProfilesFilter(e.target.value)}
+                      className="pl-10 bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                  {getFilteredAvailableProfiles().slice(0, 8).map((profile) => {
+                    const avatarColors = [
+                      "from-purple-500 to-purple-600",
+                      "from-blue-500 to-blue-600", 
+                      "from-green-500 to-green-600",
+                      "from-pink-500 to-pink-600",
+                      "from-yellow-500 to-yellow-600",
+                      "from-red-500 to-red-600",
+                      "from-indigo-500 to-indigo-600"
+                    ];
+                    const colorIndex = parseInt(profile.id) % avatarColors.length;
+                    
+                    return (
+                      <div
+                        key={profile.id}
+                        className={cn(
+                          "p-3 border rounded-lg cursor-pointer transition-all duration-200 hover:translate-x-1",
+                          selectedProfile === profile.id
+                            ? "border-blue-500 bg-blue-50 shadow-md"
+                            : "border-gray-200 bg-white hover:border-indigo-500 hover:bg-indigo-25"
+                        )}
+                        onClick={() => {
+                          if (selectedProfile === profile.id) {
+                            // If already selected, deselect it
+                            setSelectedProfile("");
+                          } else {
+                            // If not selected, populate form fields from this profile
+                            populateFormFromProfile(profile);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-3 mb-2">
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-semibold bg-gradient-to-br flex-shrink-0",
+                            avatarColors[colorIndex]
+                          )}>
+                            {(profile.name || profile.alias).split(' ').map(n => n[0]).join('').toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-semibold text-gray-900 text-sm truncate">{profile.name || profile.alias}</div>
+                            <div className="text-xs text-gray-600 truncate">{profile.alias}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {profile.user_id && (
+                              <div className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                Custom
+                              </div>
+                            )}
+                            {selectedProfile === profile.id && (
+                              <CheckCircle className="w-4 h-4 text-blue-600" />
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Building className="w-3 h-3 text-blue-600" />
+                            <span className="text-xs text-blue-700 font-medium">{profile.company_profiles.display_name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Users className="w-3 h-3 text-green-600" />
+                            <span className="text-xs text-green-700 font-medium">{profile.seniority_profiles.display_name}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Target className="w-3 h-3 text-orange-600" />
+                            <span className="text-xs text-orange-700 font-medium">{profile.difficulty_profiles.display_name}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-5 border-t border-gray-200 text-center bg-white">
+                  <button 
+                    className="text-indigo-600 text-sm font-medium hover:text-indigo-700 flex items-center gap-1 mx-auto"
+                    onClick={() => setCurrentPage(2)}
+                  >
+                    View all profiles
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Fixed Footer */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-8 py-5 flex items-center justify-between z-50 shadow-lg">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Case Selected</span>
+                </div>
+                {selectedProfile && (
+                  <div className="flex items-center gap-2 text-blue-600 text-sm">
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Profile Selected</span>
+                  </div>
+                )}
+                {!selectedProfile && customCompanyId && customSeniorityId && customDifficultyId && (
+                  <div className="flex items-center gap-2 text-purple-600 text-sm">
+                    <Settings className="w-4 h-4" />
+                    <span>Creating New Profile</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setCurrentPage(2);
+                    setSelectedProfile(""); // Clear selection when going back
+                  }}
+                >
+                  Back
+                </Button>
+                {selectedProfile ? (
+                  <Button
+                    onClick={() => {
+                      if (requiresDocuments) {
+                        setCurrentPage(4);
+                        const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                        setDocumentSessionId(sessionId);
+                        setShowDocumentUpload(true);
+                      } else {
+                        proceedToInterview();
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Continue with Selected
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={createCustomProfile}
+                    disabled={!customProfileName || !customProfileAlias || !customCompanyId || !customSeniorityId || !customDifficultyId}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    Create & Continue
+                  </Button>
+                )}
+              </div>
+            </div>
+            
+            {/* Spacer for fixed footer */}
+            <div className="h-20"></div>
           </motion.div>
         )}
       </AnimatePresence>

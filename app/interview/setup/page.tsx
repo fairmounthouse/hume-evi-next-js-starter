@@ -9,8 +9,7 @@ export default function InterviewSetupPage() {
 
   const handleStartInterview = (selections: {
     caseId: string;
-    interviewerId: string;
-    difficultyId: string;
+    interviewerProfileId: string; // Updated to use combined profile ID
     sessionId?: string; // NEW: Accept session ID from document upload
   }) => {
     // Use provided session ID or generate a new one
@@ -26,8 +25,7 @@ export default function InterviewSetupPage() {
     const params = new URLSearchParams({
       sessionId: finalSessionId,
       caseId: selections.caseId,
-      interviewerId: selections.interviewerId,
-      difficultyId: selections.difficultyId,
+      interviewerProfileId: selections.interviewerProfileId, // Updated parameter name
     });
     
     router.push(`/interview/device-setup?${params.toString()}`);

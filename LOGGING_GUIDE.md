@@ -43,8 +43,7 @@ The timer only determines **WHEN** to send to Hume, but **ALL** time-sensitive v
 📝 Session data to be created: {
   session_id: "1737019234567",
   case_id: "uuid-case-123",
-  interviewer_profile_id: "uuid-interviewer-456", 
-  difficulty_profile_id: "uuid-difficulty-789",
+  new_interviewer_profile_id: "uuid-interviewer-456", // Combined profile includes difficulty, seniority, company
   coach_mode_enabled: false,
   status: "in_progress"
 }
@@ -156,7 +155,7 @@ The timer only determines **WHEN** to send to Hume, but **ALL** time-sensitive v
   INTERVIEWER_IDENTITY_length: 2847,
   INTERVIEW_CASE_length: 4521,
   COACHING_PROMPT_length: 1234,
-  DIFFICULTY_PROMPT_length: 987,
+
   TOTAL_ELAPSED_TIME: "0 seconds",
   now: "Tuesday, January 14, 2025 at 3:45 PM"
 }
@@ -191,7 +190,7 @@ The timer only determines **WHEN** to send to Hume, but **ALL** time-sensitive v
     "INTERVIEWER_IDENTITY": "...",
     "INTERVIEW_CASE": "...",
     "COACHING_PROMPT": "...",
-    "DIFFICULTY_PROMPT": "...",
+
     "TOTAL_ELAPSED_TIME": "0 seconds",
     "now": "Tuesday, January 14, 2025 at 3:45 PM"
   },

@@ -58,16 +58,14 @@ export async function getCachedDefaultProfiles() {
   if (!profiles) {
     const { supabase } = await import("./supabase-client");
     
-    const [interviewerRes, caseRes, difficultyRes] = await Promise.all([
-      supabase.from("interviewer_profiles").select("id").eq("active", true).limit(1).single(),
+    const [interviewerRes, caseRes] = await Promise.all([
+      supabase.from("interviewer_profiles_new").select("id").eq("active", true).is("user_id", null).limit(1).single(),
       supabase.from("interview_cases").select("id").eq("active", true).limit(1).single(),
-      supabase.from("difficulty_profiles").select("id").eq("level", "mid").limit(1).single(),
     ]);
 
     profiles = {
-      interviewer_profile_id: interviewerRes.data?.id || null,
+      new_interviewer_profile_id: interviewerRes.data?.id || null,
       case_id: caseRes.data?.id || null,
-      difficulty_profile_id: difficultyRes.data?.id || null,
     };
 
     // Cache for 30 minutes since profiles rarely change

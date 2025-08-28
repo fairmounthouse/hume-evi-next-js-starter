@@ -13,17 +13,16 @@ function DeviceSetupContent() {
   // Get interview configuration from URL params
   const sessionId = searchParams.get('sessionId');
   const caseId = searchParams.get('caseId');
-  const interviewerId = searchParams.get('interviewerId');
-  const difficultyId = searchParams.get('difficultyId');
+  const interviewerProfileId = searchParams.get('interviewerProfileId'); // Updated to match setup page
 
   useEffect(() => {
     // Redirect to setup if required parameters are missing
-    if (!sessionId || !caseId || !interviewerId || !difficultyId) {
+    if (!sessionId || !caseId || !interviewerProfileId) {
       router.replace('/interview/setup');
       return;
     }
     setIsReady(true);
-  }, [sessionId, caseId, interviewerId, difficultyId, router]);
+  }, [sessionId, caseId, interviewerProfileId, router]);
 
   const handleContinue = (devices: {
     cameraId: string;
@@ -39,8 +38,7 @@ function DeviceSetupContent() {
     const params = new URLSearchParams({
       sessionId: sessionId!,
       caseId: caseId!,
-      interviewerId: interviewerId!,
-      difficultyId: difficultyId!,
+      interviewerProfileId: interviewerProfileId!,
     });
     
     router.push(`/interview/session?${params.toString()}`);

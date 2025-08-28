@@ -1659,12 +1659,11 @@ export default function ClientComponent({
   
   // Get interview configuration from URL params
   const selectedCaseId = searchParams.get('caseId');
-  const selectedInterviewerId = searchParams.get('interviewerId');
-  const selectedDifficultyId = searchParams.get('difficultyId');
+  const selectedInterviewerId = searchParams.get('interviewerProfileId'); // Updated to match new system
   const urlSessionId = searchParams.get('sessionId');
   
   // Check if we have the required parameters for an interview session
-  const hasRequiredParams = selectedCaseId && selectedInterviewerId && selectedDifficultyId && urlSessionId;
+  const hasRequiredParams = selectedCaseId && selectedInterviewerId && urlSessionId;
   
   // Create ONE AudioContext for the entire chat session
   const audioCtx = useMemo(() => new (window.AudioContext || (window as any).webkitAudioContext)(), []);
@@ -1680,13 +1679,12 @@ export default function ClientComponent({
       console.log("❌ Missing required parameters, redirecting to setup:", {
         selectedCaseId,
         selectedInterviewerId,
-        selectedDifficultyId,
         urlSessionId
       });
       window.location.href = '/interview/setup';
       return;
     }
-  }, [hasRequiredParams, showEndScreen, selectedCaseId, selectedInterviewerId, selectedDifficultyId, urlSessionId]);
+  }, [hasRequiredParams, showEndScreen, selectedCaseId, selectedInterviewerId, urlSessionId]);
 
   // Check if session is already completed and should show end screen
   useEffect(() => {
@@ -2103,7 +2101,6 @@ export default function ClientComponent({
             sessionId={sessionId}
             selectedCaseId={selectedCaseId}
             selectedInterviewerId={selectedInterviewerId}
-            selectedDifficultyId={selectedDifficultyId}
             onCallStart={() => {
               console.log("📱 onCallStart callback - starting camera AND recording panel");
               // Start camera immediately

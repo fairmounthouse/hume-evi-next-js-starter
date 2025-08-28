@@ -37,17 +37,27 @@ export interface CurrentPhase {
 // NO coach_mode_enabled - coaching is local toggle only, database is for prompt lookup
 interface RawSessionRow {
   case_id: string | null;
-  interviewer_profiles: {
-    prompt_id: { prompt_content: string } | null;
+  new_interviewer_profile_id: string | null;
+  interviewer_profiles_new: {
+    alias: string;
+    name: string;
+    difficulty_profiles: {
+      display_name: string;
+      prompt_id: { prompt_content: string } | null;
+    } | null;
+    seniority_profiles: {
+      display_name: string;
+      prompt_id: { prompt_content: string } | null;
+    } | null;
+    company_profiles: {
+      display_name: string;
+      prompt_id: { prompt_content: string } | null;
+    } | null;
   } | null;
   interview_cases: {
     phases: PhaseInfo[] | null;
     additional_metadata: any | null;
     exhibits: Record<string, string> | null;
-    prompt_id: { prompt_content: string } | null;
-  } | null;
-  difficulty_profiles: {
-    display_name: string | null;
     prompt_id: { prompt_content: string } | null;
   } | null;
 }
@@ -61,7 +71,7 @@ interface CoachingConfig {
  * Build SessionSettings payload for Hume EVI based on stored data.
  */
 // OLD SYSTEM APPROACH: Cache STATIC data once, compute DYNAMIC data fresh every time
-// CACHED (from database): interviewer identity, case content, difficulty prompts, case phases/metadata
+// CACHED (from database): interviewer identity (with embedded difficulty), case content, case phases/metadata
 // FRESH (computed): elapsed time, current time, current phase, phase status, nudges
 export async function initializeSessionSettings(sessionId: string): Promise<void> {
   const cacheKey = `session_settings_${sessionId}`;
@@ -76,28 +86,34 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
   console.log("🔍 Fetching session data from Supabase (one-time)");
   console.log("📋 Session ID:", sessionId);
   
-  // Fetch session data with enhanced case metadata (NO coach_mode_enabled - local only)
+  // Fetch session data with new combined interviewer profile system
   const { data, error } = await supabase
     .from("interview_sessions")
     .select(
       `case_id,
-       interviewer_profiles(prompt_id(prompt_content)),
-       interview_cases(phases, additional_metadata, exhibits, prompt_id(prompt_content)),
-       difficulty_profiles(display_name, prompt_id(prompt_content))`
+       new_interviewer_profile_id,
+       interviewer_profiles_new!new_interviewer_profile_id(
+         alias,
+         name,
+         difficulty_profiles!difficulty_profile_id(display_name, prompt_id(prompt_content)),
+         seniority_profiles!seniority_profile_id(display_name, prompt_id(prompt_content)),
+         company_profiles!company_profile_id(display_name, prompt_id(prompt_content))
+       ),
+       interview_cases(phases, additional_metadata, exhibits, prompt_id(prompt_content))`
     )
     .eq("session_id", sessionId)
     .single<RawSessionRow>();
 
-  console.log("📊 Raw session data fetched (prompts for lookup only):", {
+  console.log("📊 Raw session data fetched (new combined profile system):", {
     hasData: !!data,
     error: error?.message,
-    hasInterviewerProfile: !!data?.interviewer_profiles,
+    hasNewInterviewerProfile: !!data?.interviewer_profiles_new,
+    interviewerProfileAlias: data?.interviewer_profiles_new?.alias,
     hasInterviewCase: !!data?.interview_cases,
-    hasDifficultyProfile: !!data?.difficulty_profiles,
     caseHasPhases: !!data?.interview_cases?.phases,
     phasesCount: data?.interview_cases?.phases?.length || 0,
     hasAdditionalMetadata: !!data?.interview_cases?.additional_metadata,
-    note: "NO coach_mode_enabled - coaching is local toggle only"
+    note: "Using new combined interviewer profile system"
   });
 
   if (error || !data) {
@@ -156,20 +172,91 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
     phaseDurations: caseMetadata?.phases?.map(p => p.duration) || []
   });
 
-  // Extract data with clear logging of what's missing
-  const interviewerIdentity = data.interviewer_profiles?.prompt_id?.prompt_content;
+  // Build comprehensive interviewer identity from combined profile system
+  let interviewerIdentity: string | null = null;
+  
+  if (data.interviewer_profiles_new) {
+    const profile = data.interviewer_profiles_new;
+    const companyPrompt = profile.company_profiles?.prompt_id?.prompt_content;
+    const companyDisplayName = profile.company_profiles?.display_name;
+    const seniorityPrompt = profile.seniority_profiles?.prompt_id?.prompt_content;
+    const difficultyPrompt = profile.difficulty_profiles?.prompt_id?.prompt_content;
+    
+    console.log("🔍 Debug: Extracted prompt content:", {
+      companyPrompt: companyPrompt ? `${companyPrompt.substring(0, 50)}...` : 'NULL',
+      seniorityPrompt: seniorityPrompt ? `${seniorityPrompt.substring(0, 50)}...` : 'NULL',
+      difficultyPrompt: difficultyPrompt ? `${difficultyPrompt.substring(0, 50)}...` : 'NULL',
+      profileStructure: {
+        hasCompanyProfiles: !!profile.company_profiles,
+        hasCompanyPromptId: !!profile.company_profiles?.prompt_id,
+        hasSeniorityProfiles: !!profile.seniority_profiles,
+        hasSeniorityPromptId: !!profile.seniority_profiles?.prompt_id,
+        hasDifficultyProfiles: !!profile.difficulty_profiles,
+        hasDifficultyPromptId: !!profile.difficulty_profiles?.prompt_id
+      }
+    });
+    
+    // Combine all three prompts into a comprehensive interviewer identity
+    const identityParts = [];
+    
+    if (companyPrompt) {
+      identityParts.push(companyPrompt);
+    }
+    
+    if (seniorityPrompt) {
+      identityParts.push(seniorityPrompt);
+    }
+    
+    if (difficultyPrompt) {
+      identityParts.push(difficultyPrompt);
+    }
+    
+    if (identityParts.length > 0) {
+      // Prepend the interviewer's name to personalize the identity
+      // Use name if available, otherwise fallback to alias
+      const displayName = profile.name || profile.alias;
+      const nameIntro = displayName ? `<name>You are ${displayName}.</name>` : '';
+      
+      // Build XML-structured interviewer identity
+      const xmlParts = [];
+      
+      if (nameIntro) {
+        xmlParts.push(nameIntro);
+      }
+      
+      if (companyPrompt && companyDisplayName) {
+        xmlParts.push(`You are conducting an interview for ${companyDisplayName}. <company>${companyPrompt}</company>`);
+      }
+      
+      if (seniorityPrompt) {
+        xmlParts.push(`<seniority>${seniorityPrompt}</seniority>`);
+      }
+      
+      if (difficultyPrompt) {
+        xmlParts.push(`<difficulty>${difficultyPrompt}</difficulty>`);
+      }
+      
+      interviewerIdentity = `<interviewer_identity>\n${xmlParts.join('\n\n')}\n</interviewer_identity>`;
+      
+      console.log("✅ Built comprehensive interviewer identity from combined profiles:", {
+        name: profile.name,
+        alias: profile.alias,
+        hasCompanyPrompt: !!companyPrompt,
+        hasSeniorityPrompt: !!seniorityPrompt,
+        hasDifficultyPrompt: !!difficultyPrompt,
+        totalLength: interviewerIdentity.length
+      });
+    }
+  }
+  
   const caseTemplate = data.interview_cases?.prompt_id?.prompt_content;
-  const difficultyPrompt = data.difficulty_profiles?.prompt_id?.prompt_content || data.difficulty_profiles?.display_name;
   
   // Log missing data clearly
   if (!interviewerIdentity) {
-    console.log("⚠️ No interviewer identity found in database - will use professional fallback");
+    console.log("⚠️ No combined interviewer identity found in database - will use professional fallback");
   }
   if (!caseTemplate) {
     console.log("⚠️ No case template found in database - will use general interview fallback");
-  }
-  if (!difficultyPrompt) {
-    console.log("⚠️ No difficulty prompt found in database - will use professional level fallback");
   }
   if (!caseMetadata) {
     console.log("⚠️ No phase metadata found in database - will run as free-form interview");
@@ -182,7 +269,6 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
   const staticData = {
     INTERVIEWER_IDENTITY: interviewerIdentity,
     INTERVIEW_CASE_TEMPLATE: caseTemplate,
-    DIFFICULTY_PROMPT: difficultyPrompt,
     caseMetadata,
     coachingConfig,
     caseId: data.case_id,
@@ -194,9 +280,8 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
   
   console.log("✅ Session settings cached with graceful fallback handling");
   console.log("💾 Data source summary:", {
-    interviewer: interviewerIdentity ? "database" : "will_use_fallback",
+    interviewer: interviewerIdentity ? "combined_profiles_database" : "will_use_fallback",
     case: caseTemplate ? "database" : "will_use_fallback", 
-    difficulty: difficultyPrompt ? "database" : "will_use_fallback",
     phases: caseMetadata ? "database" : "will_use_fallback",
     coaching: coachingConfig ? "database" : "will_use_fallback",
     cacheKey
@@ -233,10 +318,10 @@ export async function buildSessionSettings(
   console.log("📦 Using cached static data:", {
     hasInterviewerIdentity: !!staticData.INTERVIEWER_IDENTITY,
     hasCaseTemplate: !!staticData.INTERVIEW_CASE_TEMPLATE,
-    hasDifficultyPrompt: !!staticData.DIFFICULTY_PROMPT,
     hasCaseMetadata: !!staticData.caseMetadata,
     hasCoachingConfig: !!staticData.coachingConfig,
-    cacheKey
+    cacheKey,
+    note: "Difficulty now included in INTERVIEWER_IDENTITY"
   });
 
   // OLD SYSTEM APPROACH: Always compute fresh values (no caching for time-sensitive data)
@@ -291,7 +376,7 @@ export async function buildSessionSettings(
   const allWarnings: any[] = [];
   
   // Process interviewer identity with elegant fallback
-  const interviewerContent = staticData.INTERVIEWER_IDENTITY || "You are a professional AI interviewer conducting this interview.";
+  const interviewerContent = staticData.INTERVIEWER_IDENTITY || "<interviewer_identity>\n<name>You are a professional AI interviewer conducting this interview.</name>\n</interviewer_identity>";
   const hasInterviewerData = !!staticData.INTERVIEWER_IDENTITY;
   console.log("👤 Interviewer identity:", {
     hasCustomIdentity: hasInterviewerData,
@@ -424,18 +509,11 @@ export async function buildSessionSettings(
   allSubstitutions.push(...coachingResult.substitutions);
   allWarnings.push(...coachingResult.warnings);
   
-  // Process difficulty prompt with elegant fallback
-  const difficultyContent = staticData.DIFFICULTY_PROMPT || "Conduct an interview at an appropriate professional level.";
-  const hasDifficultyData = !!staticData.DIFFICULTY_PROMPT;
-  console.log("⚡ Difficulty prompt:", {
-    hasCustomDifficulty: hasDifficultyData,
-    contentLength: difficultyContent.length,
-    usingFallback: !hasDifficultyData
+  // Note: Difficulty prompt is now included in INTERVIEWER_IDENTITY
+  console.log("⚡ Difficulty handling:", {
+    note: "Difficulty prompt now integrated into INTERVIEWER_IDENTITY",
+    source: "combined_profile_system"
   });
-  
-  const difficultyResult = await globalSubstituteVariables(difficultyContent, substitutionContext);
-  allSubstitutions.push(...difficultyResult.substitutions);
-  allWarnings.push(...difficultyResult.warnings);
 
   // Log all substitution results
   if (allWarnings.length > 0) {
@@ -454,7 +532,6 @@ export async function buildSessionSettings(
     INTERVIEWER_IDENTITY: interviewerResult.processedText,
     INTERVIEW_CASE: caseResult.processedText,
     COACHING_PROMPT: coachingResult.processedText,
-    DIFFICULTY_PROMPT: difficultyResult.processedText,
     TOTAL_ELAPSED_TIME: elapsedTime,
     now: currentTime, // We can override Hume's built-in 'now' with our format
     AVAILABLE_EXHIBITS: staticData.caseExhibits && Object.keys(staticData.caseExhibits).length > 0 
@@ -476,17 +553,14 @@ export async function buildSessionSettings(
       length: variables.COACHING_PROMPT?.toString().length || 0,
       source: hasCoachingConfig ? "database" : "fallback"
     },
-    DIFFICULTY_PROMPT: {
-      length: variables.DIFFICULTY_PROMPT?.toString().length || 0,
-      source: hasDifficultyData ? "database" : "fallback"
-    },
+
     TOTAL_ELAPSED_TIME: variables.TOTAL_ELAPSED_TIME,
     now: variables.now
   });
 
   // Check for undefined variables across ALL content and generate W0106 warnings
   const allProcessedContent = [
-    interviewerResult, caseResult, coachingResult, difficultyResult
+    interviewerResult, caseResult, coachingResult
   ];
   
   const allUndefinedVars = new Set<string>();
@@ -566,16 +640,15 @@ export async function buildSessionSettings(
       interviewer: hasInterviewerData,
       case: hasCaseData, 
       coaching: hasCoachingConfig,
-      difficulty: hasDifficultyData,
       phases: !!(currentPhase && staticData.caseMetadata)
     },
     fallbacksUsed: {
       interviewer: !hasInterviewerData,
       case: !hasCaseData,
       coaching: !hasCoachingConfig, 
-      difficulty: !hasDifficultyData,
       phases: !(currentPhase && staticData.caseMetadata)
-    }
+    },
+    note: "Difficulty is now integrated into interviewer profile"
   };
   
   console.log("🎯 Session data quality summary:", dataQualitySummary);
