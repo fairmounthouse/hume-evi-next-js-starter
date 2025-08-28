@@ -42,6 +42,7 @@ interface DifficultyProfile {
   id: string;
   level: string;
   display_name: string;
+  description?: string;
 }
 
 interface InterviewSetupProps {
@@ -379,6 +380,17 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
     ];
     return colors[Math.abs(type.charCodeAt(0)) % colors.length];
+  };
+
+  // Create a short, readable summary from the difficulty description bullets
+  const summarizeDescription = (text?: string, maxItems: number = 2): string => {
+    if (!text) return "";
+    return text
+      .split("\n")
+      .map(line => line.replace(/^\-\s*/, "").trim())
+      .filter(Boolean)
+      .slice(0, maxItems)
+      .join(" • ");
   };
 
   if (loading) {
@@ -857,6 +869,18 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                               difficulties.length <= 2 ? "text-base" :
                               difficulties.length <= 4 ? "text-sm" : "text-xs"
                             )}>{difficulty.level} Level</p>
+                            {difficulty.description && (
+                              <p className={cn(
+                                "text-gray-500 line-clamp-2",
+                                difficulties.length <= 2 ? "text-sm" :
+                                difficulties.length <= 4 ? "text-xs" : "text-[11px]"
+                              )}>
+                                {summarizeDescription(
+                                  difficulty.description,
+                                  difficulties.length <= 2 ? 3 : 2
+                                )}
+                              </p>
+                            )}
                           </div>
                           {selectedDifficulty === difficulty.id && (
                             <CheckCircle className="w-5 h-5 text-green-500" />

@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import Logo from './Logo'
 
 export default function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
@@ -34,7 +35,8 @@ export default function Navigation() {
         : 'bg-transparent'
     }`}>
       <nav className="max-w-7xl mx-auto px-8 py-5 flex justify-between items-center">
-        <Link href="/" className="text-2xl font-black text-black">
+        <Link href="/" className="flex items-center gap-3 text-2xl font-black text-black">
+          <Logo width={32} height={64} />
           skillflo
         </Link>
         
