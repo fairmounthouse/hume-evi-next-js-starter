@@ -12,6 +12,7 @@ import { ComponentRef, useRef, useState, useEffect, useMemo, useCallback } from 
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
+import { useRecordingAnchor } from "@/hooks/useRecordingAnchor";
 import { Button } from "./ui/button";
 import { Toggle } from "./ui/toggle";
 import { Card } from "./ui/card";
@@ -76,6 +77,7 @@ function ChatInterface({
   onOpenDeviceSetup,
 }: any) {
   const { messages, sendSessionSettings, status, sendToolMessage } = useVoice();
+  const { getRelativeTime } = useRecordingAnchor();
   
   // Transcript scrolling refs and state
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -233,16 +235,31 @@ function ChatInterface({
     
     // Build transcript entries with enhanced metadata preservation
     const transcript = conversationMessages.map((msg, index) => {
+      const absoluteTimestamp = msg.receivedAt?.getTime() || Date.now();
+      const relativeSeconds = getRelativeTime(absoluteTimestamp);
+      
+      // Debug logging for timestamp conversion (show all messages to debug the 3000/4000 issue)
+      console.log(`🕐 [TIMESTAMP DEBUG] Message ${index}:`, {
+        humeTimestamp: msg.receivedAt?.toISOString(),
+        absoluteMs: absoluteTimestamp,
+        currentTime: new Date().toISOString(),
+        relativeSeconds,
+        relativeFormatted: `${Math.floor(relativeSeconds / 60)}:${(relativeSeconds % 60).toString().padStart(2, '0')}`,
+        messagePreview: msg.message?.content?.substring(0, 30) + "...",
+        expectedRange: "should_be_small_number_like_3_4_6_12"
+      });
+      
       const entry = {
         id: `msg-${index}`,
         speaker: msg.type === "user_message" ? "user" : "assistant",
         text: msg.message?.content || "",
-        timestamp: Math.floor((msg.receivedAt?.getTime() || Date.now()) / 1000),
+        timestamp: relativeSeconds, // Now using relative seconds from recording start
         emotions: msg.models?.prosody?.scores || undefined,
         confidence: msg.models?.language?.confidence || undefined,
         // Preserve original message metadata for debugging
         _originalType: msg.type,
         _originalTimestamp: msg.receivedAt?.toISOString(),
+        _absoluteTimestamp: Math.floor(absoluteTimestamp / 1000),
         _messageIndex: index
       };
       
@@ -261,7 +278,11 @@ function ChatInterface({
       userMessages: transcript.filter(e => e.speaker === "user").length,
       assistantMessages: transcript.filter(e => e.speaker === "assistant").length,
       firstEntry: transcript[0]?.text?.substring(0, 30) + "..." || "none",
-      lastEntry: transcript[transcript.length - 1]?.text?.substring(0, 30) + "..." || "none"
+      lastEntry: transcript[transcript.length - 1]?.text?.substring(0, 30) + "..." || "none",
+      // Timestamp debugging
+      firstTimestamp: transcript[0]?.timestamp,
+      lastTimestamp: transcript[transcript.length - 1]?.timestamp,
+      timestampFormat: "relative_seconds_from_recording_start"
     });
     
     // Additional validation - but don't alarm for normal startup messages
@@ -1096,7 +1117,10 @@ function ChatInterface({
           URL.revokeObjectURL(url);
         } else {
           const transcriptText = transcriptData.map(entry => {
-            const timeStr = new Date(entry.timestamp * 1000).toLocaleTimeString();
+            // entry.timestamp is now relative seconds from recording start
+            const mins = Math.floor(entry.timestamp / 60);
+            const secs = Math.floor(entry.timestamp % 60);
+            const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
             const speaker = entry.speaker === "user" ? "Interviewee" : "AI Interviewer";
             return `[${timeStr}] ${speaker}: ${entry.text}`;
           }).join('\n');
@@ -1322,7 +1346,15 @@ function ChatInterface({
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Duration:</span>
                               <span className="font-medium">
-                                {Math.floor((Date.now() - (storedTranscript[0]?.timestamp * 1000 || Date.now())) / 60000)} minutes
+                                {(() => {
+                                  if (storedTranscript.length === 0) return "0 seconds";
+                                  const totalSeconds = storedTranscript[storedTranscript.length - 1]?.timestamp || 0;
+                                  if (totalSeconds < 60) {
+                                    return `${Math.floor(totalSeconds)} seconds`;
+                                  } else {
+                                    return `${Math.floor(totalSeconds / 60)} minutes`;
+                                  }
+                                })()}
                               </span>
                             </div>
                             <div className="flex justify-between">
@@ -1864,6 +1896,22 @@ export default function ClientComponent({
   useEffect(() => {
     const checkSessionState = async () => {
       if (!urlSessionId) {
+        setIsCheckingSessionState(false);
+        return;
+      }
+
+      // Skip status check for brand new sessions (prevents race condition)
+      // If session ID is a timestamp and it's less than 30 seconds old, it's definitely new
+      const sessionTimestamp = parseInt(urlSessionId.split('-')[0]); // Handle both "123456789" and "123456789-abc123" formats
+      const now = Date.now();
+      const sessionAge = now - sessionTimestamp;
+      
+      if (!isNaN(sessionTimestamp) && sessionAge < 30000) { // Less than 30 seconds old
+        console.log("🆕 Skipping status check for brand new session:", {
+          sessionId: urlSessionId,
+          sessionAge: Math.round(sessionAge / 1000) + 's',
+          reason: 'too_recent_to_be_completed'
+        });
         setIsCheckingSessionState(false);
         return;
       }

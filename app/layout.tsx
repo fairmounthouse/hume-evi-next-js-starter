@@ -5,6 +5,7 @@ import "./globals.css";
 import { cn } from "@/utils";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { RecordingAnchorProvider } from "@/hooks/useRecordingAnchor";
 import {
   ClerkProvider,
 } from "@clerk/nextjs";
@@ -42,8 +43,10 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
-            <Toaster position="top-center" richColors={true} />
+            <RecordingAnchorProvider>
+              {children}
+              <Toaster position="top-center" richColors={true} />
+            </RecordingAnchorProvider>
           </ThemeProvider>
         </body>
       </html>

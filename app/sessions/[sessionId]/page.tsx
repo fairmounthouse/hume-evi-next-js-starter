@@ -286,7 +286,16 @@ export default function SessionViewerPage() {
                       {transcript.map((entry: any, index: number) => (
                         <div key={index} className="flex gap-3">
                           <div className="flex-shrink-0 w-16 text-xs text-gray-500">
-                            {new Date(entry.timestamp * 1000).toLocaleTimeString()}
+                            {(() => {
+                              // Handle both old absolute timestamps and new relative timestamps
+                              if (entry.timestamp > 86400) { // Likely absolute timestamp (> 1 day in seconds)
+                                return new Date(entry.timestamp * 1000).toLocaleTimeString();
+                              } else { // Relative timestamp in seconds
+                                const mins = Math.floor(entry.timestamp / 60);
+                                const secs = Math.floor(entry.timestamp % 60);
+                                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+                              }
+                            })()}
                           </div>
                           <div className="flex-grow">
                             <div className="text-xs font-medium mb-1">

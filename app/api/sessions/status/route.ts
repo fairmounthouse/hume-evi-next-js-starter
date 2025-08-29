@@ -18,8 +18,8 @@ export async function GET(request: NextRequest) {
     // Check if session exists and has been completed
     const { data: session, error } = await supabase
       .from('interview_sessions')
-      .select('id, status, transcript_data, video_url, ended_at')
-      .eq('id', sessionId)
+      .select('id, status, transcript_path, live_transcript_data, video_url, ended_at')
+      .eq('session_id', sessionId)  // Use session_id column, not id column
       .single();
 
     if (error) {
@@ -35,14 +35,15 @@ export async function GET(request: NextRequest) {
     console.log("✅ Session status checked:", {
       sessionId,
       isCompleted,
-      hasTranscript: !!session.transcript_data,
+      hasTranscript: !!(session.transcript_path || session.live_transcript_data),
       hasVideo: !!session.video_url
     });
 
     return NextResponse.json({
       isCompleted,
       exists: true,
-      transcript: session.transcript_data,
+      transcript: session.live_transcript_data || null, // Use live transcript data
+      transcriptPath: session.transcript_path || null,
       videoUrl: session.video_url,
       endedAt: session.ended_at
     });

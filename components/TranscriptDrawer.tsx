@@ -6,6 +6,7 @@ import { X, FileText, Download, User } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { cn } from "@/utils";
+import { useRecordingAnchor } from "@/hooks/useRecordingAnchor";
 
 interface TranscriptEntry {
   id: string;
@@ -29,6 +30,7 @@ export default function TranscriptDrawer({
   transcript,
   className = "" 
 }: TranscriptDrawerProps) {
+  const { formatRelativeTime } = useRecordingAnchor();
   // Close drawer when clicking backdrop
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -54,8 +56,8 @@ export default function TranscriptDrawer({
   }, [isOpen, onClose]);
 
   const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    // timestamp is now relative seconds from recording start
+    return formatRelativeTime(timestamp);
   };
 
   const downloadTranscript = () => {
@@ -89,7 +91,7 @@ Generated: ${new Date().toISOString()}
 Total Entries: ${transcript.length}
 User Messages: ${transcript.filter(e => e.speaker === 'user').length}
 Assistant Messages: ${transcript.filter(e => e.speaker === 'assistant').length}
-Duration: ${transcript.length > 0 ? Math.floor((Date.now() - (transcript[0]?.timestamp * 1000 || Date.now())) / 1000 / 60) : 0} minutes
+Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.length - 1]?.timestamp || 0) : "00:00"} (${transcript.length > 0 ? Math.floor(transcript[transcript.length - 1]?.timestamp || 0) : 0} seconds)
 
 --- TRANSCRIPT ---
 
@@ -113,21 +115,28 @@ Duration: ${transcript.length > 0 ? Math.floor((Date.now() - (transcript[0]?.tim
   const downloadJSON = () => {
     console.log("📥 [DRAWER] Downloading JSON transcript with", transcript.length, "entries");
     
-    // Enhanced JSON format with comprehensive metadata
+    // Enhanced JSON format with comprehensive metadata - aligned with TXT format
     const jsonData = {
       generated_at: new Date().toISOString(),
       session_metadata: {
         total_entries: transcript.length,
         user_messages: transcript.filter(e => e.speaker === 'user').length,
         assistant_messages: transcript.filter(e => e.speaker === 'assistant').length,
-        duration_minutes: transcript.length > 0 ? Math.floor((Date.now() - (transcript[0]?.timestamp * 1000 || Date.now())) / 1000 / 60) : 0,
+        duration_seconds: transcript.length > 0 ? Math.floor(transcript[transcript.length - 1]?.timestamp || 0) : 0,
+        duration_formatted: transcript.length > 0 ? formatRelativeTime(transcript[transcript.length - 1]?.timestamp || 0) : "00:00",
+        duration_minutes: transcript.length > 0 ? Math.floor((transcript[transcript.length - 1]?.timestamp || 0) / 60) : 0,
         has_emotions: transcript.some(e => e.emotions && Object.keys(e.emotions).length > 0),
         has_confidence: transcript.some(e => e.confidence),
         first_message_timestamp: transcript[0]?.timestamp,
         last_message_timestamp: transcript[transcript.length - 1]?.timestamp,
+        timestamp_format: "relative_seconds_from_recording_start",
         preservation_mode: "COMPLETE_TRANSCRIPT_DRAWER"
       },
-      entries: transcript
+      entries: transcript.map(entry => ({
+        ...entry,
+        timestamp_formatted: formatTimestamp(entry.timestamp), // Add MM:SS format to each entry
+        timestamp_raw: entry.timestamp // Keep raw value for reference
+      }))
     };
     
     const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });

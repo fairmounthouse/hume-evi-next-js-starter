@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { useRecordingAnchor } from "./useRecordingAnchor";
 
 export interface RecordingOptions {
   mimeType?: string;
@@ -36,6 +37,7 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
   const chunksRef = useRef<Blob[]>([]);
   const startTimeRef = useRef<number>(0);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const { setRecordingStartTime } = useRecordingAnchor();
 
   const recordingOptions = { ...DEFAULT_OPTIONS, ...options };
 
@@ -100,9 +102,16 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
 
         recorder.onstart = () => {
           console.log("✅ MediaRecorder STARTED!");
-          startTimeRef.current = Date.now();
+          const recordingStartTime = Date.now();
+          startTimeRef.current = recordingStartTime;
+          setRecordingStartTime(recordingStartTime);
           setIsRecording(true);
           setIsPaused(false);
+
+          console.log("🕐 [RECORDING] Recording anchor time set:", {
+            timestamp: recordingStartTime,
+            readable: new Date(recordingStartTime).toISOString()
+          });
 
           // Update duration every 100ms
           durationIntervalRef.current = setInterval(() => {
@@ -150,6 +159,7 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
         setIsRecording(false);
         setIsPaused(false);
         setDuration(0);
+        setRecordingStartTime(null);
         
         if (durationIntervalRef.current) {
           clearInterval(durationIntervalRef.current);

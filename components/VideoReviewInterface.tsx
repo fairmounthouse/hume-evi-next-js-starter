@@ -174,6 +174,7 @@ export default function VideoReviewInterface({
   };
 
   const formatTime = (seconds: number): string => {
+    // Handle both video time and transcript timestamps consistently  
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;

@@ -83,7 +83,10 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
     
     // Create transcript text content with enhanced formatting
     const transcriptText = transcript.map((entry, index) => {
-      const timeStr = new Date(entry.timestamp * 1000).toLocaleTimeString();
+      // Format timestamp as MM:SS (entry.timestamp is now relative seconds)
+      const mins = Math.floor(entry.timestamp / 60);
+      const secs = Math.floor(entry.timestamp % 60);
+      const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
       const speaker = entry.speaker === "user" ? "Interviewee" : "AI Interviewer";
       
       // Include emotions and confidence if available
@@ -111,15 +114,15 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
       metadata: {
         total_entries: transcript.length,
         duration_seconds: transcript.length > 0 
-          ? Math.floor((Date.now() - (transcript[0]?.timestamp * 1000 || Date.now())) / 1000)
+          ? Math.max(transcript[transcript.length - 1]?.timestamp || 0, 0)
           : 0,
         speakers: {
           user_messages: transcript.filter(e => e.speaker === "user").length,
           assistant_messages: transcript.filter(e => e.speaker === "assistant").length,
         },
-        // Enhanced metadata for debugging
-        first_message_timestamp: transcript[0]?.timestamp,
-        last_message_timestamp: transcript[transcript.length - 1]?.timestamp,
+        // Enhanced metadata for debugging (now using relative timestamps)
+        first_message_timestamp: transcript[0]?.timestamp, // Relative seconds from recording start
+        last_message_timestamp: transcript[transcript.length - 1]?.timestamp, // Relative seconds from recording start
         has_emotions: transcript.some(e => e.emotions && Object.keys(e.emotions).length > 0),
         has_confidence: transcript.some(e => e.confidence),
         upload_timestamp: Date.now(),

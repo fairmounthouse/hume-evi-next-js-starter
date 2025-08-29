@@ -203,7 +203,10 @@ export class TranscriptEvaluator {
     console.log(`📝 [EVALUATOR] NOTE: Master transcript is preserved separately and not truncated`);
 
     return entries.map(entry => {
-      const timeStr = new Date(entry.timestamp * 1000).toLocaleTimeString();
+      // entry.timestamp is now relative seconds from recording start
+      const mins = Math.floor(entry.timestamp / 60);
+      const secs = Math.floor(entry.timestamp % 60);
+      const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
       const speaker = entry.speaker === "user" ? "Candidate" : "Interviewer";
       
       // Add emotion data if available
