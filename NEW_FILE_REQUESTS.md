@@ -1,40 +1,20 @@
-# New File Request: middleware.ts
+# New File Request: LANDING_COPY.md
 
-- Purpose: Add Clerk middleware using App Router approach with `clerkMiddleware()` from `@clerk/nextjs/server`.
-- Location: Project root (`middleware.ts`).
+- Purpose: Centralize all user-facing copy from the marketing landing pages for review/editing.
+- Location: Project root (`LANDING_COPY.md`).
 
 ## Duplicate Functionality Search
 
-- Searched entire repository for existing Clerk setup: no occurrences of `clerk`, `ClerkProvider`, or existing `middleware.ts` were found.
-- Verified `app/layout.tsx` did not contain any Clerk wrappers prior to this change.
-- Confirmed there was no prior `pages/`-based auth or deprecated `authMiddleware()` usage.
+- Searched for existing copy inventories or content maps across repo: looked for files named `COPY.md`, `CONTENT.md`, `LANDING_COPY`, `copy`, and `content` in docs—none found.
+- Reviewed marketing components in both implementations:
+  - `landing-site/components/*` and `landing-site/app/layout.tsx`
+  - `components/landing/*`
+- Verified `README.md` and other docs do not already aggregate landing copy.
 
 ## Implemented File
 
-```ts
-// middleware.ts
-import { clerkMiddleware } from "@clerk/nextjs/server";
-
-export default clerkMiddleware();
-
-export const config = {
-  matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
-  ],
-};
-
-## New Files: Clerk Auth Routes
-
-- Purpose: Provide dedicated routes for user authentication using Clerk components.
-- Locations:
-  - `app/sign-in/[[...sign-in]]/page.tsx`
-  - `app/sign-up/[[...sign-up]]/page.tsx`
-
-### Duplicate Functionality Search
-- Searched for existing auth pages/components: looked for `SignIn`, `SignUp`, `sign-in`, `sign-up`, and Clerk components across the repo. None found.
-- Verified there are no `pages/`-based auth routes or legacy Clerk usage.
-
-### Implemented Files
-- `app/sign-in/[[...sign-in]]/page.tsx`: renders `<SignIn />` centered.
-- `app/sign-up/[[...sign-up]]/page.tsx`: renders `<SignUp />` centered.
+- `LANDING_COPY.md` contains a structured inventory of all visible text from:
+  - `landing-site/app/layout.tsx`
+  - `landing-site/components/{Navigation,Hero,Stats,WhatWeOffer,WhoWeBuiltFor,Testimonials,Pricing,Team,Footer}.tsx`
+  - `components/landing/{Hero,Problem,Solution,Results,Transformation,Footer,FooterNewsletter}.tsx`
+- For each, it lists section titles, taglines, bullets, quotes, plan names/prices, CTAs, and notable UI labels.
