@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User } from "lucide-react";
+import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
@@ -122,16 +122,16 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     });
   };
 
-  // Filter available profiles based on current form selections AND search query
+  // Filter available profiles. When typing, rely ONLY on the search text.
+  // When the search is empty, rely on the left-side selections.
   const getFilteredAvailableProfiles = () => {
-    let filtered = combinedProfiles;
+    const hasSearch = availableProfilesFilter.trim().length > 0;
     
-    // Apply search filter first
-    if (availableProfilesFilter.trim()) {
-      filtered = fuzzySearchProfiles(filtered, availableProfilesFilter);
+    if (hasSearch) {
+      return fuzzySearchProfiles(combinedProfiles, availableProfilesFilter);
     }
     
-    // Apply form-based filtering (show profiles matching current selections)
+    let filtered = combinedProfiles;
     if (customCompanyId || customSeniorityId || customDifficultyId) {
       filtered = filtered.filter(profile => {
         const companyMatch = !customCompanyId || profile.company_profiles.id === customCompanyId;
@@ -168,9 +168,13 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     setCustomSeniorityId(profile.seniority_profiles.id);
     setCustomDifficultyId(profile.difficulty_profiles.id);
     
-    // Clear any existing selection since we're populating form
-    setSelectedProfile("");
+    // Clear search bar when populating from profile (search takes priority over selection)
+    setAvailableProfilesFilter("");
+    
+    // Clear suggested profile since we're using an existing one
     setSuggestedProfile(null);
+    
+    // NOTE: Don't clear selectedProfile here - it's set in the click handler
   };
 
   // Run exact match check whenever custom selections change
@@ -543,7 +547,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-hidden flex flex-col">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-16">
         <div className="container mx-auto px-6 h-full flex items-center justify-between">
@@ -603,8 +607,9 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
         </div>
       </header>
 
-      {/* Page 1: Case Selection */}
-      <AnimatePresence mode="wait">
+      {/* Page Content Area - Takes remaining space */}
+      <div className="flex-1 overflow-hidden">
+        <AnimatePresence mode="wait">
         {currentPage === 1 && (
           <motion.div
             key="page1"
@@ -844,6 +849,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             {/* Fixed Header + Filters */}
             <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
               <div className="container mx-auto px-6 py-6">
+                {/* Header - No duplicate Dashboard button (already in main header) */}
                 <div className="text-center space-y-2 mb-4">
                   <h2 className="text-3xl font-bold text-gray-900">Choose Interview Style</h2>
                   <p className="text-gray-600 text-lg">Select an AI interviewer personality that matches your preparation goals</p>
@@ -951,7 +957,9 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                         ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
                         : "hover:border-blue-200"
                     )}
-                    onClick={() => setSelectedProfile(profile.id)}
+                    onClick={() => {
+                      setSelectedProfile(prev => (prev === profile.id ? "" : profile.id));
+                    }}
                   >
                     <CardContent className="p-6 text-center">
                       {selectedProfile === profile.id && (
@@ -1042,19 +1050,22 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
             transition={{ duration: 0.3 }}
-            className="bg-gray-50 min-h-screen"
+            className="h-full flex flex-col overflow-hidden"
           >
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200 px-8 py-8 text-center">
-              <h1 className="text-2xl font-semibold text-gray-900 mb-2">Create Custom Interviewer Profile</h1>
-              <p className="text-gray-600 text-sm">Design your perfect interviewer by combining company culture, seniority level, and difficulty</p>
+            {/* Page Header (not fixed) */}
+            <div className="bg-white border-b border-gray-100 px-6 py-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-3xl font-bold text-gray-900">Create Custom Interviewer Profile</h2>
+                <p className="text-gray-600 text-lg">Design your perfect interviewer by combining company culture, seniority level, and difficulty</p>
+              </div>
             </div>
 
-            {/* Main Content - Split Layout */}
-            <div className="flex h-[calc(100vh-280px)]">
+            {/* Main Content - Split Layout (takes remaining height) */}
+            <div className="flex flex-1 overflow-hidden">
               
-              {/* Left Panel - Form */}
-              <div className="flex-1 bg-white overflow-y-auto p-8">
+              {/* Left Panel - Form (independently scrollable) */}
+              <div className="flex-1 bg-white overflow-y-auto">
+                <div className="p-8 pt-8">
                 
                 {/* Interviewer Details Section */}
                 <div className="mb-6">
@@ -1116,8 +1127,10 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                                 key={company.id}
                                 className="p-3 hover:bg-indigo-50 cursor-pointer text-sm"
                                 onClick={() => {
-                                  setCustomCompanyId(company.id);
-                                  setCompanySearchQuery(company.display_name);
+                                  setCustomCompanyId(prev => prev === company.id ? "" : company.id);
+                                  if (customCompanyId !== company.id) {
+                                    setCompanySearchQuery(company.display_name);
+                                  }
                                   setIsCompanyDropdownOpen(false);
                                 }}
                               >
@@ -1162,8 +1175,10 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                               : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25"
                           )}
                           onClick={() => {
-                            setCustomCompanyId(company.id);
-                            setCompanySearchQuery(company.display_name);
+                            setCustomCompanyId(prev => prev === company.id ? "" : company.id);
+                            if (customCompanyId !== company.id) {
+                              setCompanySearchQuery(company.display_name);
+                            }
                           }}
                         >
                           <div className="font-semibold text-gray-900 text-sm mb-2">{company.display_name}</div>
@@ -1205,7 +1220,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                               ? "border-indigo-500 bg-indigo-50" 
                               : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25"
                           )}
-                          onClick={() => setCustomSeniorityId(seniority.id)}
+                          onClick={() => setCustomSeniorityId(prev => prev === seniority.id ? "" : seniority.id)}
                         >
                           <div className="text-sm text-gray-700 mb-2">{seniority.display_name}</div>
                           <div className="flex gap-1 justify-center">
@@ -1248,7 +1263,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                                 ? "border-indigo-500 bg-indigo-50" 
                                 : "border-gray-200 bg-white hover:border-indigo-300 hover:bg-indigo-25"
                             )}
-                            onClick={() => setCustomDifficultyId(difficulty.id)}
+                            onClick={() => setCustomDifficultyId(prev => prev === difficulty.id ? "" : difficulty.id)}
                           >
                             <div className="text-sm text-gray-700 mb-2">{difficulty.display_name}</div>
                             <div className="flex gap-1 justify-center">
@@ -1268,10 +1283,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                     </div>
                   </div>
                 </div>
+                </div>
               </div>
 
               {/* Right Panel - Available Profiles */}
-              <div className="w-96 bg-gray-50 border-l border-gray-200 flex flex-col">
+              <div className="w-96 bg-gray-50 border-l border-gray-200 flex flex-col overflow-hidden">
                 <div className="p-5 border-b border-gray-200 bg-white">
                   <div className="text-base font-semibold text-gray-700 mb-1">Available Profiles</div>
                   <div className="text-sm text-gray-600">
@@ -1320,8 +1336,17 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                       placeholder="Search: easy amazon, hard google..."
                       value={availableProfilesFilter}
                       onChange={(e) => setAvailableProfilesFilter(e.target.value)}
-                      className="pl-10 bg-white"
+                      className="pl-10 pr-9 bg-white"
                     />
+                    {availableProfilesFilter.trim() && (
+                      <button
+                        aria-label="Clear search"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        onClick={() => setAvailableProfilesFilter("")}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1351,9 +1376,18 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                           if (selectedProfile === profile.id) {
                             // If already selected, deselect it
                             setSelectedProfile("");
+                            // Also clear form fields to show we're not using this profile anymore
+                            setCustomProfileName("John Doe");
+                            setCustomProfileAlias("");
+                            setCustomCompanyId("");
+                            setCustomSeniorityId("");
+                            setCustomDifficultyId("");
+                            console.log("🔄 Deselected profile and cleared form:", profile.alias);
                           } else {
-                            // If not selected, populate form fields from this profile
+                            // If not selected, select it and populate form fields
+                            setSelectedProfile(profile.id);
                             populateFormFromProfile(profile);
+                            console.log("✅ Selected profile and populated form:", profile.alias);
                           }
                         }}
                       >
@@ -1430,6 +1464,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                     <span>Creating New Profile</span>
                   </div>
                 )}
+                {/* Removed search warning to allow continuing even with active search */}
               </div>
               <div className="flex items-center gap-3">
                 <Button
@@ -1455,7 +1490,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                     }}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
-                    Continue with Selected
+                    Continue with Selected Profile
                   </Button>
                 ) : (
                   <Button
@@ -1473,7 +1508,8 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             <div className="h-20"></div>
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

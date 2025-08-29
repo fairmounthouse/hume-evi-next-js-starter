@@ -16,8 +16,10 @@ import {
   RefreshCw,
   Play,
   Square,
-  X
+  X,
+  Home
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/utils";
 import { toast } from "sonner";
 
@@ -38,6 +40,7 @@ interface DeviceSetupProps {
 }
 
 export default function DeviceSetup({ onContinue, onClose, isModal = false }: DeviceSetupProps) {
+  const router = useRouter();
   // Device lists
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
@@ -660,6 +663,26 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
+      {/* Header with Dashboard Button - only show if not modal */}
+      {!isModal && (
+        <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-16">
+          <div className="container mx-auto px-6 h-full flex items-center justify-between">
+            <h1 className="text-xl font-bold text-gray-900">Device Setup</h1>
+            
+            {/* Dashboard Button - Top Right */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/dashboard')}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <Home className="w-4 h-4" />
+              Dashboard
+            </Button>
+          </div>
+        </header>
+      )}
+      
       <div className="container mx-auto px-6 py-8 max-w-6xl">
         {content}
       </div>

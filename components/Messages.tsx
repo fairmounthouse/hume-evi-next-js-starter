@@ -4,12 +4,14 @@ import { useVoice } from "@humeai/voice-react";
 import Expressions from "./Expressions";
 import { AnimatePresence, motion } from "framer-motion";
 import { ComponentRef, forwardRef } from "react";
+import { useRecordingAnchor } from "@/hooks/useRecordingAnchor";
 
 const Messages = forwardRef<
   ComponentRef<typeof motion.div>,
   Record<never, never>
 >(function Messages(_, ref) {
   const { messages } = useVoice();
+  const { getRelativeTime, formatRelativeTime } = useRecordingAnchor();
 
   return (
     <motion.div
@@ -61,11 +63,7 @@ const Messages = forwardRef<
                         "text-xs capitalize font-medium leading-none opacity-50 tracking-tight"
                       )}
                     >
-                      {msg.receivedAt.toLocaleTimeString(undefined, {
-                        hour: "numeric",
-                        minute: "2-digit",
-                        second: undefined,
-                      })}
+                      {formatRelativeTime(getRelativeTime(msg.receivedAt?.getTime() || Date.now()))}
                     </div>
                   </div>
                   <div className={"pb-3 px-3"}>{msg.message.content}</div>

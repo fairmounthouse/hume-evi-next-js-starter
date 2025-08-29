@@ -5,7 +5,8 @@ import { useDropzone } from "react-dropzone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertCircle, Type, ChevronDown, Plus, History } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, AlertCircle, Type, ChevronDown, Plus, History, Home } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
@@ -42,6 +43,7 @@ interface UserDocument {
 }
 
 export default function DocumentUpload({ sessionId, onContinue }: DocumentUploadProps) {
+  const router = useRouter();
   const [uploadedFiles, setUploadedFiles] = useState<{
     resume?: UploadedFile;
     job_description?: UploadedFile;
@@ -654,7 +656,25 @@ export default function DocumentUpload({ sessionId, onContinue }: DocumentUpload
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto px-5 pt-16 pb-7">
+      {/* Header with Dashboard Button */}
+      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-16">
+        <div className="container mx-auto px-6 h-full flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">Upload Documents</h1>
+          
+          {/* Dashboard Button - Top Right */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+          >
+            <Home className="w-4 h-4" />
+            Dashboard
+          </Button>
+        </div>
+      </header>
+      
+      <div className="container mx-auto px-5 pt-8 pb-7">
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
