@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
 import DocumentUpload from "./DocumentUpload";
+import ScrollFadeIndicator from "./ScrollFadeIndicator";
 
 interface InterviewCase {
   id: string;
@@ -199,13 +200,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const requiresDocuments = selectedCaseData?.requires_documents || false;
   const totalSteps = requiresDocuments ? 5 : 4; // Case -> Profile -> [Custom Profile] -> [Documents] -> Device
   
-  // Scroll detection state
-  const [isCasesScrollable, setIsCasesScrollable] = useState(false);
-  const [isInterviewersScrollable, setIsInterviewersScrollable] = useState(false);
-  const [isCasesAtBottom, setIsCasesAtBottom] = useState(false);
-  const [isInterviewersAtBottom, setIsInterviewersAtBottom] = useState(false);
-  const casesGridRef = useRef<HTMLDivElement>(null);
-  const interviewersGridRef = useRef<HTMLDivElement>(null);
+  // Removed scroll detection state - now handled by ScrollFadeIndicator
 
   
   // Handle session selection from SessionSelector
@@ -214,106 +209,14 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     router.push(`/sessions/${sessionId}`);
   };
 
-  // Check if content is scrollable
-  const checkScrollable = (interviewerCount?: number) => {
-    if (casesGridRef.current) {
-      const isScrollable = casesGridRef.current.scrollHeight > casesGridRef.current.clientHeight;
-      setIsCasesScrollable(isScrollable);
-    }
-    
-    if (interviewersGridRef.current) {
-      const element = interviewersGridRef.current;
-      const isScrollable = element.scrollHeight > element.clientHeight;
-      
-      // For interviewers, also check if we have 3+ items (since 2x2 grid fits 4 perfectly)
-      const currentCount = interviewerCount || 0;
-      const hasEnoughItems = currentCount >= 3;
-      const shouldShowFade = isScrollable || hasEnoughItems;
-      
-      setIsInterviewersScrollable(shouldShowFade);
-    }
-  };
-
-  // Check scroll position to determine if at bottom
-  const checkScrollPosition = (element: HTMLDivElement, setAtBottom: (atBottom: boolean) => void) => {
-    const { scrollTop, scrollHeight, clientHeight } = element;
-    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-    setAtBottom(isAtBottom);
-  };
-
-  // Handle scroll events
-  const handleCasesScroll = useCallback(() => {
-    if (casesGridRef.current) {
-      checkScrollPosition(casesGridRef.current, setIsCasesAtBottom);
-    }
-  }, []);
-
-  const handleInterviewersScroll = useCallback(() => {
-    if (interviewersGridRef.current) {
-      checkScrollPosition(interviewersGridRef.current, setIsInterviewersAtBottom);
-    }
-  }, []);
+  // Scroll handling now managed by ScrollFadeIndicator component
 
   // Fetch all data on component mount
   useEffect(() => {
     fetchAllData();
   }, []);
 
-  // Check scrollable state when data or filters change
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // Calculate filtered profiles count for the check
-      const filteredCount = combinedProfiles.filter(profile => {
-        if (profileTypeFilter === "default") return profile.user_id === null;
-        if (profileTypeFilter === "custom") return profile.user_id !== null;
-        return true; // "all"
-      }).length;
-      
-      checkScrollable(filteredCount);
-    }, 100); // Small delay to ensure DOM is updated
-    
-    return () => clearTimeout(timer);
-  }, [cases, combinedProfiles, profileTypeFilter, currentPage]);
-
-  // Also check on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      // Calculate current filtered count for resize check
-      const filteredCount = combinedProfiles.filter(profile => {
-        if (profileTypeFilter === "default") return profile.user_id === null;
-        if (profileTypeFilter === "custom") return profile.user_id !== null;
-        return true; // "all"
-      }).length;
-      
-      checkScrollable(filteredCount);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [combinedProfiles, profileTypeFilter]);
-
-  // Attach scroll listeners
-  useEffect(() => {
-    const casesElement = casesGridRef.current;
-    const interviewersElement = interviewersGridRef.current;
-
-    if (casesElement) {
-      casesElement.addEventListener('scroll', handleCasesScroll);
-    }
-    
-    if (interviewersElement) {
-      interviewersElement.addEventListener('scroll', handleInterviewersScroll);
-    }
-
-    return () => {
-      if (casesElement) {
-        casesElement.removeEventListener('scroll', handleCasesScroll);
-      }
-      if (interviewersElement) {
-        interviewersElement.removeEventListener('scroll', handleInterviewersScroll);
-      }
-    };
-  }, [handleCasesScroll, handleInterviewersScroll]); // Re-attach when handlers change
+  // Removed scroll detection useEffects - now handled by ScrollFadeIndicator
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -331,17 +234,25 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
         fetch('/api/profiles/difficulty').then(res => res.json()) // Use new difficulty API with prompt content
       ]);
 
-      if (!casesRes.error) setCases(casesRes.data || []);
-      if (combinedProfilesRes.success) setCombinedProfiles(combinedProfilesRes.profiles || []);
-      if (companyProfilesRes.success) setCompanyProfiles(companyProfilesRes.profiles || []);
-      if (seniorityProfilesRes.success) setSeniorityProfiles(seniorityProfilesRes.profiles || []);
-      if (difficultyProfilesRes.success) setDifficultyProfiles(difficultyProfilesRes.profiles || []);
+      // Get base data
+      const baseCases = casesRes.error ? [] : (casesRes.data || []);
+      const baseProfiles = combinedProfilesRes.success ? (combinedProfilesRes.profiles || []) : [];
+      const baseCompanyProfiles = companyProfilesRes.success ? (companyProfilesRes.profiles || []) : [];
+      const baseSeniorityProfiles = seniorityProfilesRes.success ? (seniorityProfilesRes.profiles || []) : [];
+      const baseDifficultyProfiles = difficultyProfilesRes.success ? (difficultyProfilesRes.profiles || []) : [];
+
+      setCases(baseCases);
+      setCombinedProfiles(baseProfiles);
+      setCompanyProfiles(baseCompanyProfiles);
+      setSeniorityProfiles(baseSeniorityProfiles);
+      setDifficultyProfiles(baseDifficultyProfiles);
       
       console.log("📊 Loaded profile data:", {
-        combinedProfiles: combinedProfilesRes.profiles?.length || 0,
-        companyProfiles: companyProfilesRes.profiles?.length || 0,
-        seniorityProfiles: seniorityProfilesRes.profiles?.length || 0,
-        difficultyProfiles: difficultyProfilesRes.data?.length || 0
+        cases: baseCases.length,
+        combinedProfiles: baseProfiles.length,
+        companyProfiles: baseCompanyProfiles.length,
+        seniorityProfiles: baseSeniorityProfiles.length,
+        difficultyProfiles: baseDifficultyProfiles.length
       });
     } catch (error) {
       console.error("Error fetching interview setup data:", error);
@@ -700,10 +611,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="container mx-auto px-6 py-8"
+            className="h-full flex flex-col"
           >
             {/* Clean Single-Row Filter Bar */}
-            <div className="sticky top-16 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 -mx-6 px-6 py-6 mb-8">
+            <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-6 py-6">
+              <div className="container mx-auto">
               <div className="flex items-center gap-4">
                 {/* Search */}
                 <div className="relative flex-1 max-w-lg">
@@ -782,17 +694,20 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                   </div>
                 </div>
               </div>
+              </div>
             </div>
 
-            {/* Cases Grid */}
-            <div className="relative">
-              <div 
-                ref={casesGridRef}
-                onScroll={handleCasesScroll}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[70vh] overflow-y-auto pr-4 pt-2 pb-1 px-1"
-              >
-                <AnimatePresence>
-                  {filteredCases.map((case_, index) => (
+            {/* Scrollable Content Area with Fade Indicators */}
+            <ScrollFadeIndicator 
+              className="h-[calc(100vh-8rem)]"
+              fadeHeight={80}
+              fadeColor="white"
+              topOffset={96}
+            >
+              <div className="px-6 pt-24 pb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  <AnimatePresence>
+                    {filteredCases.map((case_, index) => (
                   <motion.div
                     key={case_.id}
                     initial={{ opacity: 0, y: 20 }}
@@ -874,15 +789,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                       </CardContent>
                     </Card>
                   </motion.div>
-                  ))}
-                </AnimatePresence>
+                    ))}
+                  </AnimatePresence>
+                </div>
               </div>
-              
-              {/* Fade effect overlay - only show if scrollable and not at bottom */}
-              {isCasesScrollable && !isCasesAtBottom && (
-                <div className="absolute bottom-0 left-1 right-4 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
-              )}
-            </div>
+            </ScrollFadeIndicator>
 
             {/* No Results */}
             {filteredCases.length === 0 && (
@@ -928,16 +839,18 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
-            className="container mx-auto px-6 py-8"
+            className="h-full flex flex-col"
           >
-            {/* Header */}
-            <div className="text-center space-y-2 mb-8">
-              <h2 className="text-3xl font-bold text-gray-900">Choose Interview Style</h2>
-              <p className="text-gray-600 text-lg">Select an AI interviewer personality that matches your preparation goals</p>
-            </div>
+            {/* Fixed Header + Filters */}
+            <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+              <div className="container mx-auto px-6 py-6">
+                <div className="text-center space-y-2 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-900">Choose Interview Style</h2>
+                  <p className="text-gray-600 text-lg">Select an AI interviewer personality that matches your preparation goals</p>
+                </div>
 
-            {/* Filters and Create Custom Button */}
-            <div className="flex flex-wrap gap-3 mb-6 items-center">
+                {/* Filters and Create Custom Button */}
+                <div className="flex flex-wrap gap-3 items-center">
               <Select value={profileTypeFilter} onValueChange={setProfileTypeFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All Types" />
@@ -1015,16 +928,20 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               <div className="text-sm text-gray-500 flex items-center ml-auto">
                 {filteredProfiles.length} profiles available
               </div>
+                </div>
+              </div>
             </div>
 
-            {/* Profiles Grid */}
-            <div className="relative">
-              <div 
-                ref={interviewersGridRef}
-                onScroll={handleInterviewersScroll}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 max-h-[70vh] overflow-y-auto pr-4 pt-2 pb-1 px-1"
-              >
-                {filteredProfiles.map((profile) => (
+            {/* Profiles Grid (scrolls under fixed header) */}
+            <ScrollFadeIndicator 
+              className="h-[calc(100vh-9rem)]"
+              fadeHeight={80}
+              fadeColor="white"
+              topOffset={152}
+            >
+              <div className="container mx-auto px-6 pt-48 pb-24">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {filteredProfiles.map((profile) => (
                   <Card
                     key={profile.id}
                     data-profile-card="true"
@@ -1072,17 +989,13 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  ))}
+                </div>
               </div>
-              
-              {/* Fade effect overlay - only show if scrollable and not at bottom */}
-              {isInterviewersScrollable && !isInterviewersAtBottom && (
-                <div className="absolute bottom-0 left-1 right-4 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
-              )}
-            </div>
+            </ScrollFadeIndicator>
 
             {/* Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-6 z-40">
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
               <div className="container mx-auto flex items-center justify-between">
                 {/* Left: Summary Pills */}
                 <div className="flex items-center gap-3">
@@ -1117,8 +1030,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               </div>
             </div>
 
-            {/* Spacer for fixed bottom bar */}
-            <div className="h-24" />
+            {/* No spacer needed - scroller overlaps footer */}
           </motion.div>
         )}
 

@@ -6,6 +6,7 @@ import { Badge } from "./ui/badge";
 import { FileText, Download, Loader2, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
+import ScrollFadeIndicator from "./ScrollFadeIndicator";
 
 interface SessionDocument {
   id: string;
@@ -61,7 +62,8 @@ export default function SessionDocuments({ sessionId, className }: SessionDocume
       const result = await response.json();
       
       if (result.success) {
-        setDocuments(result.documents || []);
+        const baseDocuments = result.documents || [];
+        setDocuments(baseDocuments);
       } else {
         throw new Error(result.error || 'Failed to fetch documents');
       }
@@ -220,7 +222,11 @@ export default function SessionDocuments({ sessionId, className }: SessionDocume
               </div>
 
               {/* Modal Body */}
-              <div className="p-4 overflow-y-auto max-h-[60vh]">
+              <ScrollFadeIndicator 
+                className="max-h-[60vh] p-4"
+                fadeHeight={40}
+                fadeColor="white"
+              >
                 <div className="space-y-4">
                   {/* Document Info */}
                   <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
@@ -237,9 +243,13 @@ export default function SessionDocuments({ sessionId, className }: SessionDocume
                   {selectedDoc.extracted_text ? (
                     <div>
                       <h4 className="font-medium mb-2">Content:</h4>
-                      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 text-sm whitespace-pre-wrap border max-h-96 overflow-y-auto">
+                      <ScrollFadeIndicator 
+                        className="max-h-96 bg-gray-50 dark:bg-gray-800 rounded-lg border p-4 text-sm whitespace-pre-wrap"
+                        fadeHeight={30}
+                        fadeColor="rgb(249 250 251)"
+                      >
                         {selectedDoc.extracted_text}
-                      </div>
+                      </ScrollFadeIndicator>
                     </div>
                   ) : (
                     <div className="text-center py-8 text-gray-500">
@@ -249,7 +259,7 @@ export default function SessionDocuments({ sessionId, className }: SessionDocume
                     </div>
                   )}
                 </div>
-              </div>
+              </ScrollFadeIndicator>
             </motion.div>
           </motion.div>
         )}
