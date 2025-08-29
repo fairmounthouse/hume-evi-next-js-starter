@@ -8,6 +8,7 @@ import { Badge } from "./ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 import { TranscriptEntry } from "@/utils/feedbackTypes";
 import { FinalEvaluation } from "@/utils/feedbackTypes";
+import { useRecordingAnchor } from "@/hooks/useRecordingAnchor";
 import { cn } from "@/utils";
 
 import Link from "next/link";
@@ -173,12 +174,9 @@ export default function VideoReviewInterface({
     }
   };
 
-  const formatTime = (seconds: number): string => {
-    // Handle both video time and transcript timestamps consistently  
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
+  const { formatRelativeTime } = useRecordingAnchor();
+  // Use central timestamp formatting function
+  const formatTime = formatRelativeTime;
 
   const getEmotionColor = (emotions?: Record<string, number>): string => {
     if (!emotions) return "text-gray-600";

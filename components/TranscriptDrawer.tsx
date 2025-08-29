@@ -122,9 +122,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
         total_entries: transcript.length,
         user_messages: transcript.filter(e => e.speaker === 'user').length,
         assistant_messages: transcript.filter(e => e.speaker === 'assistant').length,
-        duration_seconds: transcript.length > 0 ? Math.floor(transcript[transcript.length - 1]?.timestamp || 0) : 0,
-        duration_formatted: transcript.length > 0 ? formatRelativeTime(transcript[transcript.length - 1]?.timestamp || 0) : "00:00",
-        duration_minutes: transcript.length > 0 ? Math.floor((transcript[transcript.length - 1]?.timestamp || 0) / 60) : 0,
+        duration: transcript.length > 0 ? formatRelativeTime(transcript[transcript.length - 1]?.timestamp || 0) : "00:00",
         has_emotions: transcript.some(e => e.emotions && Object.keys(e.emotions).length > 0),
         has_confidence: transcript.some(e => e.confidence),
         first_message_timestamp: transcript[0]?.timestamp,
@@ -133,9 +131,12 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
         preservation_mode: "COMPLETE_TRANSCRIPT_DRAWER"
       },
       entries: transcript.map(entry => ({
-        ...entry,
-        timestamp_formatted: formatTimestamp(entry.timestamp), // Add MM:SS format to each entry
-        timestamp_raw: entry.timestamp // Keep raw value for reference
+        id: entry.id,
+        speaker: entry.speaker,
+        text: entry.text,
+        timestamp: formatTimestamp(entry.timestamp), // Use MM:SS format just like TXT
+        emotions: entry.emotions,
+        confidence: entry.confidence
       }))
     };
     

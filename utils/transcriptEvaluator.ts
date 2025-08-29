@@ -141,13 +141,27 @@ export class TranscriptEvaluator {
    * contains the complete conversation history for download.
    */
   private getRollingWindow(): TranscriptEntry[] {
-    const cutoffTime = Date.now() - this.ROLLING_WINDOW_MS;
+    // Since timestamps are now relative seconds from recording start, 
+    // we need to filter based on relative time, not absolute time
+    const rollingWindowSeconds = this.ROLLING_WINDOW_MS / 1000; // Convert to seconds (300 seconds = 5 minutes)
+    const latestTimestamp = this.transcriptHistory.length > 0 
+      ? Math.max(...this.transcriptHistory.map(e => e.timestamp))
+      : 0;
+    const cutoffTimestamp = Math.max(0, latestTimestamp - rollingWindowSeconds);
+    
     const rollingEntries = this.transcriptHistory.filter(
-      entry => entry.timestamp * 1000 >= cutoffTime
+      entry => entry.timestamp >= cutoffTimestamp
     );
     
     console.log(`🕐 [EVALUATOR] Rolling window: ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 5 minutes only)`);
     console.log(`🕐 [EVALUATOR] Full transcript history preserved separately: ${this.transcriptHistory.length} total entries`);
+    console.log(`🕐 [EVALUATOR] Rolling window debug:`, {
+      rollingWindowSeconds,
+      latestTimestamp,
+      cutoffTimestamp,
+      allTimestamps: this.transcriptHistory.map(e => e.timestamp),
+      filteredTimestamps: rollingEntries.map(e => e.timestamp)
+    });
     
     return rollingEntries;
   }

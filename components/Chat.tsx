@@ -77,7 +77,7 @@ function ChatInterface({
   onOpenDeviceSetup,
 }: any) {
   const { messages, sendSessionSettings, status, sendToolMessage } = useVoice();
-  const { getRelativeTime } = useRecordingAnchor();
+  const { getRelativeTime, formatRelativeTime } = useRecordingAnchor();
   
   // Transcript scrolling refs and state
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -238,16 +238,17 @@ function ChatInterface({
       const absoluteTimestamp = msg.receivedAt?.getTime() || Date.now();
       const relativeSeconds = getRelativeTime(absoluteTimestamp);
       
-      // Debug logging for timestamp conversion (show all messages to debug the 3000/4000 issue)
-      console.log(`🕐 [TIMESTAMP DEBUG] Message ${index}:`, {
-        humeTimestamp: msg.receivedAt?.toISOString(),
-        absoluteMs: absoluteTimestamp,
-        currentTime: new Date().toISOString(),
-        relativeSeconds,
-        relativeFormatted: `${Math.floor(relativeSeconds / 60)}:${(relativeSeconds % 60).toString().padStart(2, '0')}`,
-        messagePreview: msg.message?.content?.substring(0, 30) + "...",
-        expectedRange: "should_be_small_number_like_3_4_6_12"
-      });
+      // Debug logging for timestamp conversion (only first few messages to avoid spam)
+      if (index < 3) {
+        console.log(`🕐 [TIMESTAMP DEBUG] Message ${index}:`, {
+          humeTimestamp: msg.receivedAt?.toISOString(),
+          absoluteMs: absoluteTimestamp,
+          currentTime: new Date().toISOString(),
+          relativeSeconds,
+          relativeFormatted: formatRelativeTime(relativeSeconds),
+          messagePreview: msg.message?.content?.substring(0, 30) + "..."
+        });
+      }
       
       const entry = {
         id: `msg-${index}`,
@@ -833,38 +834,32 @@ function ChatInterface({
           // Upload transcript to Supabase Storage
           const transcriptPath = await uploadTranscriptToStorage(sessionId, preservedTranscript);
           
-          // Save session metadata to database
+          // Save session metadata to database - use relative timestamps
           const now = new Date();
-          const firstMessageTime = preservedTranscript[0]?.timestamp 
-            ? new Date(preservedTranscript[0].timestamp * 1000)
-            : now;
+          const totalDurationSeconds = preservedTranscript.length > 0 
+            ? (preservedTranscript[preservedTranscript.length - 1]?.timestamp || 0)
+            : 0;
           
-          // CRITICAL: Ensure ended_at is ALWAYS after started_at with consistent fallback
-          const sessionStartTime = firstMessageTime.toISOString();
-          const minEndTime = new Date(firstMessageTime.getTime() + 5000); // 5 second minimum buffer
-          const actualEndTime = new Date(Math.max(now.getTime(), minEndTime.getTime()));
-          const sessionEndTime = actualEndTime.toISOString();
+          // Calculate actual start/end times based on current time and duration
+          const sessionEndTime = now.toISOString();
+          const sessionStartTime = new Date(now.getTime() - (totalDurationSeconds * 1000)).toISOString();
           
-          // Debug logging for timestamp validation
-          console.log("🕐 [TIMESTAMP] Validation:", {
-            firstMessageTimestamp: preservedTranscript[0]?.timestamp,
-            firstMessageTime: firstMessageTime.toISOString(),
-            currentTime: now.toISOString(),
+          console.log("🕐 [TIMESTAMP] Session timing (using relative timestamps):", {
+            totalDurationSeconds,
+            durationFormatted: formatRelativeTime(totalDurationSeconds),
             calculatedStartTime: sessionStartTime,
             calculatedEndTime: sessionEndTime,
-            timeDifferenceMs: actualEndTime.getTime() - firstMessageTime.getTime(),
-            isValid: actualEndTime >= firstMessageTime,
-            usedFallback: actualEndTime.getTime() === minEndTime.getTime()
+            method: "relative_timestamps_from_transcript"
           });
           
           await upsertInterviewSession({
             session_id: sessionId,
-            started_at: sessionStartTime, // Required field - use first message timestamp or current time
+            started_at: sessionStartTime,
             status: "completed" as const,
-            ended_at: sessionEndTime, // Ensure this is after started_at
-            duration_seconds: Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000),
-            transcript_path: transcriptPath || undefined, // Store the storage path, handle null case
-            live_transcript_data: preservedTranscript, // Store live session format for UI consistency
+            ended_at: sessionEndTime,
+            duration_seconds: totalDurationSeconds,
+            transcript_path: transcriptPath || undefined,
+            live_transcript_data: preservedTranscript,
           });
           console.log("✅ [END] Session data and transcript saved to Supabase");
           
@@ -876,10 +871,10 @@ function ChatInterface({
             console.warn("Failed to clean up session storage backup:", error);
           }
           
-          // Track usage for billing
+          // Track usage for billing - use relative timestamp duration
           try {
-            const durationMinutes = Math.floor((now.getTime() - firstMessageTime.getTime()) / 1000 / 60);
-            console.log("💰 [BILLING] Tracking interview usage:", { durationMinutes });
+            const durationMinutes = Math.floor(totalDurationSeconds / 60);
+            console.log("💰 [BILLING] Tracking interview usage:", { durationMinutes, totalDurationSeconds });
             
             // Store duration for usage warning component
             setCompletedInterviewDuration(durationMinutes);
@@ -1100,9 +1095,9 @@ function ChatInterface({
             entries: transcriptData,
             metadata: {
               total_entries: transcriptData.length,
-              duration_seconds: transcriptData.length > 0 
-                ? Math.floor((Date.now() - (transcriptData[0]?.timestamp * 1000 || Date.now())) / 1000)
-                : 0,
+              duration: transcriptData.length > 0 
+                ? formatRelativeTime(transcriptData[transcriptData.length - 1]?.timestamp || 0)
+                : "00:00",
             }
           };
           const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
@@ -1417,7 +1412,7 @@ function ChatInterface({
               id: entry.id || `${entry.timestamp}-${entry.speaker}`,
               speaker: entry.speaker,
               text: entry.text,
-              timestamp: entry.timestamp * 1000, // Convert to milliseconds
+              timestamp: entry.timestamp, // Keep as relative seconds (no conversion needed)
               emotions: entry.emotions,
               confidence: entry.confidence
             }))}

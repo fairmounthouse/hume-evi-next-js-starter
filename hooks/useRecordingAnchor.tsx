@@ -29,6 +29,7 @@ export function RecordingAnchorProvider({ children }: { children: ReactNode }) {
     return relativeSeconds;
   };
 
+  // SINGLE SOURCE OF TRUTH for all timestamp formatting
   const formatRelativeTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
