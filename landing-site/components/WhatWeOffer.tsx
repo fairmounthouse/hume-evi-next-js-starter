@@ -18,11 +18,11 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Ultra Personalized Mocks</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            Case & behavioral
+            <strong>Case &amp; behavioral • Beta</strong>
           </p>
-          <span className="inline-block bg-orange-accent text-white px-3 py-1 rounded-full text-sm font-semibold">
-            Beta
-          </span>
+          <p className="text-base text-black opacity-80 italic">
+            "AI that knows exactly which questions will break you—and serves them until they don't."
+          </p>
         </div>
         
         <div className="card-neubrutalist">
@@ -31,11 +31,11 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Real-Time Coaching</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            For interviews
+            <strong>For interviews • Beta</strong>
           </p>
-          <span className="inline-block bg-orange-accent text-white px-3 py-1 rounded-full text-sm font-semibold">
-            Beta
-          </span>
+          <p className="text-base text-black opacity-80 italic">
+            "Get corrected mid-mistake, not after you've already failed."
+          </p>
         </div>
         
         <div className="card-neubrutalist">
@@ -43,8 +43,11 @@ export default function WhatWeOffer() {
             <BarChart3 className="w-8 h-8" />
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Actionable Feedback</h3>
-          <p className="text-lg text-black opacity-80 leading-relaxed">
-            Objective & subjective
+          <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
+            <strong>Objective &amp; subjective</strong>
+          </p>
+          <p className="text-base text-black opacity-80 italic">
+            "See the invisible tells that cost offers: 23 ums, broken eye contact, energy crashes at 4:32."
           </p>
         </div>
         
@@ -53,8 +56,11 @@ export default function WhatWeOffer() {
             <Book className="w-8 h-8" />
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">MBB-Inspired Cases</h3>
-          <p className="text-lg text-black opacity-80 leading-relaxed">
-            Full range + more coming soon
+          <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
+            <strong>Full range + more coming soon</strong>
+          </p>
+          <p className="text-base text-black opacity-80 italic">
+            "Practice what stumped Harvard MBAs yesterday, not what case books published last year."
           </p>
         </div>
         
@@ -64,11 +70,11 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Training Materials</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            Frameworks, drills
+            <strong>Frameworks, drills • Coming Soon</strong>
           </p>
-          <span className="inline-block bg-blue-accent text-white px-3 py-1 rounded-full text-sm font-semibold">
-            Coming Soon
-          </span>
+          <p className="text-base text-black opacity-80 italic">
+            "The boring daily reps that make you sound brilliant without trying."
+          </p>
         </div>
       </div>
 
