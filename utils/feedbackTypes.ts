@@ -9,9 +9,10 @@ export interface TranscriptEntry {
 
 export interface InInterviewFeedback {
   status: "great" | "good" | "bad";
-  feedback: string;
-  confidence: number;
-  timestamp: number;
+  feedback?: string;
+  bullet_points?: string[];
+  confidence?: number;
+  timestamp?: number;
 }
 
 export interface FinalEvaluationFactor {

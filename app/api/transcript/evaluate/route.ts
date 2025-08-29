@@ -23,31 +23,44 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('External API error:', response.status, errorText);
+      const status = response.status;
+      const statusText = response.statusText;
+      const contentType = response.headers.get('content-type') || '';
+      let serviceBody = '';
+      try { serviceBody = await response.text(); } catch { serviceBody = '[unreadable body]'; }
+      console.error('External API error', { status, statusText, contentType, body: serviceBody?.slice(0, 2000) });
       return NextResponse.json(
-        { error: "Failed to evaluate transcript" },
-        { status: response.status }
+        { error: "Upstream evaluation failed", service: { status, statusText, contentType, body: serviceBody } },
+        { status }
       );
     }
 
     const result = await response.json();
+    console.log('[Evaluate] Upstream service result:', result);
     
     // Validate response structure
-    if (!result.status || !result.feedback || typeof result.confidence !== 'number') {
-      console.error('Invalid response structure from evaluation service');
+    // Accept either feedback string or bullet_points array; confidence optional
+    if (!result.status || typeof result.status !== 'string') {
+      console.error('Invalid response structure from evaluation service - missing status');
       return NextResponse.json(
-        { error: "Invalid response from evaluation service" },
+        { error: "Invalid response from evaluation service", raw: result },
         { status: 502 }
       );
     }
 
-    const finalResponse = {
+    const finalResponse: any = {
       status: result.status,
-      feedback: result.feedback,
-      confidence: result.confidence,
       timestamp: result.timestamp || Date.now()
     };
+    if (Array.isArray(result.bullet_points)) {
+      finalResponse.bullet_points = result.bullet_points;
+    }
+    if (typeof result.feedback === 'string') {
+      finalResponse.feedback = result.feedback;
+    }
+    if (typeof result.confidence === 'number') {
+      finalResponse.confidence = result.confidence;
+    }
 
     // Return the evaluation result
     return NextResponse.json(finalResponse);

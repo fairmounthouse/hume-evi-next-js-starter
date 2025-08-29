@@ -124,11 +124,11 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
   };
 
   return (
-    <div className={cn("w-full h-[180px] overflow-y-auto", className)}>
-      {/* Fixed height container - always shows content */}
-      <div className="h-full">
+    <div className={cn("w-full overflow-y-auto", className)}>
+      {/* Auto-fit container */}
+      <div>
         {isLoading ? (
-          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg h-full">
+          <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
             <Loader2 className="w-3 h-3 text-gray-500 animate-spin" />
             <span className="text-xs text-gray-600 dark:text-gray-400">
               Analyzing...
@@ -137,7 +137,7 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
         ) : feedback && isVisible ? (
           <div
             className={cn(
-              "border rounded-lg p-3 relative h-full flex flex-col",
+              "border rounded-lg p-3 relative flex flex-col",
               getStatusColor(feedback.status)
             )}
           >
@@ -149,16 +149,30 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
                   {feedback.status}
                 </span>
               </div>
-              <span className="text-xs text-gray-500">
-                {getConfidenceText(feedback.confidence)}
-              </span>
+              {typeof feedback.confidence === 'number' && (
+                <span className="text-xs text-gray-500">
+                  {getConfidenceText(feedback.confidence)}
+                </span>
+              )}
             </div>
             
-            {/* Feedback text */}
+            {/* Feedback content */}
             <div className="flex-1 overflow-y-auto mb-3">
-              <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-                {feedback.feedback}
-              </p>
+              {Array.isArray(feedback.bullet_points) && feedback.bullet_points.length > 0 ? (
+                <ul className="list-disc list-inside space-y-1">
+                  {feedback.bullet_points.map((point, idx) => (
+                    <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              ) : feedback.feedback ? (
+                <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
+                  {feedback.feedback}
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 italic">No details provided.</p>
+              )}
             </div>
             
             {/* Progress bar underneath text */}
@@ -172,7 +186,7 @@ const FeedbackDisplay = forwardRef<FeedbackDisplayRef, FeedbackDisplayProps>(({ 
             </div>
           </div>
         ) : (
-          <div className="text-center py-3 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg h-full flex flex-col justify-center">
+          <div className="text-center py-3 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
             {isEvaluationActive ? (
               <div className="text-xs text-gray-400 dark:text-gray-600">
                 Evaluating performance...

@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { AssistantAudioBus } from "@/utils/assistantAudio";
 import { useRecordingAnchor } from "@/hooks/useRecordingAnchor";
 import { Button } from "./ui/button";
+import { Switch } from "./ui/switch";
 import { Toggle } from "./ui/toggle";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -93,6 +94,7 @@ function ChatInterface({
     });
   }, [status.value, sessionId]);
   const [coachingMode, setCoachingMode] = useState(false);
+  const [liveFeedbackEnabled, setLiveFeedbackEnabled] = useState(true);
   const [isUpdatingCoaching, setIsUpdatingCoaching] = useState(false);
   const [completedInterviewDuration, setCompletedInterviewDuration] = useState<number>(0);
   const [showUsageWarning, setShowUsageWarning] = useState(false);
@@ -399,7 +401,7 @@ function ChatInterface({
 
   // Setup transcript evaluation when call starts (only once per call)
   useEffect(() => {
-    if (isCallActive && transcriptEvaluator) {
+    if (isCallActive && transcriptEvaluator && liveFeedbackEnabled) {
       // Start the timer animation
       feedbackDisplayRef.current?.startTimer();
       
@@ -424,7 +426,7 @@ function ChatInterface({
       // Stop timer when call is not active
       feedbackDisplayRef.current?.stopTimer();
     }
-  }, [isCallActive, transcriptEvaluator]); // Removed storedTranscript dependency
+  }, [isCallActive, transcriptEvaluator, liveFeedbackEnabled]); // Removed storedTranscript dependency
 
   // Listen for voice status changes to detect when call ends
   const [hasBeenConnected, setHasBeenConnected] = useState(false);
@@ -1576,11 +1578,24 @@ function ChatInterface({
 
             {/* Live Feedback Display - Integrated into sidebar */}
             <div className="flex-shrink-0">
-              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                <div className={`w-2 h-2 rounded-full ${isCallActive ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${isCallActive && liveFeedbackEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
                 Live Feedback
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">{liveFeedbackEnabled ? 'On' : 'Off'}</span>
+                  <Switch
+                    checked={liveFeedbackEnabled}
+                    onCheckedChange={setLiveFeedbackEnabled}
+                  />
+                </div>
               </div>
-              <FeedbackDisplay ref={feedbackDisplayRef} />
+              {liveFeedbackEnabled ? (
+                <FeedbackDisplay ref={feedbackDisplayRef} />
+              ) : (
+                <div className="text-center py-3 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                  <div className="text-xs text-gray-400 dark:text-gray-600">Live feedback disabled</div>
+                </div>
+              )}
             </div>
 
             {/* Case Exhibits Panel - Only show during active interview */}

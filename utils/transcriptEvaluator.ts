@@ -189,8 +189,26 @@ export class TranscriptEvaluator {
       console.log("🔍 [EVALUATOR] API response status:", response.status);
 
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error("❌ [EVALUATOR] API failed:", response.status, errorText);
+        const status = response.status;
+        const statusText = response.statusText;
+        const contentType = response.headers.get('content-type') || '';
+        let rawBody = '';
+        try {
+          rawBody = await response.text();
+        } catch (e) {
+          rawBody = '[unreadable body]';
+        }
+        let parsedJson: any = null;
+        if (contentType.includes('application/json')) {
+          try { parsedJson = JSON.parse(rawBody); } catch {}
+        }
+        const trimmedBody = rawBody.length > 2000 ? rawBody.slice(0, 2000) + '…[truncated]' : rawBody;
+        console.error("❌ [EVALUATOR] API failed", {
+          status,
+          statusText,
+          contentType,
+          body: parsedJson ?? trimmedBody
+        });
         return null;
       }
 
