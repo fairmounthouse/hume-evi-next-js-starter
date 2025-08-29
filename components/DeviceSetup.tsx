@@ -243,7 +243,8 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
         audio: { 
           deviceId: deviceId ? { exact: deviceId } : undefined,
           echoCancellation: true,
-          noiseSuppression: true
+          noiseSuppression: true,
+          autoGainControl: true
         }
       });
 
@@ -266,9 +267,13 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const analyser = audioContext.createAnalyser();
       const microphone = audioContext.createMediaStreamSource(stream);
+      const gain = audioContext.createGain();
+      // Apply a modest boost so quieter mics register visibly on the meter
+      gain.gain.value = 2.0;
       
       analyser.fftSize = 256;
-      microphone.connect(analyser);
+      microphone.connect(gain);
+      gain.connect(analyser);
       
       audioContextRef.current = audioContext;
       analyserRef.current = analyser;
@@ -286,7 +291,9 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
     analyserRef.current.getByteFrequencyData(dataArray);
     
     const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-    setAudioLevel(average / 255);
+    // Slight non-linear scaling for better low-end sensitivity in UI meter
+    const scaled = Math.min(1, Math.pow(average / 255, 0.8));
+    setAudioLevel(scaled);
     
     animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
   };

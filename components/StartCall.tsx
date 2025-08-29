@@ -245,6 +245,12 @@ export default function StartCall({
         auth: { type: "accessToken", value: accessToken },
         configId,
         sessionSettings,
+        // Ensure Hume's mic capture is boosted and cleaned up by the browser
+        audioConstraints: {
+          autoGainControl: true,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
       });
     } catch (err) {
       console.error("❌ CALL FAILED:", err);

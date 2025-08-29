@@ -16,7 +16,7 @@ export default function Hero() {
           </h1>
           
           <p className="text-xl lg:text-2xl text-black opacity-80 mb-12 leading-relaxed animate-[slideUp_0.9s_ease-out]">
-            AI mock interviews that actually prepare you for the real thing. 
+            Cutting-edgeAI interviews that actually prepare you for the real thing. 
             No fluff, just results that land you the job.
           </p>
 

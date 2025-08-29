@@ -22,7 +22,8 @@ export default function MicFFT({
             className={cn("absolute !inset-0 !size-full", className)}
           >
             {Array.from({ length: 24 }).map((_, index) => {
-              const value = (fft[index] ?? 0) / 4;
+              // Increase visual sensitivity so quieter mic input is more visible
+              const value = (fft[index] ?? 0) / 2;
               const h = Math.min(Math.max(height * value, 2), height);
               const yOffset = height * 0.5 - h * 0.5;
 
