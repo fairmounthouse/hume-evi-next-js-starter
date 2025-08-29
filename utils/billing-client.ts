@@ -102,10 +102,11 @@ export async function trackInterviewSession(
 /**
  * Get user's usage summary (usage tracking only)
  */
-export async function getUserUsageSummary(clerkId: string): Promise<UsageSummary[]> {
+export async function getUserUsageSummary(clerkId: string, monthlyMinuteLimit: number = 300): Promise<UsageSummary[]> {
   const { data, error } = await supabase
     .rpc('get_user_usage_summary', {
-      p_clerk_id: clerkId
+      p_clerk_id: clerkId,
+      p_monthly_minute_limit: monthlyMinuteLimit
     });
 
   if (error) {
@@ -114,6 +115,60 @@ export async function getUserUsageSummary(clerkId: string): Promise<UsageSummary
   }
 
   return data as UsageSummary[];
+}
+
+/**
+ * Get user's usage summary with plan limits from Supabase
+ * This uses the new Supabase-based plan configuration
+ */
+export async function getUserUsageSummaryFromSupabase(clerkId: string, planKey: string = 'free'): Promise<UsageSummary[]> {
+  const { data, error } = await supabase
+    .rpc('get_user_usage_summary_with_plan', {
+      p_clerk_id: clerkId,
+      p_plan_key: planKey
+    });
+
+  if (error) {
+    console.error('Error getting usage summary from Supabase:', error);
+    throw new Error(`Failed to get usage summary: ${error.message}`);
+  }
+
+  return data as UsageSummary[];
+}
+
+/**
+ * Get plan details from Supabase
+ */
+export async function getPlanDetails(planKey: string) {
+  const { data, error } = await supabase
+    .rpc('get_plan_limits', {
+      p_plan_key: planKey
+    });
+
+  if (error) {
+    console.error('Error getting plan details:', error);
+    throw new Error(`Failed to get plan details: ${error.message}`);
+  }
+
+  return data?.[0] || null;
+}
+
+/**
+ * Get per-session usage breakdown
+ */
+export async function getSessionBreakdown(clerkId: string, limit: number = 20) {
+  const { data, error } = await supabase
+    .rpc('get_user_session_breakdown', {
+      p_clerk_id: clerkId,
+      p_limit: limit
+    });
+
+  if (error) {
+    console.error('Error getting session breakdown:', error);
+    throw new Error(`Failed to get session breakdown: ${error.message}`);
+  }
+
+  return data || [];
 }
 
 /**

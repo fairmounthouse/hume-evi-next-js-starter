@@ -265,7 +265,7 @@ export default function DashboardPage() {
 
         <Card 
           className="hover:shadow-md transition-shadow cursor-pointer group"
-          onClick={() => window.location.href = '/premium'}
+          onClick={() => window.location.href = '/pricing'}
         >
           <CardContent className="p-6">
             <div className="flex items-center space-x-4">
@@ -274,7 +274,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="font-semibold">All Features</p>
-                <p className="text-sm text-muted-foreground">See what's available</p>
+                <p className="text-sm text-muted-foreground">See plans & pricing</p>
               </div>
             </div>
           </CardContent>

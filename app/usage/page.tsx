@@ -15,7 +15,10 @@ import {
   RefreshCw,
   BarChart3,
   Target,
-  Zap
+  Zap,
+  PlayCircle,
+  Timer,
+  CalendarDays
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +29,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { getSessionBreakdown } from '@/utils/billing-client';
 
 interface UsageSummary {
   usage_type: string;
@@ -44,10 +48,21 @@ interface SubscriptionInfo {
   current_period_end: string;
 }
 
+interface SessionBreakdown {
+  session_id: string;
+  started_at: string;
+  ended_at: string;
+  duration_minutes: number;
+  case_title: string;
+  status: string;
+  created_at: string;
+}
+
 export default function UsagePage() {
   const { user } = useUser();
   const [usageData, setUsageData] = useState<UsageSummary[]>([]);
   const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
+  const [sessionBreakdown, setSessionBreakdown] = useState<SessionBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -68,6 +83,12 @@ export default function UsagePage() {
         const sub = await subResponse.json();
         setSubscriptionInfo(sub);
       }
+
+      // Fetch session breakdown
+      if (user?.id) {
+        const sessions = await getSessionBreakdown(user.id, 15);
+        setSessionBreakdown(sessions);
+      }
     } catch (error) {
       console.error('Error fetching usage data:', error);
     } finally {
@@ -87,19 +108,19 @@ export default function UsagePage() {
       variant: 'destructive' as const, 
       icon: AlertTriangle, 
       color: 'text-red-600',
-      bg: 'bg-red-50 border-red-200'
+      bg: 'bg-red-50 border-red-200 dark:bg-red-950 dark:border-red-800'
     };
     if (percentage >= 70) return { 
       variant: 'default' as const, 
       icon: Clock, 
       color: 'text-yellow-600',
-      bg: 'bg-yellow-50 border-yellow-200'
+      bg: 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950 dark:border-yellow-800'
     };
     return { 
       variant: 'default' as const, 
       icon: CheckCircle, 
       color: 'text-green-600',
-      bg: 'bg-green-50 border-green-200'
+      bg: 'bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800'
     };
   };
 
@@ -117,9 +138,29 @@ export default function UsagePage() {
     }
   };
 
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
+      case 'in_progress':
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">In Progress</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-8">
         <div className="space-y-2">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-4 w-96" />
@@ -152,7 +193,7 @@ export default function UsagePage() {
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight">Usage & Limits</h1>
           <p className="text-muted-foreground">
-            Monitor your usage across all features and plan limits
+            Monitor your usage and track your interview sessions
           </p>
         </div>
         
@@ -189,7 +230,7 @@ export default function UsagePage() {
       )}
 
       {/* Current Plan Overview */}
-      <Card>
+      <Card className="border-2">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Crown className="h-5 w-5" />
@@ -201,11 +242,11 @@ export default function UsagePage() {
         </CardHeader>
         <CardContent>
           {subscriptionInfo ? (
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-3">
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Plan</p>
                 <div className="flex items-center gap-2">
-                  <Badge variant={subscriptionInfo.plan_key === 'free_user' ? 'secondary' : 'default'}>
+                  <Badge variant={subscriptionInfo.plan_key === 'free' ? 'secondary' : 'default'} className="text-sm">
                     {subscriptionInfo.plan_name}
                   </Badge>
                   <span className="text-sm text-muted-foreground">
@@ -236,7 +277,7 @@ export default function UsagePage() {
             </div>
           )}
           
-          <Separator className="my-4" />
+          <Separator className="my-6" />
           
           <div className="flex gap-2">
             <Button asChild variant="outline">
@@ -245,7 +286,7 @@ export default function UsagePage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-            {subscriptionInfo?.plan_key === 'free_user' && (
+            {subscriptionInfo?.plan_key === 'free' && (
               <Button asChild>
                 <Link href="/pricing">
                   Upgrade Now
@@ -259,9 +300,10 @@ export default function UsagePage() {
 
       {/* Usage Details */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="overview">Usage Overview</TabsTrigger>
-          <TabsTrigger value="detailed">Detailed View</TabsTrigger>
+          <TabsTrigger value="sessions">Session Breakdown</TabsTrigger>
+          <TabsTrigger value="detailed">Monthly Minutes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
@@ -273,7 +315,7 @@ export default function UsagePage() {
                 const UsageIcon = getUsageIcon(usage.usage_type);
                 
                 return (
-                  <Card key={usage.usage_type} className={`${status.bg} border-2`}>
+                  <Card key={`${usage.usage_type}-${usage.period_start}`} className={`${status.bg} border-2`}>
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center justify-between text-lg">
                         <div className="flex items-center gap-2">
@@ -288,7 +330,7 @@ export default function UsagePage() {
                         <div className="flex items-center justify-between text-sm">
                           <span>Used</span>
                           <span className="font-medium">
-                            {usage.current_usage} / {usage.limit_value}
+                            {usage.current_usage} / {usage.limit_value === 999999 ? '∞' : usage.limit_value}
                           </span>
                         </div>
                         <Progress 
@@ -326,12 +368,120 @@ export default function UsagePage() {
           )}
         </TabsContent>
 
+        <TabsContent value="sessions" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PlayCircle className="h-5 w-5" />
+                Session Breakdown
+              </CardTitle>
+              <CardDescription>
+                Detailed breakdown of your recent interview sessions and time usage
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sessionBreakdown.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+                    <div className="bg-primary/5 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <Timer className="h-4 w-4 text-primary" />
+                        <span className="text-sm font-medium">Total Minutes</span>
+                      </div>
+                      <p className="text-2xl font-bold mt-1">
+                        {sessionBreakdown.reduce((acc, session) => acc + session.duration_minutes, 0)}
+                      </p>
+                    </div>
+                    <div className="bg-secondary/5 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <PlayCircle className="h-4 w-4 text-secondary-foreground" />
+                        <span className="text-sm font-medium">Total Sessions</span>
+                      </div>
+                      <p className="text-2xl font-bold mt-1">
+                        {sessionBreakdown.length}
+                      </p>
+                    </div>
+                    <div className="bg-accent/5 rounded-lg p-4">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-accent-foreground" />
+                        <span className="text-sm font-medium">Avg Duration</span>
+                      </div>
+                      <p className="text-2xl font-bold mt-1">
+                        {sessionBreakdown.length > 0 
+                          ? Math.round(sessionBreakdown.reduce((acc, session) => acc + session.duration_minutes, 0) / sessionBreakdown.length)
+                          : 0} min
+                      </p>
+                    </div>
+                  </div>
+
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Session</TableHead>
+                        <TableHead>Case</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sessionBreakdown.map((session) => (
+                        <TableRow key={session.session_id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <PlayCircle className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-mono text-xs">
+                                {session.session_id.slice(-8)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm">{session.case_title}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Timer className="h-3 w-3 text-muted-foreground" />
+                              <span className="font-medium">{session.duration_minutes} min</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getStatusBadge(session.status)}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <CalendarDays className="h-3 w-3" />
+                              {formatDate(session.started_at)}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <PlayCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Sessions Yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Start your first interview session to see detailed breakdowns here.
+                  </p>
+                  <Button asChild>
+                    <Link href="/interview/setup">
+                      Start Your First Interview
+                    </Link>
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="detailed" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Detailed Usage Table</CardTitle>
+              <CardTitle>Monthly Minutes Usage</CardTitle>
               <CardDescription>
-                Complete breakdown of your usage across all features
+                Detailed breakdown of your monthly minutes usage and limits
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -353,12 +503,12 @@ export default function UsagePage() {
                       const StatusIcon = status.icon;
                       
                       return (
-                        <TableRow key={usage.usage_type}>
+                        <TableRow key={`${usage.usage_type}-${usage.period_start}`}>
                           <TableCell className="font-medium">
                             {formatUsageType(usage.usage_type)}
                           </TableCell>
                           <TableCell>{usage.current_usage}</TableCell>
-                          <TableCell>{usage.limit_value}</TableCell>
+                          <TableCell>{usage.limit_value === 999999 ? '∞' : usage.limit_value}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Progress 

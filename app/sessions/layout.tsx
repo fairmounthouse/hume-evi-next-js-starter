@@ -7,11 +7,9 @@ import {
   MessageSquare, 
   Activity, 
   CreditCard, 
-  Crown,
   BarChart3,
   Menu,
-  Play,
-  Users
+  Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -104,19 +102,14 @@ function Sidebar({ className }: { className?: string }) {
       {/* User Profile */}
       <div className="p-4">
         <div className="flex items-center gap-3">
-          <UserButton 
-            afterSignOutUrl="/"
-            appearance={{
-              elements: {
-                avatarBox: "h-9 w-9",
-                userButtonPopoverCard: "shadow-lg border",
-                userButtonPopoverActionButton: "hover:bg-accent"
-              }
-            }}
-          />
-          <div className="flex flex-col">
-            <span className="text-sm font-medium">{user?.firstName || 'User'}</span>
-            <span className="text-xs text-muted-foreground">{user?.emailAddresses[0]?.emailAddress}</span>
+          <UserButton afterSignOutUrl="/" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">
+              {user?.firstName} {user?.lastName}
+            </p>
+            <p className="text-xs text-muted-foreground truncate">
+              {user?.primaryEmailAddress?.emailAddress}
+            </p>
           </div>
         </div>
       </div>
@@ -124,7 +117,7 @@ function Sidebar({ className }: { className?: string }) {
   );
 }
 
-export default function DashboardLayout({
+export default function SessionsLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -165,9 +158,7 @@ export default function DashboardLayout({
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <main className="flex-1 overflow-y-auto">
-            <div className="container mx-auto p-6 lg:p-8 max-w-7xl">
-              {children}
-            </div>
+            {children}
           </main>
         </div>
       </div>

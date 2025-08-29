@@ -14,6 +14,7 @@ export default function StartCall({
   selectedCaseId,
   selectedInterviewerId,
   onCallStart,
+  autoStart,
 }: {
   configId?: string;
   accessToken: string;
@@ -21,6 +22,7 @@ export default function StartCall({
   selectedCaseId?: string | null;
   selectedInterviewerId?: string | null;
   onCallStart?: () => void;
+  autoStart?: boolean;
 }) {
   const { status, connect, sendSessionSettings } = useVoice();
   const { user } = useUser(); // Get current Clerk user
@@ -29,6 +31,7 @@ export default function StartCall({
   const startTimeRef = useRef<number | null>(null);
   const [currentPhaseIndex, setCurrentPhaseIndex] = useState<number>(0);
   const [lastPhaseUpdate, setLastPhaseUpdate] = useState<number>(0);
+  const startedRef = useRef<boolean>(false);
 
   // Enhanced context update with real-time phase detection
   const sendContextUpdate = async (temporaryContext?: string, forceUpdate = false) => {
@@ -173,6 +176,91 @@ export default function StartCall({
     }
   }, [status.value]);
 
+  // Encapsulated start function
+  const startCall = async () => {
+    if (startedRef.current) {
+      console.log("ℹ️ Start call already initiated - skipping duplicate trigger");
+      return;
+    }
+    startedRef.current = true;
+
+    console.log("🟢 START CALL TRIGGERED");
+    console.log("📋 Interview configuration:", {
+      sessionId,
+      selectedCaseId,
+      selectedInterviewerId,
+      configId,
+      hasAccessToken: !!accessToken
+    });
+
+    if (!selectedCaseId || !selectedInterviewerId) {
+      console.error("❌ Missing required selections:", {
+        hasCaseId: !!selectedCaseId,
+        hasInterviewerId: !!selectedInterviewerId
+      });
+      toast.error("Please complete interview setup first");
+      window.location.href = "/interview/setup";
+      return;
+    }
+
+    onCallStart?.();
+
+    try {
+      startTimeRef.current = Date.now();
+
+      console.log("💾 Creating session record in database...");
+      const { createSessionWithBilling } = await import("@/utils/supabase-client");
+      const userId = user?.id || undefined;
+      const userEmail = user?.emailAddresses?.[0]?.emailAddress || undefined;
+
+      const sessionData = {
+        session_id: sessionId,
+        started_at: new Date().toISOString(),
+        status: "in_progress" as const,
+        case_id: selectedCaseId || undefined,
+        new_interviewer_profile_id: selectedInterviewerId || undefined,
+      };
+
+      const sessionCreated = await createSessionWithBilling(
+        sessionData,
+        userId,
+        userEmail
+      );
+
+      if (!sessionCreated) {
+        throw new Error("Failed to create session record");
+      }
+
+      const { initializeSessionSettings, buildSessionSettings } = await import("@/utils/session-context");
+      await initializeSessionSettings(sessionId);
+      const sessionSettings = await buildSessionSettings(
+        sessionId,
+        0,
+        undefined,
+        undefined,
+        false
+      );
+
+      await connect({
+        auth: { type: "accessToken", value: accessToken },
+        configId,
+        sessionSettings,
+      });
+    } catch (err) {
+      console.error("❌ CALL FAILED:", err);
+      toast.error("Unable to start call");
+    }
+  };
+
+  // Auto-start support
+  useEffect(() => {
+    if (!autoStart) return;
+    if (status.value === "connected") return;
+    if (!selectedCaseId || !selectedInterviewerId) return;
+    startCall();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, status.value, selectedCaseId, selectedInterviewerId]);
+
   // Expose functions globally for other components
   useEffect(() => {
     (window as any).__sendContextUpdate = sendContextUpdate;
@@ -213,122 +301,20 @@ export default function StartCall({
                 exit: { scale: 0.5 },
               }}
             >
-              <Button
-                className={"z-50 flex items-center gap-1.5 rounded-full"}
-                onClick={async () => {
-                  console.log("🟢 START CALL BUTTON CLICKED");
-                  console.log("📋 Interview configuration:", {
-                    sessionId,
-                    selectedCaseId,
-                    selectedInterviewerId,
-                    configId,
-                    hasAccessToken: !!accessToken
-                  });
-                  
-                  // Check if user has selected all required options
-                  if (!selectedCaseId || !selectedInterviewerId) {
-                    console.error("❌ Missing required selections:", {
-                      hasCaseId: !!selectedCaseId,
-                      hasInterviewerId: !!selectedInterviewerId
-                    });
-                    toast.error("Please complete interview setup first");
-                    window.location.href = "/interview/setup";
-                    return;
-                  }
-
-                  // Start camera immediately
-                  onCallStart?.();
-
-                                try {
-                // start timer
-                startTimeRef.current = Date.now();
-
-                // First: Create session record with selected interview configuration
-                console.log("💾 Creating session record in database...");
-                const { createSessionWithBilling } = await import("@/utils/supabase-client");
-                
-                // Get current user ID and email from Clerk
-                const userId = user?.id || undefined;
-                const userEmail = user?.emailAddresses?.[0]?.emailAddress || undefined;
-                console.log("👤 Current user ID:", userId);
-                
-                const sessionData = {
-                  session_id: sessionId,
-                  started_at: new Date().toISOString(),
-                  status: "in_progress" as const,
-                  // Use selected configuration from setup screen
-                  case_id: selectedCaseId || undefined,
-                  new_interviewer_profile_id: selectedInterviewerId || undefined, // Updated to match new schema
-                };
-
-                console.log("📝 Session data to be created:", sessionData);
-                
-                const sessionCreated = await createSessionWithBilling(
-                  sessionData, 
-                  userId, 
-                  userEmail
-                );
-                
-                if (!sessionCreated) {
-                  throw new Error("Failed to create session record");
-                }
-
-                console.log("✅ Session record created successfully");
-                console.log("📋 Documents are already linked via session_id - no additional linking needed!");
-
-                // Initialize session settings cache (fetch once from Supabase)
-                console.log("🔄 Initializing session settings cache...");
-                const { initializeSessionSettings, buildSessionSettings } = await import("@/utils/session-context");
-                await initializeSessionSettings(sessionId);
-                console.log("✅ Session settings cache initialized");
-
-                // Build initial session settings (uses cached data + current time)
-                // Coaching starts as disabled by default (local state only)
-                console.log("🏗️ Building initial session settings...");
-                const sessionSettings = await buildSessionSettings(
-                  sessionId, 
-                  0, 
-                  undefined, 
-                  undefined, 
-                  false // Start with coaching disabled (local state)
-                );
-                console.log("✅ Initial session settings built:", {
-                  hasVariables: !!sessionSettings.variables,
-                  variableCount: Object.keys(sessionSettings.variables || {}).length,
-                  hasContext: !!sessionSettings.context,
-                  hasTranscription: !!sessionSettings.transcription,
-                  initialCoachingMode: false
-                });
-
-                    console.log("🔌 Connecting to Hume with session settings...");
-                    console.log("📤 Session settings being sent to Hume:", {
-                      auth: { type: "accessToken", hasValue: !!accessToken },
-                      configId,
-                      sessionSettingsSize: JSON.stringify(sessionSettings).length,
-                      sessionSettingsPreview: JSON.stringify(sessionSettings, null, 2).substring(0, 500) + "..."
-                    });
-
-                    await connect({
-                      auth: { type: "accessToken", value: accessToken },
-                      configId,
-                      sessionSettings,
-                    });
-
-                    console.log("✅ CALL CONNECTED SUCCESSFULLY TO HUME");
-                  } catch (err) {
-                    console.error("❌ CALL FAILED:", err);
-                    toast.error("Unable to start call");
-                  }
-                }}
-              >
-                <span>
-                  <Phone
-                    className={"size-4 opacity-50 fill-current"}
-                    strokeWidth={0}
-                  />
-                </span>
-                <span>Start Call</span>
-              </Button>
+              {!autoStart && (
+                <Button
+                  className={"z-50 flex items-center gap-1.5 rounded-full"}
+                  onClick={startCall}
+                >
+                  <span>
+                    <Phone
+                      className={"size-4 opacity-50 fill-current"}
+                      strokeWidth={0}
+                    />
+                  </span>
+                  <span>Start Call</span>
+                </Button>
+              )}
             </motion.div>
           </AnimatePresence>
         </motion.div>

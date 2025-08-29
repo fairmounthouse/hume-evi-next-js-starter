@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserUsageSummary } from "@/utils/billing-client";
+import { getUserUsageSummaryFromSupabase } from "@/utils/billing-client";
 
 export async function GET(request: NextRequest) {
   try {
     // Check authentication
-    const { userId } = await auth();
+    const { userId, has } = await auth();
     if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -13,8 +13,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get user's usage summary
-    const usageSummary = await getUserUsageSummary(userId);
+    // Determine user's plan key from Clerk
+    let planKey = 'free'; // default
+    if (has?.({ plan: 'premium' })) {
+      planKey = 'premium';
+    } else if (has?.({ plan: 'professional' })) {
+      planKey = 'professional';
+    } else if (has?.({ plan: 'starter' })) {
+      planKey = 'starter';
+    }
+
+    // Get user's usage summary with plan from Supabase
+    const usageSummary = await getUserUsageSummaryFromSupabase(userId, planKey);
 
     return NextResponse.json(usageSummary);
 

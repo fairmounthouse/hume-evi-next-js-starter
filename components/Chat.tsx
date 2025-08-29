@@ -2256,13 +2256,11 @@ export default function ClientComponent({
             sessionId={sessionId}
             selectedCaseId={selectedCaseId}
             selectedInterviewerId={selectedInterviewerId}
+            autoStart={true}
             onCallStart={() => {
               console.log("📱 onCallStart callback - starting camera AND recording panel");
-              // Start camera immediately
               videoRef.current?.startVideo();
-              // Force show recording panel
               setForceShowRecording(true);
-              // Also try to set call active
               setIsCallActive(true);
             }}
           />
