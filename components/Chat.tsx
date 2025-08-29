@@ -206,16 +206,26 @@ function ChatInterface({
     
     // Filter for actual conversation messages with content - be more inclusive to avoid data loss
     const conversationMessages = messages.filter(msg => {
-      const hasContent = msg.message?.content && msg.message.content.trim().length > 0;
+      // Safety checks for message structure
+      if (!msg || typeof msg !== 'object') {
+        console.log("🔍 [TRANSCRIPT] Skipping invalid message:", msg);
+        return false;
+      }
+
+      const hasContent = msg.message?.content && 
+                        typeof msg.message.content === 'string' && 
+                        msg.message.content.trim().length > 0;
       const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
       
-      // Log all message types for debugging
-      if (!isConversation) {
-        console.log("🔍 [TRANSCRIPT] Skipping non-conversation message:", msg.type);
-      } else if (!hasContent) {
-        console.log("⚠️ [TRANSCRIPT] Skipping empty message:", msg.type, "content:", msg.message?.content);
-      } else {
-        console.log("✅ [TRANSCRIPT] Including message:", msg.type, msg.message.content.substring(0, 50) + "...");
+      // Log all message types for debugging (but only first few to avoid spam)
+      if (messages.indexOf(msg) < 5 || isConversation) {
+        if (!isConversation) {
+          console.log("🔍 [TRANSCRIPT] Skipping non-conversation message:", msg.type);
+        } else if (!hasContent) {
+          console.log("⚠️ [TRANSCRIPT] Skipping empty message:", msg.type, "content:", msg.message?.content);
+        } else {
+          console.log("✅ [TRANSCRIPT] Including message:", msg.type, msg.message.content.substring(0, 50) + "...");
+        }
       }
       
       return isConversation && hasContent;
@@ -254,10 +264,19 @@ function ChatInterface({
       lastEntry: transcript[transcript.length - 1]?.text?.substring(0, 30) + "..." || "none"
     });
     
-    // Additional validation
+    // Additional validation - but don't alarm for normal startup messages
     if (transcript.length === 0 && messages.length > 0) {
-      console.error("🚨 [TRANSCRIPT] CRITICAL: No transcript entries created from", messages.length, "messages!");
-      console.error("🚨 [TRANSCRIPT] Message types:", messages.map(m => m.type));
+      const conversationMessageCount = messages.filter(m => m.type === "user_message" || m.type === "assistant_message").length;
+      const nonConversationTypes = [...new Set(messages.map(m => m.type))];
+      
+      if (conversationMessageCount > 0) {
+        // Only show error if we actually have conversation messages that failed to process
+        console.error("🚨 [TRANSCRIPT] CRITICAL: No transcript entries created from", conversationMessageCount, "conversation messages!");
+        console.error("🚨 [TRANSCRIPT] Message types:", messages.map(m => m.type));
+      } else {
+        // Normal case - only connection/metadata messages at start
+        console.log("📋 [TRANSCRIPT] No conversation messages yet, only connection messages:", nonConversationTypes.join(", "));
+      }
     }
     
     return transcript;

@@ -124,13 +124,11 @@ export class TranscriptEvaluator {
    */
   private updateTranscriptHistory(entries: TranscriptEntry[]): void {
     // Replace the entire history with new entries
+    // CRITICAL: Do NOT truncate the master transcript history!
+    // The rolling window is applied separately in getRollingWindow()
     this.transcriptHistory = [...entries];
     
-    // Clean up old entries outside the rolling window
-    const cutoffTime = Date.now() - this.ROLLING_WINDOW_MS;
-    this.transcriptHistory = this.transcriptHistory.filter(
-      entry => entry.timestamp * 1000 >= cutoffTime
-    );
+    console.log(`📚 [EVALUATOR] Updated master transcript history: ${this.transcriptHistory.length} total entries (NEVER truncated)`);
   }
 
   /**
@@ -227,6 +225,15 @@ export class TranscriptEvaluator {
       
       return `[${timeStr}] ${speaker}: ${entry.text}${emotionInfo}${confidenceInfo}`;
     }).join('\n');
+  }
+
+  /**
+   * Get the complete transcript history (never truncated)
+   * This is what should be used for downloads and final storage
+   */
+  getCompleteTranscriptHistory(): TranscriptEntry[] {
+    console.log(`📚 [EVALUATOR] Returning complete transcript history: ${this.transcriptHistory.length} entries (NEVER truncated)`);
+    return [...this.transcriptHistory];
   }
 
   /**
