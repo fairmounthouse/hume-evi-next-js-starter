@@ -42,7 +42,7 @@ export default function Navigation() {
         
         <ul className="hidden md:flex gap-8 list-none">
           <li><Link href="#features" onClick={(e) => handleSmoothScroll(e, 'features')} className="text-black font-semibold hover:text-blue-accent transition-colors">Features</Link></li>
-          <li><Link href="#who-we-built-for" onClick={(e) => handleSmoothScroll(e, 'who-we-built-for')} className="text-black font-semibold hover:text-blue-accent transition-colors">Who We Built This For</Link></li>
+          <li><Link href="#built-for-you" onClick={(e) => handleSmoothScroll(e, 'built-for-you')} className="text-black font-semibold hover:text-blue-accent transition-colors">Built for You</Link></li>
           <li><Link href="#testimonials" onClick={(e) => handleSmoothScroll(e, 'testimonials')} className="text-black font-semibold hover:text-blue-accent transition-colors">Testimonials</Link></li>
           <li><Link href="#pricing" onClick={(e) => handleSmoothScroll(e, 'pricing')} className="text-black font-semibold hover:text-blue-accent transition-colors">Pricing</Link></li>
           <li><Link href="#team" onClick={(e) => handleSmoothScroll(e, 'team')} className="text-black font-semibold hover:text-blue-accent transition-colors">Team</Link></li>

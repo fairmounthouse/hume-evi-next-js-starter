@@ -2,7 +2,7 @@
 
 export default function WhoWeBuiltFor() {
   return (
-    <section className="section-padding" style={{backgroundColor: '#94A4FF'}}>
+    <section id="built-for-you" className="section-padding" style={{backgroundColor: '#94A4FF'}}>
       <div className="max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight font-poppins">Built for You</h2>
