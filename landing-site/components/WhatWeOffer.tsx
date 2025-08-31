@@ -21,7 +21,7 @@ export default function WhatWeOffer() {
             <strong>Case &amp; behavioral • Beta</strong>
           </p>
           <p className="text-base text-black opacity-80 italic">
-            "AI that knows exactly which questions will break you—and serves them until they don't."
+            AI that knows exactly which questions will break you—and serves them until they don't.
           </p>
         </div>
         
@@ -34,7 +34,7 @@ export default function WhatWeOffer() {
             <strong>For interviews • Beta</strong>
           </p>
           <p className="text-base text-black opacity-80 italic">
-            "Get corrected mid-mistake, not after you've already failed."
+            Get corrected mid-mistake, not after you've already failed.
           </p>
         </div>
         
@@ -47,7 +47,7 @@ export default function WhatWeOffer() {
             <strong>Objective &amp; subjective</strong>
           </p>
           <p className="text-base text-black opacity-80 italic">
-            "See the invisible tells that cost offers: 23 ums, broken eye contact, energy crashes at 4:32."
+            See the invisible tells that cost offers: 23 ums, broken eye contact, energy crashes at 4:32.
           </p>
         </div>
         
@@ -60,7 +60,7 @@ export default function WhatWeOffer() {
             <strong>Full range + more coming soon</strong>
           </p>
           <p className="text-base text-black opacity-80 italic">
-            "Practice what stumped Harvard MBAs yesterday, not what case books published last year."
+            Practice what stumped Harvard MBAs yesterday, not what case books published last year.
           </p>
         </div>
         
@@ -73,7 +73,7 @@ export default function WhatWeOffer() {
             <strong>Frameworks, drills • Coming Soon</strong>
           </p>
           <p className="text-base text-black opacity-80 italic">
-            "The boring daily reps that make you sound brilliant without trying."
+            The boring daily reps that make you sound brilliant without trying.
           </p>
         </div>
       </div>
