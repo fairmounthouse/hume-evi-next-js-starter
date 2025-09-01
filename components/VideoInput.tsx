@@ -206,7 +206,7 @@ const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = fal
   }, []);
 
   return (
-    <div className="relative">
+    <div className="relative w-full h-full">
       <AnimatePresence mode="wait">
         {isVideoOn && (
           <motion.div
@@ -215,7 +215,7 @@ const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = fal
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.2 }}
             className={cn(
-              "relative overflow-hidden rounded-xl border border-border/50",
+              "relative w-full h-full overflow-hidden rounded-xl border border-border/50",
               "bg-card shadow-sm"
             )}
           >
@@ -261,8 +261,8 @@ const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = fal
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className={cn(
-              "flex items-center justify-center p-8 rounded-xl border-2 border-dashed border-border",
-              "bg-card shadow-lg"
+              "flex items-center justify-center rounded-xl border-2 border-dashed border-border",
+              "bg-card shadow-lg w-full h-full"
             )}
           >
             <div className="text-center">
