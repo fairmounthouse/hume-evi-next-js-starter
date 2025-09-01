@@ -324,9 +324,39 @@ export default function DashboardPage() {
                       <Star className="h-4 w-4 text-yellow-600" />
                       <span className="text-sm font-medium">Avg. Score</span>
                     </div>
-                    <p className="text-2xl font-bold">
-{quickStats?.average_score ? `${quickStats.average_score}/5.0` : 'No data'}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      {quickStats?.average_score ? (
+                        <>
+                          {(() => {
+                            const score = parseFloat(quickStats.average_score.toString());
+                            const filledStars = Math.round(score);
+                            const stars = [];
+                            
+                            for (let i = 1; i <= 5; i++) {
+                              stars.push(
+                                <Star
+                                  key={i}
+                                  className={`w-4 h-4 ${
+                                    i <= filledStars 
+                                      ? 'text-yellow-500 fill-yellow-500' 
+                                      : 'text-gray-300 fill-gray-300'
+                                  }`}
+                                />
+                              );
+                            }
+                            
+                            return (
+                              <div className="flex items-center gap-0.5">
+                                {stars}
+                              </div>
+                            );
+                          })()}
+
+                        </>
+                      ) : (
+                        <span className="text-sm text-gray-500">No data</span>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
