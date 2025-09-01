@@ -39,7 +39,7 @@ export default function SessionViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'verdict' | 'analysis' | 'nextsteps'>('verdict');
-  const [showTranscript, setShowTranscript] = useState(true);
+
 
   useEffect(() => {
     const fetchSessionData = async () => {
@@ -111,6 +111,34 @@ export default function SessionViewerPage() {
     if (score >= 4) return "high";
     if (score >= 2.5) return "medium";
     return "low";
+  };
+
+  // Star rating component
+  const renderStarRating = (score: number, showScore: boolean = true) => {
+    const filledStars = Math.round(score);
+    const stars = [];
+    
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            i <= filledStars 
+              ? 'text-yellow-500 fill-yellow-500' 
+              : 'text-gray-300 fill-gray-300'
+          }`}
+        />
+      );
+    }
+    
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5">
+          {stars}
+        </div>
+
+      </div>
+    );
   };
 
   const getVerdict = (score: number): string => {
@@ -206,15 +234,7 @@ export default function SessionViewerPage() {
               <span className="text-sm text-[#71717a]">ID: {sessionId}</span>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowTranscript(!showTranscript)}
-                disabled={!transcript}
-                className="flex items-center gap-2"
-              >
-                📥 {showTranscript ? 'Hide' : 'Show'} Transcript
-              </Button>
+
               <Button 
                 variant="outline" 
                 size="sm"
@@ -384,9 +404,30 @@ export default function SessionViewerPage() {
                   <div>
                     {/* Overall Score */}
                     <div className="text-center py-8 mb-6 border-b border-[#e4e4e7]">
-                      <div>
-                        <span className="text-6xl font-bold text-[#dc2626] leading-none">{overallScore}</span>
-                        <span className="text-2xl text-[#71717a] font-normal"> / 5.0</span>
+                      <div className="flex justify-center">
+                        {(() => {
+                          const filledStars = Math.round(overallScore);
+                          const stars = [];
+                          
+                          for (let i = 1; i <= 5; i++) {
+                            stars.push(
+                              <Star
+                                key={i}
+                                className={`w-12 h-12 ${
+                                  i <= filledStars 
+                                    ? 'text-yellow-500 fill-yellow-500' 
+                                    : 'text-gray-300 fill-gray-300'
+                                }`}
+                              />
+                            );
+                          }
+                          
+                          return (
+                            <div className="flex items-center gap-1">
+                              {stars}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className={`inline-block mt-4 px-4 py-1.5 rounded text-xs font-semibold uppercase tracking-wider ${
                         verdict === 'Recommended' ? 'bg-[#dcfce7] text-[#22c55e]' :
@@ -455,12 +496,8 @@ export default function SessionViewerPage() {
                                 <div className="text-sm font-semibold text-[#0a0a0a] flex-1 leading-tight">
                                   {dimensionLabels[key as keyof typeof dimensionLabels]}
                                 </div>
-                                <div className={`text-2xl font-bold ml-3 ${
-                                  scoreColor === 'high' ? 'text-[#22c55e]' :
-                                  scoreColor === 'medium' ? 'text-[#f59e0b]' :
-                                  'text-[#dc2626]'
-                                }`}>
-                                  {dimension.score}
+                                <div className="ml-3">
+                                  {renderStarRating(dimension.score)}
                                 </div>
                               </div>
                               <div className="text-xs text-[#71717a] mb-3 leading-tight">
@@ -649,6 +686,11 @@ export default function SessionViewerPage() {
                   <div className="p-5">
                     <div className="mb-6">
                       <h2 className="text-lg font-semibold text-[#0a0a0a] mb-2">Your Path Forward</h2>
+                      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800 font-medium">
+                          📝 This is placeholder content for now. Transcript is available by default in the right panel.
+                        </p>
+                      </div>
                       <p className="text-sm text-[#71717a] leading-relaxed">
                         {mbbReport.next_steps}
                       </p>
@@ -697,7 +739,7 @@ export default function SessionViewerPage() {
               </div>
               
           {/* Right Panel - Transcript */}
-          {showTranscript && (
+          {(
             <div className="lg:col-span-1 bg-white border border-[#e4e4e7] rounded-lg max-h-[600px] overflow-y-auto">
                 <div className="p-4 border-b border-[#e4e4e7] flex justify-between items-center sticky top-0 bg-white z-10">
                   <h3 className="text-base font-semibold text-[#0a0a0a] flex items-center gap-2">
@@ -724,20 +766,55 @@ export default function SessionViewerPage() {
                 </div>
                 <div className="flex-1 p-4">
                   {transcript ? (
-                    <div className="space-y-2">
-                      {transcript.map((entry: any, index: number) => {
-                        const isUser = entry.speaker === "user";
-                        const timestamp = entry.timestamp ? 
-                          `${Math.floor(entry.timestamp / 60).toString().padStart(2, '0')}:${(entry.timestamp % 60).toString().padStart(2, '0')}` : 
-                          '';
+                    <div className="space-y-3">
+                      {(() => {
+                        // Group consecutive messages by speaker for cleaner display
+                        const groups: Array<{speaker: string, entries: any[], startIndex: number}> = [];
+                        let currentGroup: {speaker: string, entries: any[], startIndex: number} | null = null;
                         
-                        return (
-                          <div key={index} className={`p-3 rounded-lg ${isUser ? 'bg-blue-50 border-l-4 border-blue-500' : 'bg-gray-50 border-l-4 border-gray-400'}`}>
-                            <div className="text-xs text-gray-500 mb-1">{timestamp}</div>
-                            <p className="text-sm text-gray-800 leading-relaxed">{entry.text}</p>
-                          </div>
-                        );
-                      })}
+                        transcript.forEach((entry: any, index: number) => {
+                          if (!currentGroup || currentGroup.speaker !== entry.speaker) {
+                            if (currentGroup) groups.push(currentGroup);
+                            currentGroup = { speaker: entry.speaker, entries: [entry], startIndex: index };
+                          } else {
+                            currentGroup.entries.push(entry);
+                          }
+                        });
+                        if (currentGroup) groups.push(currentGroup);
+                        
+                        return groups.map((group, groupIndex) => {
+                          const isUser = group.speaker === "user";
+                          const speakerLabel = isUser ? "You" : "AI Interviewer";
+                          const speakerIcon = isUser ? "👤" : "🤖";
+                          
+                          return (
+                            <div key={groupIndex} className="space-y-2">
+                              {/* Speaker heading */}
+                              <div className="flex items-center gap-2 mt-4 first:mt-0">
+                                <span className="text-lg">{speakerIcon}</span>
+                                <h4 className={`text-sm font-medium ${isUser ? 'text-blue-700' : 'text-gray-700'}`}>
+                                  {speakerLabel}
+                                </h4>
+                                <div className={`flex-1 h-px ${isUser ? 'bg-blue-200' : 'bg-gray-200'}`}></div>
+                              </div>
+                              
+                              {/* Messages in this group */}
+                              {group.entries.map((entry: any, entryIndex: number) => {
+                                const timestamp = entry.timestamp ? 
+                                  `${Math.floor(entry.timestamp / 60).toString().padStart(2, '0')}:${(entry.timestamp % 60).toString().padStart(2, '0')}` : 
+                                  '';
+                                
+                                return (
+                                  <div key={group.startIndex + entryIndex} className={`p-3 rounded-lg ${isUser ? 'bg-blue-50 border-l-2 border-blue-300' : 'bg-gray-50 border-l-2 border-gray-300'}`}>
+                                    <div className="text-xs text-gray-500 mb-1">{timestamp}</div>
+                                    <p className="text-sm text-gray-800 leading-relaxed">{entry.text}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
                   ) : (
                     <div className="flex items-center justify-center py-12 text-gray-500">

@@ -5,6 +5,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
 import { Timeline, VerticalTimeline } from "./ui/timeline";
+import { Star } from "lucide-react";
 
 interface DimensionScore {
   score: number;
@@ -96,7 +97,7 @@ export default function InterviewEndScreen({
   const [isLoadingMbbReport, setIsLoadingMbbReport] = useState(false);
   const [mbbReportError, setMbbReportError] = useState<string | null>(null);
   const [timelineFilter, setTimelineFilter] = useState<'all' | 'critical' | 'warning' | 'positive'>('all');
-  const [showTranscript, setShowTranscript] = useState(true);
+
   const [mbbAssessment, setMbbAssessment] = useState<any | null>(null);
   const [isLoadingMbbAssessment, setIsLoadingMbbAssessment] = useState(false);
 
@@ -281,6 +282,34 @@ export default function InterviewEndScreen({
     return "low";
   };
 
+  // Star rating component
+  const renderStarRating = (score: number, showScore: boolean = true) => {
+    const filledStars = Math.round(score);
+    const stars = [];
+    
+    for (let i = 1; i <= 5; i++) {
+      stars.push(
+        <Star
+          key={i}
+          className={`w-4 h-4 ${
+            i <= filledStars 
+              ? 'text-yellow-500 fill-yellow-500' 
+              : 'text-gray-300 fill-gray-300'
+          }`}
+        />
+      );
+    }
+    
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5">
+          {stars}
+        </div>
+
+      </div>
+    );
+  };
+
   const getVerdict = (score: number): string => {
     if (score >= 4) return "Recommended";
     if (score >= 3) return "Borderline";
@@ -405,15 +434,7 @@ export default function InterviewEndScreen({
             <span className="text-sm text-[#71717a]">Session ID: {sessionId}</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setShowTranscript(!showTranscript)}
-              disabled={!hasTranscript}
-              className="flex items-center gap-2"
-            >
-              📥 {showTranscript ? 'Hide' : 'Show'} Transcript
-            </Button>
+
             <Button 
               variant="outline" 
               size="sm"
@@ -544,9 +565,31 @@ export default function InterviewEndScreen({
                     <div>
                   {/* Overall Score */}
                   <div className="text-center py-8 mb-6 border-b border-[#e4e4e7]">
-                    <div>
-                      <span className="text-6xl font-bold text-[#dc2626] leading-none">{overallScore}</span>
-                      <span className="text-2xl text-[#71717a] font-normal"> / 5.0</span>
+                    <div className="flex flex-col items-center gap-3">
+                      {(() => {
+                        const filledStars = Math.round(overallScore);
+                        const stars = [];
+                        
+                        for (let i = 1; i <= 5; i++) {
+                          stars.push(
+                            <Star
+                              key={i}
+                              className={`w-8 h-8 ${
+                                i <= filledStars 
+                                  ? 'text-yellow-500 fill-yellow-500' 
+                                  : 'text-gray-300 fill-gray-300'
+                              }`}
+                            />
+                          );
+                        }
+                        
+                        return (
+                          <div className="flex items-center gap-1">
+                            {stars}
+                          </div>
+                        );
+                      })()}
+
                     </div>
                     <div className={`inline-block mt-4 px-4 py-1.5 rounded text-xs font-semibold uppercase tracking-wider ${
                       verdict === 'Recommended' ? 'bg-[#dcfce7] text-[#22c55e]' :
@@ -613,12 +656,8 @@ export default function InterviewEndScreen({
                               <div className="text-sm font-semibold text-[#0a0a0a] flex-1 leading-tight">
                                 {dimensionLabels[key as keyof typeof dimensionLabels]}
                               </div>
-                              <div className={`text-2xl font-bold ml-3 ${
-                                scoreColor === 'high' ? 'text-[#22c55e]' :
-                                scoreColor === 'medium' ? 'text-[#f59e0b]' :
-                                'text-[#dc2626]'
-                              }`}>
-                                {dimension.score}
+                              <div className="ml-3">
+                                {renderStarRating(dimension.score)}
                               </div>
                             </div>
                             <div className="text-xs text-[#71717a] mb-3 leading-tight">
@@ -889,6 +928,11 @@ export default function InterviewEndScreen({
                     <div>
                       <div className="mb-6">
                         <h2 className="text-lg font-semibold text-[#0a0a0a] mb-2">Your Path Forward</h2>
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800 font-medium">
+                            📝 This is placeholder content for now. Transcript is available by default in the right panel.
+                          </p>
+                        </div>
                         <p className="text-sm text-[#71717a] leading-relaxed">
                           {mbbReport.next_steps}
                         </p>
@@ -975,8 +1019,8 @@ export default function InterviewEndScreen({
             </div>
           </div>
 
-          {/* Right Panel - Transcript (conditionally shown) */}
-          {showTranscript && (
+          {/* Right Panel - Transcript */}
+          {(
             <div className="w-full xl:w-80 xl:flex-shrink-0 xl:fixed xl:right-4 xl:top-36 xl:bottom-4 xl:overflow-y-auto bg-white border border-[#e4e4e7] rounded-lg">
               <div className="p-4 border-b border-[#e4e4e7] flex justify-between items-center sticky top-0 bg-white z-10">
                   <h3 className="text-base font-semibold text-[#0a0a0a] flex items-center gap-2">
@@ -1003,22 +1047,56 @@ export default function InterviewEndScreen({
                 </div>
                 <div className="flex-1 p-4">
                 {transcriptText ? (
-                  <div className="space-y-2">
-                    {transcriptText.split('\n').map((line, index) => {
-                      if (!line.trim()) return null;
+                  <div className="space-y-3">
+                    {(() => {
+                      // Parse and group messages by speaker
+                      const lines = transcriptText.split('\n').filter(line => line.trim());
+                      const groups: Array<{speaker: string, messages: Array<{timestamp: string, content: string}>, startIndex: number}> = [];
+                      let currentGroup: {speaker: string, messages: Array<{timestamp: string, content: string}>, startIndex: number} | null = null;
                       
-                      const isUser = line.includes('YOU:');
-                      const timeMatch = line.match(/\[([^\]]+)\]/);
-                      const timestamp = timeMatch ? timeMatch[1] : '';
-                      const content = line.replace(/\[[^\]]+\]/, '').replace(/^(YOU:|AI INTERVIEWER:)/, '').trim();
+                      lines.forEach((line, index) => {
+                        const isUser = line.includes('YOU:');
+                        const speaker = isUser ? 'user' : 'assistant';
+                        const timeMatch = line.match(/\[([^\]]+)\]/);
+                        const timestamp = timeMatch ? timeMatch[1] : '';
+                        const content = line.replace(/\[[^\]]+\]/, '').replace(/^(YOU:|AI INTERVIEWER:)/, '').trim();
+                        
+                        if (!currentGroup || currentGroup.speaker !== speaker) {
+                          if (currentGroup) groups.push(currentGroup);
+                          currentGroup = { speaker, messages: [{timestamp, content}], startIndex: index };
+                        } else {
+                          currentGroup.messages.push({timestamp, content});
+                        }
+                      });
+                      if (currentGroup) groups.push(currentGroup);
                       
-                      return (
-                        <div key={index} className={`p-3 rounded-lg ${isUser ? 'bg-blue-50 border-l-4 border-blue-500' : 'bg-gray-50 border-l-4 border-gray-400'}`}>
-                          <div className="text-xs text-gray-500 mb-1">{timestamp}</div>
-                          <p className="text-sm text-gray-800 leading-relaxed">{content}</p>
-                        </div>
-                      );
-                    })}
+                      return groups.map((group, groupIndex) => {
+                        const isUser = group.speaker === "user";
+                        const speakerLabel = isUser ? "You" : "AI Interviewer";
+                        const speakerIcon = isUser ? "👤" : "🤖";
+                        
+                        return (
+                          <div key={groupIndex} className="space-y-2">
+                            {/* Speaker heading */}
+                            <div className="flex items-center gap-2 mt-4 first:mt-0">
+                              <span className="text-lg">{speakerIcon}</span>
+                              <h4 className={`text-sm font-medium ${isUser ? 'text-blue-700' : 'text-gray-700'}`}>
+                                {speakerLabel}
+                              </h4>
+                              <div className={`flex-1 h-px ${isUser ? 'bg-blue-200' : 'bg-gray-200'}`}></div>
+                            </div>
+                            
+                            {/* Messages in this group */}
+                            {group.messages.map((msg, msgIndex) => (
+                              <div key={group.startIndex + msgIndex} className={`p-3 rounded-lg ${isUser ? 'bg-blue-50 border-l-2 border-blue-300' : 'bg-gray-50 border-l-2 border-gray-300'}`}>
+                                <div className="text-xs text-gray-500 mb-1">{msg.timestamp}</div>
+                                <p className="text-sm text-gray-800 leading-relaxed">{msg.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center py-12 text-gray-500">

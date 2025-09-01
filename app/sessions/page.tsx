@@ -210,10 +210,35 @@ export default function SessionsPage() {
                         </span>
                       </div>
                       <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {session.overall_score}/5.0
+                        <div className="flex items-center justify-center gap-2">
+                          {(() => {
+                            const filledStars = Math.round(session.overall_score);
+                            const stars = [];
+                            
+                            for (let i = 1; i <= 5; i++) {
+                              stars.push(
+                                <Star
+                                  key={i}
+                                  className={`w-5 h-5 ${
+                                    i <= filledStars 
+                                      ? 'text-yellow-500 fill-yellow-500' 
+                                      : 'text-gray-300 fill-gray-300'
+                                  }`}
+                                />
+                              );
+                            }
+                            
+                            return (
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="flex items-center gap-0.5">
+                                  {stars}
+                                </div>
+
+                              </div>
+                            );
+                          })()}
                         </div>
-                        <div className="text-xs text-blue-600 dark:text-blue-400">MBB Assessment Score</div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">MBB Assessment Score</div>
                       </div>
                     </div>
                   )}

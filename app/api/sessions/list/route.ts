@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         created_at: session.created_at,
         started_at: session.started_at,
         duration_seconds: session.duration_seconds,
-        has_detailed_analysis: !!(session.detailed_analysis),
+        has_detailed_analysis: !!(session.detailed_analysis) || !!(session.mbb_assessment_data) || !!(session.mbb_report_data),
         has_video: !!(session.video_url),
         status: session.status,
         transcript_path: session.transcript_path,
