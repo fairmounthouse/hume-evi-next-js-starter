@@ -17,7 +17,7 @@ export default function FloatingTranscriptButton({
     <Button
       onClick={onClick}
       className={cn(
-        "fixed bottom-6 right-6 z-30 shadow-lg hover:shadow-xl transition-all duration-200",
+        "fixed top-4 right-4 z-30 shadow-lg hover:shadow-xl transition-all duration-200",
         "bg-blue-600 hover:bg-blue-700 text-white",
         "rounded-full px-4 py-3 flex items-center gap-2",
         "lg:px-4 lg:py-3 md:px-3 md:py-2 sm:px-3 sm:py-2",

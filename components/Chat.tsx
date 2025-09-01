@@ -18,7 +18,7 @@ import { Switch } from "./ui/switch";
 import { Toggle } from "./ui/toggle";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { GraduationCap, FileText, Download, User, Maximize2, X, Eye, EyeOff, Settings, Home } from "lucide-react";
+import { GraduationCap, FileText, Download, User, Maximize2, X, Eye, EyeOff, Settings, Home, Mic, MicOff, Video as VideoIcon, VideoOff as VideoOffIcon } from "lucide-react";
 import DeviceSetup from "./DeviceSetup";
 import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
@@ -27,7 +27,6 @@ import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
 import MBBAssessment from "./MBBAssessment";
 import InterviewEndScreen from "./InterviewEndScreen";
 import TranscriptDrawer from "./TranscriptDrawer";
-import FloatingTranscriptButton from "./FloatingTranscriptButton";
 import ExhibitModal from "./ExhibitModal";
 import { ExhibitManager, ExhibitManagerState, initializeGlobalExhibitManager } from "@/utils/exhibit-manager";
 import { useSmartScroll } from "@/hooks/useSmartScroll";
@@ -78,7 +77,7 @@ function ChatInterface({
   selectedDevices,
   onOpenDeviceSetup,
 }: any) {
-  const { messages, sendSessionSettings, status, sendToolMessage } = useVoice();
+  const { messages, sendSessionSettings, status, sendToolMessage, micFft, isMuted, mute, unmute } = useVoice();
   const { getRelativeTime, formatRelativeTime } = useRecordingAnchor();
   
   // Transcript scrolling refs and state
@@ -118,6 +117,21 @@ function ChatInterface({
   // DUAL TRANSCRIPT SYSTEM:
   // 1. transcriptEvaluator.getCompleteTranscriptHistory() - NEVER TRUNCATED - Used for downloads and storage
   // 2. transcriptEvaluator rolling window (1 minute) - TRUNCATED - Used for real-time feedback only
+
+  const pipRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const [pipPos, setPipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [hasCustomPipPos, setHasCustomPipPos] = useState(false);
+  const [isDraggingPip, setIsDraggingPip] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [assistantSpeaking, setAssistantSpeaking] = useState(false);
+  const lastAssistantIndexRef = useRef<number>(-1);
+  // Simple instant detection – flash when audio is present
+  const assistantLastTriggerMsRef = useRef<number>(0);
+  const sessionStorageKey = useMemo(
+    () => `pipPos_${sessionId || urlSessionId || 'default'}`,
+    [sessionId, urlSessionId]
+  );
   // MASTER TRANSCRIPT - NEVER TRUNCATED - Contains complete conversation history
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
   const currentMessagesRef = useRef<any[]>([]);
@@ -674,21 +688,7 @@ function ChatInterface({
     };
   }, [unlockedExhibits, showEndScreen]);
 
-  // Auto-open exhibits when AI tool calls create them
-  useEffect(() => {
-    if (showEndScreen || !exhibitManager) return;
-
-    // Find any newly unlocked exhibits that should be auto-displayed
-    const autoDisplayExhibit = unlockedExhibits.find((exhibit: any) => 
-      exhibit.auto_displayed && 
-      Date.now() - exhibit.unlocked_at.getTime() < 2000 // Within last 2 seconds
-    );
-
-    if (autoDisplayExhibit && exhibitManager && !exhibitManagerState.isActive) {
-      console.log("🤖 Auto-opening exhibit from AI tool call:", autoDisplayExhibit.display_name);
-      exhibitManager.openExhibit(autoDisplayExhibit.id);
-    }
-  }, [unlockedExhibits, exhibitManager, showEndScreen, exhibitManagerState.isActive]);
+  // (moved to ClientComponent) Auto-open exhibits when AI tool calls create them
 
   // Auto-scroll transcript when new messages arrive (only if at bottom)
   useEffect(() => {
@@ -1333,6 +1333,115 @@ function ChatInterface({
     setShowAnalysisFeedbackForm(false);
   };
 
+  // Expose a global toggle function for Controls' coach button
+  useEffect(() => {
+    (window as any).handleGlobalCoachingToggle = () => handleCoachingToggle(!coachingMode);
+    return () => { delete (window as any).handleGlobalCoachingToggle };
+  }, [coachingMode]);
+
+  // Expose camera controls for bottom Controls bar (off-the-shelf style integration)
+  useEffect(() => {
+    (window as any).__toggleCamera = async () => {
+      try {
+        const stream = videoRef.current?.getStream();
+        const hasTrack = !!stream && stream.getVideoTracks().length > 0;
+        if (hasTrack) {
+          videoRef.current?.stopVideo();
+        } else {
+          await videoRef.current?.startVideo();
+        }
+      } catch (e) {
+        console.error("Camera toggle failed", e);
+      }
+    };
+    (window as any).__isCameraOn = () => {
+      try {
+        const stream = videoRef.current?.getStream();
+        if (!stream) return false;
+        const track = stream.getVideoTracks()[0];
+        return !!track && track.readyState === 'live' && track.enabled !== false;
+      } catch {
+        return false;
+      }
+    };
+    return () => {
+      delete (window as any).__toggleCamera;
+      delete (window as any).__isCameraOn;
+    };
+  }, []);
+
+  // Initialize PiP position to bottom-right with safe margins
+  useEffect(() => {
+    const setInitial = () => {
+      const stage = stageRef.current;
+      const pip = pipRef.current;
+      if (!stage || !pip) return;
+      const stageRect = stage.getBoundingClientRect();
+      const pipRect = pip.getBoundingClientRect();
+      const safe = { left: 16, top: 16, right: 16, bottom: 120 };
+      // Try restore from sessionStorage first
+      try {
+        const raw = sessionStorage.getItem(sessionStorageKey);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          const clampedX = Math.min(
+            Math.max(safe.left, saved.x ?? 0),
+            stageRect.width - pipRect.width - safe.right
+          );
+          const clampedY = Math.min(
+            Math.max(safe.top, saved.y ?? 0),
+            stageRect.height - pipRect.height - safe.bottom
+          );
+          setPipPos({ x: clampedX, y: clampedY });
+          setHasCustomPipPos(true);
+          return;
+        }
+      } catch {}
+      // Default to bottom-right
+      const x = stageRect.width - pipRect.width - safe.right;
+      const y = stageRect.height - pipRect.height - safe.bottom;
+      setPipPos({ x: Math.max(safe.left, x), y: Math.max(safe.top, y) });
+    };
+    setTimeout(setInitial, 0);
+    window.addEventListener('resize', setInitial);
+    return () => window.removeEventListener('resize', setInitial);
+  }, [sessionStorageKey]);
+
+  // Determine speaking state from mic FFT
+  useEffect(() => {
+    if (!micFft || micFft.length === 0 || isMuted) { setIsSpeaking(false); return; }
+    const sample = micFft.slice(0, Math.min(16, micFft.length));
+    const max = sample.reduce((m, v) => v > m ? v : m, 0);
+    // Simple noise gate: require max above a slightly higher threshold and at least 2 bins above gate
+    const gate = 0.3; // filter out little noises
+    const countAbove = sample.filter(v => v > gate).length;
+    setIsSpeaking(max > gate && countAbove >= 2);
+  }, [micFft, isMuted]);
+
+  // Assistant speaking indicator – glow the interviewer window on new assistant messages (throttled)
+  useEffect(() => {
+    try {
+      const types = messages.map((m: any) => m.type);
+      const idx = types.lastIndexOf("assistant_message");
+      if (idx > lastAssistantIndexRef.current) {
+        lastAssistantIndexRef.current = idx;
+        const now = performance.now();
+        // Avoid re-triggering too frequently on rapid message bursts
+        if (now - assistantLastTriggerMsRef.current > 400) {
+          assistantLastTriggerMsRef.current = now;
+          setAssistantSpeaking(true);
+          const t = setTimeout(() => setAssistantSpeaking(false), 900);
+          return () => clearTimeout(t);
+        }
+      }
+    } catch {}
+    return undefined;
+  }, [messages]);
+
+  // PiP dragging with safe zones
+  // Using react-draggable for off-the-shelf PiP dragging
+  // No custom pip dragging; keep static bottom-right per simple conferencing UI
+
   return (
     <>
       {showEndScreen ? (
@@ -1356,7 +1465,6 @@ function ChatInterface({
             // Use storedTranscript as primary source (has correct timestamps from buildTranscriptFromMessages)
             const completeTranscript = storedTranscript;
             console.log("📄 [END_SCREEN] Using stored transcript (with correct timestamps):", completeTranscript.length, "entries");
-            
             return completeTranscript.map(entry => {
               // Use centralized timestamp formatting (same as used during interview display)
               const timeStr = formatRelativeTime(entry.timestamp || 0);
@@ -1372,9 +1480,8 @@ function ChatInterface({
             window.location.href = "/dashboard";
           }}
         />
-
       ) : showVideoReview ? (
-        <div className="grow flex flex-col overflow-hidden pt-14 p-6">
+        <div className="grow flex flex-col overflow-hidden p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-2xl font-bold">Interview Recording</h2>
             <div className="flex gap-2">
@@ -1421,244 +1528,148 @@ function ChatInterface({
           )}
         </div>
       ) : (
-        <div 
-          id="mainContainer" 
-          className={cn(
-            "main-container grow h-full min-h-0 pt-14",
-            exhibitManagerState.isActive && "exhibit-active"
-          )}
-        >
-          {/* Left Column - Transcript Section */}
-          <div className={cn(
-            "transcript-column",
-            !exhibitManagerState.isActive && "flex-1" // Take full space when no exhibit
-          )}>
-            <div className="transcript-section">
-              <div className="transcript-header relative">
-                <h3>Transcript</h3>
-                {/* Scroll to bottom button - always visible when not at bottom */}
-                {showScrollButton && (
-                  <button
-                    onClick={scrollToBottom}
-                    className="absolute top-0 right-0 w-8 h-8 bg-blue-500 hover:bg-blue-600 
-                              text-white rounded-full shadow-lg flex items-center justify-center 
-                              transition-all duration-200 z-10 text-sm"
-                    title="Go to latest message"
-                    aria-label="Scroll to latest message"
-                  >
-                    ↓
-                  </button>
+        <div className={cn("relative grow h-full min-h-0", primaryExhibit ? "" : "flex items-center justify-center p-4")}>        
+          {primaryExhibit ? (
+            <>
+              {/* Exhibit-first layout */}
+              <div className="h-full w-full flex items-center justify-center p-4">
+                {primaryExhibit?.image_url ? (
+                  <div className="w-full max-w-[1400px] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl">
+                    <img
+                      src={primaryExhibit.image_url}
+                      alt={primaryExhibit.description || primaryExhibit.display_name || "Exhibit"}
+                      className="w-full h-full object-contain bg-black"
+                      loading="eager"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full max-w-[1400px] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
+                    <span className="text-white/80 text-sm">Exhibit asset missing (no image_url)</span>
+                  </div>
                 )}
               </div>
-              <div 
-                ref={transcriptScrollRef}
-                className="transcript-content flex-1 overflow-y-auto min-h-0"
-                onScroll={handleTranscriptScroll}
-              >
-                <Messages ref={messagesRef} />
+
+              {/* Videos stack (top-right) */}
+              <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
+                {/* Interviewer tile */}
+                <div ref={stageRef} className={cn(
+                  "w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl",
+                  assistantSpeaking ? "ring-4 ring-blue-400" : "ring-0"
+                )}>
+                  <div className="w-full h-full flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-full bg-gray-700/60 text-white flex items-center justify-center">
+                      <span>👤</span>
+              </div>
+                  </div>
               </div>
               
-              {/* Session Selector - Only show when needed */}
-              {!urlSessionId && (
-                <div className="flex-shrink-0 flex justify-end p-4 border-t bg-white dark:bg-gray-900">
-                  <SessionSelector 
-                    onSelectSession={loadEndScreenFromCache}
-                    currentSessionId={sessionId}
-                  />
+                {/* User tile */}
+                <div ref={pipRef} className={cn(
+                  "w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl",
+                  !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
+                )}>
+                  <VideoInput ref={videoRef} autoStart={isCallActive} preferredDeviceId={selectedDevices?.cameraId} />
                 </div>
-              )}
+              </div>
+            </>
+          ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl scale-90">
+          {/* Interviewer window */}
+          <div ref={stageRef} className={cn(
+            "relative bg-black rounded-xl overflow-hidden shadow-2xl aspect-video",
+            assistantSpeaking ? "ring-4 ring-blue-400" : "ring-0"
+          )}>
+            {/* Stage label */}
+            <div className="absolute top-3 left-3 z-10">
+              <span className="px-2 py-1 text-[11px] font-medium rounded-full bg-white/80 backdrop-blur text-gray-900 border">Interviewer</span>
+            </div>
+            {/* Placeholder avatar (no effects) */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-24 w-24 rounded-full bg-gray-700/60 text-white flex items-center justify-center">
+                <span className="text-2xl">👤</span>
+              </div>
             </div>
           </div>
 
-          {/* Right Column - Video and Feedback */}
-          <div className="right-column w-full flex-shrink-0 p-4 pt-12 space-y-4 flex flex-col max-h-full overflow-y-auto">
-            {/* Video Input */}
-            <div className="flex-shrink-0">
-              <VideoInput 
-                ref={videoRef} 
-                autoStart={isCallActive} 
-                preferredDeviceId={selectedDevices?.cameraId}
-              />
+          {/* User window */}
+          <div ref={pipRef} className={cn(
+            "relative rounded-xl overflow-hidden shadow-2xl bg-black aspect-video",
+            !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
+          )}>
+            <VideoInput ref={videoRef} autoStart={isCallActive} preferredDeviceId={selectedDevices?.cameraId} />
             </div>
 
-
-          
-            {/* Coaching & Download Controls - Combined on one line */}
-            {isCallActive && (
-              <div className="flex-shrink-0">
-                <div className="flex gap-2 items-center">
-                  {/* Coaching Toggle */}
-                  <div className="flex items-center gap-1">
+          {/* Collapsible sidebar trigger handled by top-right icon */}
+          {/* Gear (devices) next to transcript button */}
+          {/* Top-right actions: Coach toggle, Transcript, Settings (no white header) */}
+          <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
+            <button
+              onClick={() => handleCoachingToggle(!coachingMode)}
+              className={cn("p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white", coachingMode && "bg-blue-600 text-white hover:bg-blue-700")}
+              title="Hints (Coach)"
+            >
+              <GraduationCap className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsTranscriptDrawerOpen(true)}
+              className="p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white"
+              title="View transcript"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+            <button
+              onClick={onOpenDeviceSetup}
+              className="p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white"
+              title="Device settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+          </div>
+          )}
+          <TranscriptDrawer
+            isOpen={isTranscriptDrawerOpen}
+            onClose={() => setIsTranscriptDrawerOpen(false)}
+            transcript={storedTranscript.map(entry => ({
+              id: entry.id || `${entry.timestamp}-${entry.speaker}`,
+              speaker: entry.speaker,
+              text: entry.text,
+              timestamp: entry.timestamp,
+              emotions: entry.emotions,
+              confidence: entry.confidence
+            }))}
+            hintsContent={(
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Coaching</span>
                     <Toggle
                       size="sm"
                       pressed={coachingMode}
                       disabled={isUpdatingCoaching}
                       onPressedChange={handleCoachingToggle}
-                      className={cn(
-                        "h-5 w-9 p-0 transition-all duration-200",
-                        coachingMode 
-                          ? "bg-blue-500 hover:bg-blue-600 data-[state=on]:bg-blue-500" 
-                          : "bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      )}
-                    >
-                      <GraduationCap className={cn(
-                        "h-2.5 w-2.5 transition-colors",
-                        coachingMode ? "text-white" : "text-gray-500 dark:text-gray-400"
-                      )} />
+                    className={cn("h-5 w-9 p-0", coachingMode ? "bg-blue-500 data-[state=on]:bg-blue-500" : "bg-gray-200 dark:bg-gray-700")}
+                  >
+                    <GraduationCap className={cn("h-2.5 w-2.5", coachingMode ? "text-white" : "text-gray-500 dark:text-gray-400")} />
                     </Toggle>
                   </div>
-                  
-                  {/* Download Buttons */}
-                  {storedTranscript.length > 0 && (
-                    <>
-                      <div className="w-px h-4 bg-gray-300 dark:bg-gray-600 mx-1" />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadTranscript('txt')}
-                        className="text-xs px-2"
-                      >
-                        <Download className="w-3 h-3 mr-1" />
-                        Transcript
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Live Feedback Display - Integrated into sidebar */}
-            <div className="flex-shrink-0">
-              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <div className="text-xs font-medium text-muted-foreground mb-1 flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${isCallActive && liveFeedbackEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
-                Live Feedback
+                  Live Hints
                 <div className="ml-auto flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">{liveFeedbackEnabled ? 'On' : 'Off'}</span>
-                  <Switch
-                    checked={liveFeedbackEnabled}
-                    onCheckedChange={setLiveFeedbackEnabled}
-                  />
+                    <Switch checked={liveFeedbackEnabled} onCheckedChange={setLiveFeedbackEnabled} />
                 </div>
               </div>
               {liveFeedbackEnabled ? (
                 <FeedbackDisplay ref={feedbackDisplayRef} />
               ) : (
                 <div className="text-center py-3 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                  <div className="text-xs text-gray-400 dark:text-gray-600">Live feedback disabled</div>
+                    <div className="text-xs text-gray-400 dark:text-gray-600">Hints disabled</div>
                 </div>
               )}
             </div>
-
-            {/* Case Exhibits Panel - Only show during active interview */}
-            {isCallActive && unlockedExhibits.length > 0 && (
-              <div className="flex-shrink-0 mt-4">
-                <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  Case Exhibits
-                  <span className="ml-auto bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 py-0.5 rounded text-xs">
-                    {unlockedExhibits.length}
-                  </span>
-                </div>
-                
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {unlockedExhibits.map((exhibit: any) => {
-                    const isPrimary = exhibitManagerState.currentExhibit?.id === exhibit.id;
-                    const isNewlyUnlocked = Date.now() - exhibit.unlocked_at.getTime() < 5000;
-                    
-                    return (
-                      <div
-                        key={exhibit.id}
-                        className={cn(
-                          "p-2 rounded-lg border cursor-pointer transition-all duration-200",
-                          isPrimary 
-                            ? "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 ring-1 ring-blue-200 dark:ring-blue-800" 
-                            : "bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800",
-                          isNewlyUnlocked && "ring-2 ring-green-400 animate-pulse"
-                        )}
-                        data-exhibit-trigger
-                        data-exhibit-id={exhibit.id}
-                        data-react-handled="true"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          
-                          console.log('🖱️ Sidebar exhibit clicked:', {
-                            exhibitId: exhibit.id,
-                            displayName: exhibit.display_name,
-                            isPrimary,
-                            managerActive: exhibitManagerState.isActive,
-                            currentExhibit: exhibitManagerState.currentExhibit?.id
-                          });
-                          
-                          if (exhibitManager) {
-                            if (isPrimary) {
-                              // If clicking active exhibit, close it
-                              console.log('🔄 Closing active exhibit from sidebar');
-                              exhibitManager.closeExhibit();
-                            } else {
-                              // If clicking different exhibit, open it
-                              console.log('🔄 Opening exhibit from sidebar:', exhibit.display_name);
-                              
-                              // Add a small delay to prevent conflicts
-                              setTimeout(() => {
-                                exhibitManager.openExhibit(exhibit.id);
-                              }, 50);
-                            }
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <img
-                            src={exhibit.image_url}
-                            alt={exhibit.display_name}
-                            className="w-8 h-8 object-cover rounded flex-shrink-0"
-                            loading="lazy"
-                          />
-                          
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-xs font-medium truncate">
-                              {exhibit.display_name}
-                            </h4>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              {isPrimary ? (
-                                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-                                  Active
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">
-                                  Click to show
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          
-                          <div className={cn(
-                            "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                            isPrimary ? "bg-blue-500" : "bg-gray-300"
-                          )} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs text-muted-foreground text-center">
-                    Exhibits unlocked by AI
-                  </p>
-                </div>
-              </div>
             )}
-
-
-
-          </div>
-          
-
-          
-
-
+          />
         </div>
       )}
 
@@ -1666,16 +1677,6 @@ function ChatInterface({
       {!showEndScreen && (
         <div className="relative">
           <Controls />
-          {/* Device Setup Button - Floating */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenDeviceSetup}
-            className="absolute -top-12 right-4 bg-white/90 backdrop-blur-sm border-gray-200 hover:bg-white shadow-sm"
-          >
-            <Settings className="w-4 h-4 mr-2" />
-            Devices
-          </Button>
         </div>
       )}
 
@@ -2041,9 +2042,13 @@ export default function ClientComponent({
   }, []);
 
   const handleShowExhibitFromSidebar = useCallback((exhibitId: string) => {
-    const exhibit = unlockedExhibits.find(e => e.id === exhibitId);
+    const exhibit = unlockedExhibits.find(e => e.id === exhibitId || e.exhibit_id === exhibitId);
     if (exhibit) {
-      setPrimaryExhibit({ ...exhibit, auto_displayed: false });
+      console.log("🎬 Embedding exhibit from sidebar:", exhibit.display_name || exhibit.exhibit_name);
+      setPrimaryExhibit(exhibit);
+      setExpandedExhibit(null);
+    } else {
+      console.warn("Exhibit ID not found in unlocked list:", exhibitId);
     }
   }, [unlockedExhibits]);
 
@@ -2057,6 +2062,16 @@ export default function ClientComponent({
   const handleCloseModal = useCallback(() => {
     setExpandedExhibit(null);
   }, []);
+  
+  // Auto-embed newly unlocked exhibits (parent level)
+  useEffect(() => {
+    if (!unlockedExhibits || unlockedExhibits.length === 0) return;
+    const newestAuto = unlockedExhibits.find((e: any) => e?.auto_displayed);
+    if (newestAuto && (!primaryExhibit || primaryExhibit.id !== newestAuto.id)) {
+      console.log("🎬 Embedding unlocked exhibit:", newestAuto.display_name || newestAuto.exhibit_name);
+      setPrimaryExhibit({ ...newestAuto, auto_displayed: false });
+    }
+  }, [unlockedExhibits, primaryExhibit]);
   
   // Monitor video stream availability (less frequently to reduce spam)
   useEffect(() => {

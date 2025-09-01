@@ -22,6 +22,7 @@ import {
 import { useRouter } from "next/navigation";
 import { cn } from "@/utils";
 import { toast } from "sonner";
+import { Progress } from "./ui/progress";
 
 interface MediaDeviceInfo {
   deviceId: string;
@@ -56,6 +57,7 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [isTestingAudio, setIsTestingAudio] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [micPercent, setMicPercent] = useState(0);
   
   // Permission states
   const [hasVideoPermission, setHasVideoPermission] = useState<boolean | null>(null);
@@ -67,6 +69,7 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const peakRef = useRef<number>(0);
 
   // Initialize devices and permissions
   useEffect(() => {
@@ -291,22 +294,31 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   const monitorAudioLevel = () => {
     if (!analyserRef.current) return;
     
-    // Use time-domain RMS so the percentage text and bar width correspond
     const analyser = analyserRef.current;
     const bufferLength = analyser.fftSize;
     const timeDomainData = new Uint8Array(bufferLength);
     analyser.getByteTimeDomainData(timeDomainData);
     
-    let sumSquares = 0;
+    // Find peak value in this frame
+    let peak = 0;
     for (let i = 0; i < bufferLength; i++) {
-      const centered = (timeDomainData[i] - 128) / 128; // normalize to [-1, 1]
-      sumSquares += centered * centered;
+      const amplitude = Math.abs((timeDomainData[i] - 128) / 128);
+      if (amplitude > peak) peak = amplitude;
     }
-    const rms = Math.sqrt(sumSquares / bufferLength); // 0..~1
     
-    // Apply gentle gain and clamp. This keeps the UI responsive without overshooting.
-    const normalizedLevel = Math.min(1, rms * 1.8);
+    // Apply peak hold with decay
+    if (!peakRef.current) peakRef.current = 0;
+    if (peak > peakRef.current) {
+      peakRef.current = peak;
+    } else {
+      // Decay the peak value gradually
+      peakRef.current *= 0.95;
+    }
+    
+    // Scale more aggressively for visual feedback
+    const normalizedLevel = Math.min(1, peakRef.current * 4);
     setAudioLevel(normalizedLevel);
+    setMicPercent(Math.max(0, Math.min(100, Math.round(normalizedLevel * 100))));
     
     animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
   };
@@ -562,14 +574,9 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
                 </label>
                 <div className="flex items-center gap-2">
                   <Mic className="w-4 h-4 text-gray-500" />
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-500 h-2 rounded-full transition-all duration-100"
-                      style={{ width: `${Math.min(audioLevel * 100, 100)}%` }}
-                    />
-                  </div>
+                  <Progress value={micPercent} className="flex-1 h-2" />
                   <span className="text-xs text-gray-500 w-8">
-                    {Math.round(audioLevel * 100)}%
+                    {micPercent}%
                   </span>
                 </div>
               </div>

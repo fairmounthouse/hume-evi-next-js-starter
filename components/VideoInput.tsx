@@ -225,7 +225,7 @@ const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = fal
               playsInline
               muted
               className={cn(
-                "w-full h-full min-h-[200px] max-h-[300px] object-cover",
+                "w-full h-full object-cover",
                 !usingFallback && "mirror" // Only mirror real camera
               )}
               style={{ 
@@ -240,34 +240,14 @@ const VideoInput = forwardRef<VideoInputRef, VideoInputProps>(({ autoStart = fal
               }}
             />
             
-            {/* Status indicator */}
-            <div className="absolute top-2 left-2">
-              <div className={cn(
-                "flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium",
-                usingFallback 
-                  ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                  : "bg-green-500/20 text-green-300 border border-green-500/30"
-              )}>
-                {usingFallback ? (
-                  <>
-                    <User className="h-3 w-3" />
-                    Virtual
-                  </>
-                ) : (
-                  <>
-                    <Video className="h-3 w-3" />
-                    Live
-                  </>
-                )}
-              </div>
-            </div>
-            
+            {/* Single camera toggle button */}
             <div className="absolute bottom-2 right-2">
               <Button
                 size="sm"
                 variant="secondary"
                 onClick={toggleVideo}
                 className="rounded-full shadow-md bg-background/80 backdrop-blur"
+                title={isVideoOn ? "Turn camera off" : "Turn camera on"}
               >
                 <VideoOff className="h-4 w-4" />
               </Button>
