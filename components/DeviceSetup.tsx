@@ -274,7 +274,8 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
       // Apply a modest boost so quieter mics register visibly on the meter
       gain.gain.value = 2.0;
       
-      analyser.fftSize = 256;
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.8;
       microphone.connect(gain);
       gain.connect(analyser);
       
@@ -290,13 +291,22 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   const monitorAudioLevel = () => {
     if (!analyserRef.current) return;
     
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
+    // Use time-domain RMS so the percentage text and bar width correspond
+    const analyser = analyserRef.current;
+    const bufferLength = analyser.fftSize;
+    const timeDomainData = new Uint8Array(bufferLength);
+    analyser.getByteTimeDomainData(timeDomainData);
     
-    const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
-    // Slight non-linear scaling for better low-end sensitivity in UI meter
-    const scaled = Math.min(1, Math.pow(average / 255, 0.8));
-    setAudioLevel(scaled);
+    let sumSquares = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const centered = (timeDomainData[i] - 128) / 128; // normalize to [-1, 1]
+      sumSquares += centered * centered;
+    }
+    const rms = Math.sqrt(sumSquares / bufferLength); // 0..~1
+    
+    // Apply gentle gain and clamp. This keeps the UI responsive without overshooting.
+    const normalizedLevel = Math.min(1, rms * 1.8);
+    setAudioLevel(normalizedLevel);
     
     animationFrameRef.current = requestAnimationFrame(monitorAudioLevel);
   };

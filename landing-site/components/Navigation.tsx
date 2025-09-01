@@ -6,6 +6,7 @@ import Logo from './Logo'
 
 export default function Navigation() {
   const [isScrolled, setIsScrolled] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -18,6 +19,7 @@ export default function Navigation() {
   }, [])
   const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, targetId: string) => {
     e.preventDefault()
+    setIsMobileMenuOpen(false) // Close mobile menu when navigating
     const targetElement = document.getElementById(targetId)
     if (targetElement) {
       const headerHeight = 100 // Account for fixed header height
@@ -48,21 +50,65 @@ export default function Navigation() {
           <li><Link href="#team" onClick={(e) => handleSmoothScroll(e, 'team')} className="text-black font-semibold hover:text-blue-accent transition-colors">Team</Link></li>
         </ul>
         
-        <div className="flex gap-4">
+        <div className="flex items-center gap-4">
+          {/* Desktop buttons */}
+          <div className="hidden md:flex gap-4">
+            <button 
+              className="btn-neubrutalist btn-white"
+              onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+            >
+              Log in
+            </button>
+            <button 
+              className="btn-neubrutalist btn-secondary"
+              onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+            >
+              Start Free
+            </button>
+          </div>
+          
+          {/* Mobile hamburger menu */}
           <button 
-            className="btn-neubrutalist btn-white"
-            onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+            className="md:hidden flex flex-col gap-1 p-2"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            aria-label="Toggle menu"
           >
-            Log in
-          </button>
-          <button 
-            className="btn-neubrutalist btn-secondary"
-            onClick={() => window.open('https://app.skillflo.ai', '_blank')}
-          >
-            Start Free
+            <span className={`w-6 h-0.5 bg-black transition-all duration-300 ${isMobileMenuOpen ? 'rotate-45 translate-y-1.5' : ''}`}></span>
+            <span className={`w-6 h-0.5 bg-black transition-all duration-300 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></span>
+            <span className={`w-6 h-0.5 bg-black transition-all duration-300 ${isMobileMenuOpen ? '-rotate-45 -translate-y-1.5' : ''}`}></span>
           </button>
         </div>
       </nav>
+      
+      {/* Mobile menu */}
+      <div className={`md:hidden bg-white border-t-2 border-black transition-all duration-300 ${
+        isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+      }`}>
+        <nav className="px-8 py-6">
+          <ul className="space-y-4">
+            <li><Link href="#features" onClick={(e) => handleSmoothScroll(e, 'features')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Features</Link></li>
+            <li><Link href="#built-for-you" onClick={(e) => handleSmoothScroll(e, 'built-for-you')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Built for You</Link></li>
+            <li><Link href="#testimonials" onClick={(e) => handleSmoothScroll(e, 'testimonials')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Testimonials</Link></li>
+            <li><Link href="#pricing" onClick={(e) => handleSmoothScroll(e, 'pricing')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Pricing</Link></li>
+            <li><Link href="#team" onClick={(e) => handleSmoothScroll(e, 'team')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Team</Link></li>
+          </ul>
+          
+          <div className="flex flex-col gap-3 mt-6">
+            <button 
+              className="btn-neubrutalist btn-white w-full"
+              onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+            >
+              Log in
+            </button>
+            <button 
+              className="btn-neubrutalist btn-secondary w-full"
+              onClick={() => window.open('https://app.skillflo.ai', '_blank')}
+            >
+              Start Free
+            </button>
+          </div>
+        </nav>
+      </div>
     </header>
   )
 }

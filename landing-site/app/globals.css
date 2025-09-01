@@ -196,7 +196,7 @@ html {
   justify-content: center;
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
-  transform: rotate(-5deg);
+  transform: none;
   transition: transform 0.3s;
 }
 

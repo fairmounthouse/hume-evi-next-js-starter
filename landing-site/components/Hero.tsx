@@ -7,26 +7,26 @@ export default function Hero() {
       <div className="float-shape shape-yellow absolute top-[10%] left-[-100px]"></div>
       <div className="float-shape shape-blue absolute bottom-[20%] right-[-75px]"></div>
       
-      <div className="pt-48 pb-24 px-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center relative">
+      <div className="pt-32 md:pt-48 pb-16 md:pb-24 px-4 md:px-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 items-center relative">
         <div className="z-10">
-          <h1 className="text-5xl lg:text-7xl font-black leading-[0.95] mb-8 tracking-tight animate-[slideUp_0.8s_ease-out]">
+          <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[0.95] mb-6 md:mb-8 tracking-tight animate-[slideUp_0.8s_ease-out]">
             Practice Interviews.<br/>
             <span className="text-gradient-blue">Get Hired.</span><br/>
             That Simple.
           </h1>
           
-          <p className="text-xl lg:text-2xl text-black opacity-80 mb-12 leading-relaxed animate-[slideUp_0.9s_ease-out]">
+          <p className="text-lg sm:text-xl lg:text-2xl text-black opacity-80 mb-8 md:mb-12 leading-relaxed animate-[slideUp_0.9s_ease-out]">
             Cutting-edgeAI interviews that actually prepare you for the real thing. 
             No fluff, just results that land you the job.
           </p>
 
-          <p className="text-lg font-semibold mb-8 animate-[slideUp_0.95s_ease-out]">
+          <p className="text-base sm:text-lg font-semibold mb-6 md:mb-8 animate-[slideUp_0.95s_ease-out]">
             90% cheaper than a coach. 3x more effective.
           </p>
           
-          <div className="flex flex-col sm:flex-row gap-6 animate-[slideUp_1s_ease-out]">
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 animate-[slideUp_1s_ease-out]">
             <button 
-              className="btn-neubrutalist btn-primary text-lg px-8 py-4"
+              className="btn-neubrutalist btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4 w-full sm:w-auto"
               onClick={() => window.open('https://app.skillflo.ai', '_blank')}
             >
               Start Real Practice →
