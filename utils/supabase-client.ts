@@ -780,6 +780,30 @@ export async function getSessionData(sessionId: string) {
       }
     }
     
+    // Parse MBB assessment data
+    let mbbAssessment = null;
+    if (sessionData.mbb_assessment_data) {
+      try {
+        mbbAssessment = typeof sessionData.mbb_assessment_data === 'string'
+          ? JSON.parse(sessionData.mbb_assessment_data)
+          : sessionData.mbb_assessment_data;
+      } catch (error) {
+        console.error('Error parsing MBB assessment:', error);
+      }
+    }
+    
+    // Parse MBB report data
+    let mbbReport = null;
+    if (sessionData.mbb_report_data) {
+      try {
+        mbbReport = typeof sessionData.mbb_report_data === 'string'
+          ? JSON.parse(sessionData.mbb_report_data)
+          : sessionData.mbb_report_data;
+      } catch (error) {
+        console.error('Error parsing MBB report:', error);
+      }
+    }
+    
     // Get video URL
     const videoUrl = sessionData.video_url || null;
     
@@ -791,20 +815,25 @@ export async function getSessionData(sessionId: string) {
       case_industry: sessionData.interview_cases?.industry || 'Unknown',
       case_difficulty: sessionData.interview_cases?.difficulty || 'Unknown',
       
-      interviewer_name: sessionData.interviewer_profiles_new?.alias || 'Unknown Interviewer',
+      interviewer_name: sessionData.interviewer_profiles_new?.name || 'Unknown Interviewer',
+      interviewer_alias: sessionData.interviewer_profiles_new?.alias || 'Unknown Alias',
       interviewer_company: sessionData.interviewer_profiles_new?.company_profiles?.display_name || 'Unknown Company',
       interviewer_role: sessionData.interviewer_profiles_new?.seniority_profiles?.display_name || 'Unknown Role',
       
       difficulty_level: sessionData.difficulty_profiles?.display_name || 'Unknown',
       
-      // Extract overall score from detailed analysis
-      overall_score: finalEvaluation?.summary?.total_score || null,
+      // Use MBB overall_score (5-point) with fallback to converted old score
+      overall_score: sessionData.overall_score || 
+                    (finalEvaluation?.summary?.total_score ? 
+                      parseFloat((finalEvaluation.summary.total_score / 2.0).toFixed(1)) : null),
     };
     
     const result = {
       transcript,
       finalEvaluation,
       videoUrl,
+      mbbAssessment,
+      mbbReport,
       sessionData: enhancedSessionData,
     };
     

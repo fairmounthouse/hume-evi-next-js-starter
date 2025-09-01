@@ -116,7 +116,7 @@ export default function InterviewEndScreen({
       setIsLoadingMbbReport(true);
     }
 
-    // Check for cached MBB Assessment
+    // Check for cached MBB Assessment first, then database
     const cachedAssessment = sessionStorage.getItem(`mbb_assessment_${sessionId}`);
     if (cachedAssessment) {
       try {
@@ -127,7 +127,8 @@ export default function InterviewEndScreen({
         console.warn("⚠️ [CACHE] Failed to parse cached MBB Assessment");
       }
     } else {
-      setIsLoadingMbbAssessment(true);
+      // Try loading from database
+      loadMbbAssessmentFromDatabase();
     }
 
     // Listen for real-time MBB Report updates
@@ -157,6 +158,53 @@ export default function InterviewEndScreen({
       window.removeEventListener('mbb-assessment-ready', handleMbbAssessmentReady as EventListener);
     };
   }, [sessionId]);
+
+  // Load MBB assessment from database
+  const loadMbbAssessmentFromDatabase = async () => {
+    setIsLoadingMbbAssessment(true);
+    
+    try {
+      const response = await fetch(`/api/sessions/get-mbb-assessment?sessionId=${sessionId}`);
+      const result = await response.json();
+      
+              if (result.success && result.mbbAssessment) {
+          setMbbAssessment(result.mbbAssessment);
+          console.log("✅ [DATABASE] Loaded MBB Assessment from database");
+          
+          // Cache it for future use
+          sessionStorage.setItem(`mbb_assessment_${sessionId}`, JSON.stringify(result.mbbAssessment));
+        } else {
+          console.log("ℹ️ [DATABASE] No MBB Assessment found in database");
+        }
+        
+        // Also load MBB Report from database
+        if (result.success && result.mbbReport) {
+          setMbbReport(result.mbbReport);
+          console.log("✅ [DATABASE] Loaded MBB Report from database");
+          
+          // Cache it for future use
+          sessionStorage.setItem(`mbb_report_${sessionId}`, JSON.stringify(result.mbbReport));
+        } else {
+          console.log("ℹ️ [DATABASE] No MBB Report found in database");
+          
+          // Fallback to sessionStorage for backward compatibility
+          const cachedReport = sessionStorage.getItem(`mbb_report_${sessionId}`);
+          if (cachedReport) {
+            try {
+              const reportData = JSON.parse(cachedReport);
+              setMbbReport(reportData);
+              console.log("✅ [CACHE] Loaded MBB Report from sessionStorage fallback");
+            } catch (error) {
+              console.warn("⚠️ [CACHE] Failed to parse cached MBB Report");
+            }
+          }
+        }
+    } catch (error) {
+      console.error("❌ [DATABASE] Failed to load MBB Assessment from database:", error);
+    } finally {
+      setIsLoadingMbbAssessment(false);
+    }
+  };
 
   // Load detailed MBB report when Analysis tab is accessed (fallback if not cached)
   useEffect(() => {
@@ -409,14 +457,14 @@ export default function InterviewEndScreen({
               
               <div className="relative rounded-md overflow-hidden bg-black aspect-video mb-3">
                 {finalVideoUrl ? (
-                  <video 
-                    src={finalVideoUrl}
-                    controls
-                    className="w-full h-full object-cover"
-                    poster="/api/placeholder/400/225"
-                  >
-                    Your browser does not support the video tag.
-                  </video>
+                  <iframe
+                    src={finalVideoUrl.replace('/watch', '/iframe')}
+                    className="w-full h-full aspect-video"
+                    style={{ border: "none" }}
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                    allowFullScreen
+                    title="Interview Recording"
+                  />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center text-[#71717a] text-sm gap-2">
                     <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-lg">

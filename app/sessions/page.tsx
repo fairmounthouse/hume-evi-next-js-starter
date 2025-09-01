@@ -209,9 +209,9 @@ export default function SessionsPage() {
                       </div>
                       <div className="text-center">
                         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                          {session.overall_score}/100
+                          {session.overall_score}/5.0
                         </div>
-                        <div className="text-xs text-blue-600 dark:text-blue-400">AI Analysis Score</div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">MBB Assessment Score</div>
                       </div>
                     </div>
                   )}

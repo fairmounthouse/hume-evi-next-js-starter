@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useUser, useAuth } from '@clerk/nextjs';
 import { useClerkSync } from '@/hooks/useClerkSync';
+import { useDashboardData } from '@/hooks/useDashboardData';
 import { 
   Play,
   BarChart3,
@@ -25,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DashboardSkeleton } from '@/components/ui/enhanced-skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -59,72 +61,22 @@ export default function DashboardPage() {
   const hasVideoReview = has?.({ feature: 'video_review' }) || false;
   const hasUnlimitedSessions = has?.({ feature: 'unlimited_sessions' }) || false;
   
-  // Auto-sync with Clerk on page load only (reduced frequency)
+  // Auto-sync with Clerk on page load only (optimized frequency)
   const { syncUser, lastSync, isUserLoaded } = useClerkSync({
     onPageLoad: true,
     onUserChange: false, // Disabled - user changes are rare
-    intervalMs: 300000, // Sync every 5 minutes instead of 30 seconds
+    intervalMs: 900000, // Sync every 15 minutes for better performance
     debug: false // Reduced logging
   });
-  const [usageData, setUsageData] = useState<UsageSummary[]>([]);
-  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [recentSessions, setRecentSessions] = useState<any[]>([]);
-  const [quickStats, setQuickStats] = useState<{
-    total_sessions: number;
-    monthly_sessions: number;
-    average_score: number | null;
-    improvement_percentage: number | null;
-  } | null>(null);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Note: User sync now happens automatically via webhooks
-        // No need to manually sync on every dashboard visit
-
-        // Fetch usage summary
-        const usageResponse = await fetch('/api/billing/usage-summary');
-        if (usageResponse.ok) {
-          const usage = await usageResponse.json();
-          setUsageData(usage);
-        }
-
-        // Fetch subscription info (now uses our clean backend)
-        const subResponse = await fetch('/api/billing/subscription-info');
-        if (subResponse.ok) {
-          const sub = await subResponse.json();
-          setSubscriptionInfo(sub);
-        }
-
-        // Fetch recent sessions
-        const sessionsResponse = await fetch('/api/sessions/list');
-        if (sessionsResponse.ok) {
-          const sessionsData = await sessionsResponse.json();
-          const sessions = sessionsData.sessions || [];
-          setRecentSessions(Array.isArray(sessions) ? sessions.slice(0, 3) : []);
-        }
-
-        // Fetch quick stats from Supabase RPC
-        const quickStatsResponse = await fetch('/api/dashboard/quick-stats');
-        if (quickStatsResponse.ok) {
-          const quickStatsData = await quickStatsResponse.json();
-          if (quickStatsData.success) {
-            setQuickStats(quickStatsData.stats);
-          }
-        }
-
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user) {
-      fetchDashboardData();
-    }
-  }, [user]);
+  // Use SWR for efficient data fetching with caching and revalidation
+  const { 
+    usageData, 
+    subscriptionInfo, 
+    recentSessions, 
+    quickStats, 
+    isLoading: loading, 
+    hasError 
+  } = useDashboardData();
 
   const getUsageStatus = (percentage: number) => {
     if (percentage >= 90) return { variant: 'destructive' as const, icon: AlertTriangle };
@@ -140,28 +92,7 @@ export default function DashboardPage() {
   };
 
   if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="space-y-3">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-8 w-32" />
-                  <Skeleton className="h-2 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   const criticalUsage = usageData.find(usage => usage.percentage_used >= 90);
@@ -392,7 +323,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium">Avg. Score</span>
                     </div>
                     <p className="text-2xl font-bold">
-                      {quickStats?.average_score ? `${quickStats.average_score}/100` : 'No data'}
+                      {quickStats?.average_score ? `${quickStats.average_score}/5.0` : 'No data'}
                     </p>
                   </div>
                   
@@ -497,7 +428,7 @@ export default function DashboardPage() {
               {recentSessions.length > 0 ? (
                 <div className="space-y-4">
                   {recentSessions.map((session, index) => (
-                    <div key={session.id || index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                    <div key={session.session_id || index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
                       <div className="flex items-center space-x-4">
                         <div className="p-2 bg-muted rounded-lg">
                           <BarChart3 className="h-4 w-4" />

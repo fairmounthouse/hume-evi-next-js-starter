@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
+import { useDebouncedCallback } from 'use-debounce';
 import { useRouter } from "next/navigation";
+import { useInterviewSetupData } from "@/hooks/useInterviewSetupData";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -11,8 +13,10 @@ import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Spark
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
-import DocumentUpload from "./DocumentUpload";
+// Lazy load heavy components
+const DocumentUpload = lazy(() => import("./DocumentUpload"));
 import ScrollFadeIndicator from "./ScrollFadeIndicator";
+import { InterviewSetupSkeleton } from "./ui/enhanced-skeleton";
 
 interface InterviewCase {
   id: string;
@@ -32,36 +36,23 @@ interface InterviewCase {
   }>;
 }
 
-// New combined profile interfaces
-interface CompanyProfile {
+// Use the same interfaces as the hook to avoid conflicts
+interface Profile {
   id: string;
-  name: string;
   display_name: string;
-  description?: string;
-}
-
-interface SeniorityProfile {
-  id: string;
+  name?: string;
   level: string;
-  display_name: string;
   description?: string;
 }
 
-interface DifficultyProfile {
-  id: string;
-  level: string;
-  display_name: string;
-  description?: string;
-}
-
-interface CombinedInterviewerProfile {
+interface LocalCombinedInterviewerProfile {
   id: string;
   alias: string;
   name: string; // Human-readable name like "John Doe"
   user_id?: string | null; // null = default for everyone, UUID = custom for specific user
-  difficulty_profiles: DifficultyProfile;
-  seniority_profiles: SeniorityProfile;
-  company_profiles: CompanyProfile;
+  difficulty_profiles: Profile;
+  seniority_profiles: Profile;
+  company_profiles: Profile;
 }
 
 interface InterviewSetupProps {
@@ -74,11 +65,17 @@ interface InterviewSetupProps {
 
 export default function InterviewSetup({ onStartInterview }: InterviewSetupProps) {
   const router = useRouter();
-  const [cases, setCases] = useState<InterviewCase[]>([]);
-  const [combinedProfiles, setCombinedProfiles] = useState<CombinedInterviewerProfile[]>([]);
-  const [companyProfiles, setCompanyProfiles] = useState<CompanyProfile[]>([]);
-  const [seniorityProfiles, setSeniorityProfiles] = useState<SeniorityProfile[]>([]);
-  const [difficultyProfiles, setDifficultyProfiles] = useState<DifficultyProfile[]>([]);
+  
+  // Use SWR for efficient data fetching with caching
+  const { 
+    cases, 
+    combinedProfiles, 
+    companyProfiles, 
+    seniorityProfiles, 
+    difficultyProfiles, 
+    isLoading: loading, 
+    hasError 
+  } = useInterviewSetupData();
   
   const [selectedCase, setSelectedCase] = useState<string>("");
   const [selectedProfile, setSelectedProfile] = useState<string>("");
@@ -97,10 +94,10 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   // Profile search state
   const [profileSearchQuery, setProfileSearchQuery] = useState("");
   const [availableProfilesFilter, setAvailableProfilesFilter] = useState(""); // Separate filter for available profiles sidebar
-  const [suggestedProfile, setSuggestedProfile] = useState<CombinedInterviewerProfile | null>(null);
+  const [suggestedProfile, setSuggestedProfile] = useState<LocalCombinedInterviewerProfile | null>(null);
   
   // Fuzzy search function for profiles
-  const fuzzySearchProfiles = (profiles: CombinedInterviewerProfile[], query: string) => {
+  const fuzzySearchProfiles = (profiles: LocalCombinedInterviewerProfile[], query: string) => {
     if (!query.trim()) return profiles;
     
     const searchTerms = query.toLowerCase().split(' ').filter(term => term.length > 0);
@@ -122,27 +119,26 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     });
   };
 
-  // Filter available profiles. When typing, rely ONLY on the search text.
-  // When the search is empty, rely on the left-side selections.
-  const getFilteredAvailableProfiles = () => {
+  // Memoized filtered available profiles for better performance
+  const filteredAvailableProfiles = useMemo(() => {
     const hasSearch = availableProfilesFilter.trim().length > 0;
     
     if (hasSearch) {
-      return fuzzySearchProfiles(combinedProfiles, availableProfilesFilter);
+      return fuzzySearchProfiles(combinedProfiles || [], availableProfilesFilter);
     }
     
-    let filtered = combinedProfiles;
+    let filtered = combinedProfiles || [];
     if (customCompanyId || customSeniorityId || customDifficultyId) {
       filtered = filtered.filter(profile => {
-        const companyMatch = !customCompanyId || profile.company_profiles.id === customCompanyId;
-        const seniorityMatch = !customSeniorityId || profile.seniority_profiles.id === customSeniorityId;
-        const difficultyMatch = !customDifficultyId || profile.difficulty_profiles.id === customDifficultyId;
+        const companyMatch = !customCompanyId || profile.company_profiles?.id === customCompanyId;
+        const seniorityMatch = !customSeniorityId || profile.seniority_profiles?.id === customSeniorityId;
+        const difficultyMatch = !customDifficultyId || profile.difficulty_profiles?.id === customDifficultyId;
         return companyMatch && seniorityMatch && difficultyMatch;
       });
     }
     
     return filtered;
-  };
+  }, [combinedProfiles, availableProfilesFilter, customCompanyId, customSeniorityId, customDifficultyId]);
 
   // Check for exact matches when user is creating custom profile
   const checkForExactMatch = () => {
@@ -151,22 +147,22 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       return;
     }
 
-    const exactMatch = combinedProfiles.find(profile => 
-      profile.company_profiles.id === customCompanyId &&
-      profile.seniority_profiles.id === customSeniorityId &&
-      profile.difficulty_profiles.id === customDifficultyId
+    const exactMatch = combinedProfiles?.find(profile => 
+      profile.company_profiles?.id === customCompanyId &&
+      profile.seniority_profiles?.id === customSeniorityId &&
+      profile.difficulty_profiles?.id === customDifficultyId
     );
 
     setSuggestedProfile(exactMatch || null);
   };
 
   // Populate form fields from selected available profile
-  const populateFormFromProfile = (profile: CombinedInterviewerProfile) => {
+  const populateFormFromProfile = (profile: LocalCombinedInterviewerProfile) => {
     setCustomProfileName(profile.name || "");
     setCustomProfileAlias(profile.alias || "");
-    setCustomCompanyId(profile.company_profiles.id);
-    setCustomSeniorityId(profile.seniority_profiles.id);
-    setCustomDifficultyId(profile.difficulty_profiles.id);
+    setCustomCompanyId(profile.company_profiles?.id || "");
+    setCustomSeniorityId(profile.seniority_profiles?.id || "");
+    setCustomDifficultyId(profile.difficulty_profiles?.id || "");
     
     // Clear search bar when populating from profile (search takes priority over selection)
     setAvailableProfilesFilter("");
@@ -183,10 +179,22 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   }, [customCompanyId, customSeniorityId, customDifficultyId, combinedProfiles]);
   
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [industryFilter, setIndustryFilter] = useState<string>("all");
   const [formatFilter, setFormatFilter] = useState<string>("all");
+
+  // Debounced search for better performance
+  const debouncedSearch = useDebouncedCallback(
+    (value: string) => setDebouncedSearchQuery(value),
+    300
+  );
+
+  // Trigger debounced search when searchQuery changes
+  useEffect(() => {
+    debouncedSearch(searchQuery);
+  }, [searchQuery, debouncedSearch]);
   
   // Profile filters (matching case selection design)
   const [profileTypeFilter, setProfileTypeFilter] = useState<string>("all"); // "default" or "custom" or "all"
@@ -194,7 +202,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const [profileSeniorityFilter, setProfileSeniorityFilter] = useState<string>("all");
   const [profileDifficultyFilter, setProfileDifficultyFilter] = useState<string>("all");
   
-  const [loading, setLoading] = useState(true);
+
   const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Profile Selection, 3 = Custom Profile Creation, 4 = Documents (optional), 5 = Device Setup
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [documentSessionId, setDocumentSessionId] = useState<string>("");
@@ -215,55 +223,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
   // Scroll handling now managed by ScrollFadeIndicator component
 
-  // Fetch all data on component mount
-  useEffect(() => {
-    fetchAllData();
-  }, []);
-
-  // Removed scroll detection useEffects - now handled by ScrollFadeIndicator
-
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      const { supabase } = await import("@/utils/supabase-client");
-      
-      // Fetch cases from Supabase directly
-      const casesRes = await supabase.from("interview_cases").select("*").eq("active", true);
-      
-      // Fetch profiles from our new API endpoints
-      const [combinedProfilesRes, companyProfilesRes, seniorityProfilesRes, difficultyProfilesRes] = await Promise.all([
-        fetch('/api/profiles/interviewer').then(res => res.json()),
-        fetch('/api/profiles/company').then(res => res.json()),
-        fetch('/api/profiles/seniority').then(res => res.json()),
-        fetch('/api/profiles/difficulty').then(res => res.json()) // Use new difficulty API with prompt content
-      ]);
-
-      // Get base data
-      const baseCases = casesRes.error ? [] : (casesRes.data || []);
-      const baseProfiles = combinedProfilesRes.success ? (combinedProfilesRes.profiles || []) : [];
-      const baseCompanyProfiles = companyProfilesRes.success ? (companyProfilesRes.profiles || []) : [];
-      const baseSeniorityProfiles = seniorityProfilesRes.success ? (seniorityProfilesRes.profiles || []) : [];
-      const baseDifficultyProfiles = difficultyProfilesRes.success ? (difficultyProfilesRes.profiles || []) : [];
-
-      setCases(baseCases);
-      setCombinedProfiles(baseProfiles);
-      setCompanyProfiles(baseCompanyProfiles);
-      setSeniorityProfiles(baseSeniorityProfiles);
-      setDifficultyProfiles(baseDifficultyProfiles);
-      
-      console.log("📊 Loaded profile data:", {
-        cases: baseCases.length,
-        combinedProfiles: baseProfiles.length,
-        companyProfiles: baseCompanyProfiles.length,
-        seniorityProfiles: baseSeniorityProfiles.length,
-        difficultyProfiles: baseDifficultyProfiles.length
-      });
-    } catch (error) {
-      console.error("Error fetching interview setup data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Data is now loaded via SWR hooks - no manual fetching needed
 
   // Create custom interviewer profile
   const createCustomProfile = async () => {
@@ -288,8 +248,8 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       const result = await response.json();
       
       if (result.success) {
-        // Add the new profile to the list
-        setCombinedProfiles(prev => [...prev, result.profile]);
+        // SWR will automatically revalidate the data, but we can manually trigger it for immediate feedback
+        // The profile will appear in the list after SWR revalidates
         
         // Select the new profile
         setSelectedProfile(result.profile.id);
@@ -326,48 +286,60 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     }
   };
 
-  // Filter profiles based on all filters (matching case selection logic)
-  const filteredProfiles = combinedProfiles.filter(profile => {
-    // Type filter
-    if (profileTypeFilter === "default" && profile.user_id !== null) return false;
-    if (profileTypeFilter === "custom" && profile.user_id === null) return false;
-    
-    // Company filter
-    if (profileCompanyFilter !== "all" && profile.company_profiles.name !== profileCompanyFilter) return false;
-    
-    // Seniority filter
-    if (profileSeniorityFilter !== "all" && profile.seniority_profiles.level !== profileSeniorityFilter) return false;
-    
-    // Difficulty filter
-    if (profileDifficultyFilter !== "all" && profile.difficulty_profiles.level !== profileDifficultyFilter) return false;
-    
-    return true;
-  });
+  // Memoized filtered profiles based on all filters for better performance
+  const filteredProfiles = useMemo(() => {
+    return (combinedProfiles || []).filter(profile => {
+      // Type filter
+      if (profileTypeFilter === "default" && profile.user_id !== null) return false;
+      if (profileTypeFilter === "custom" && profile.user_id === null) return false;
+      
+      // Company filter
+      if (profileCompanyFilter !== "all" && profile.company_profiles?.name !== profileCompanyFilter) return false;
+      
+      // Seniority filter
+      if (profileSeniorityFilter !== "all" && profile.seniority_profiles?.level !== profileSeniorityFilter) return false;
+      
+      // Difficulty filter
+      if (profileDifficultyFilter !== "all" && profile.difficulty_profiles?.level !== profileDifficultyFilter) return false;
+      
+      return true;
+    });
+  }, [combinedProfiles, profileTypeFilter, profileCompanyFilter, profileSeniorityFilter, profileDifficultyFilter]);
 
-  // Filter cases based on search and filters
-  const filteredCases = cases.filter(case_ => {
-    const matchesSearch = case_.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         case_.overview.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         case_.industry?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         case_.stretch_area?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === "all" || case_.type === typeFilter;
-    const matchesDifficulty = difficultyFilter === "all" || case_.difficulty === difficultyFilter;
-    const matchesIndustry = industryFilter === "all" || case_.industry === industryFilter;
-    const matchesFormat = formatFilter === "all" || case_.format === formatFilter;
-    
-    return matchesSearch && matchesType && matchesDifficulty && matchesIndustry && matchesFormat;
-  });
+  // Memoized filtered cases for better performance with debounced search
+  const filteredCases = useMemo(() => {
+    return cases.filter(case_ => {
+      const matchesSearch = case_.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                           case_.overview.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                           case_.industry?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                           case_.stretch_area?.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
+      const matchesType = typeFilter === "all" || case_.type === typeFilter;
+      const matchesDifficulty = difficultyFilter === "all" || case_.difficulty === difficultyFilter;
+      const matchesIndustry = industryFilter === "all" || case_.industry === industryFilter;
+      const matchesFormat = formatFilter === "all" || case_.format === formatFilter;
+      
+      return matchesSearch && matchesType && matchesDifficulty && matchesIndustry && matchesFormat;
+    });
+  }, [cases, debouncedSearchQuery, typeFilter, difficultyFilter, industryFilter, formatFilter]);
 
-  // Get unique filter options
-  const typeOptions = [...new Set(cases.map(c => c.type).filter(Boolean))];
-  const difficultyOptions = [...new Set(cases.map(c => c.difficulty).filter(Boolean))];
-  const industryOptions = [...new Set(cases.map(c => c.industry).filter(Boolean))];
-  const formatOptions = [...new Set(cases.map(c => c.format).filter(Boolean))];
+  // Memoized filter options to avoid recalculating on every render
+  const filterOptions = useMemo(() => ({
+    types: [...new Set((cases || []).map(c => c.type).filter(Boolean))],
+    difficulties: [...new Set((cases || []).map(c => c.difficulty).filter(Boolean))],
+    industries: [...new Set((cases || []).map(c => c.industry).filter(Boolean))],
+    formats: [...new Set((cases || []).map(c => c.format).filter(Boolean))]
+  }), [cases]);
+
+  const { types: typeOptions, difficulties: difficultyOptions, industries: industryOptions, formats: formatOptions } = filterOptions;
   
-  // Profile filter options (no longer needed for filtering, but kept for potential future use)
-  const companyOptions = [...new Set(companyProfiles.map(c => c.display_name).filter(Boolean))];
-  const seniorityOptions = [...new Set(seniorityProfiles.map(s => s.display_name).filter(Boolean))];
-  const difficultyLevelOptions = [...new Set(difficultyProfiles.map(d => d.display_name).filter(Boolean))];
+  // Memoized profile filter options for better performance
+  const profileFilterOptions = useMemo(() => ({
+    companies: [...new Set((companyProfiles || []).map(c => c.display_name).filter(Boolean))],
+    seniorities: [...new Set((seniorityProfiles || []).map(s => s.display_name).filter(Boolean))],
+    difficulties: [...new Set((difficultyProfiles || []).map(d => d.display_name).filter(Boolean))]
+  }), [companyProfiles, seniorityProfiles, difficultyProfiles]);
+
+  const { companies: companyOptions, seniorities: seniorityOptions, difficulties: difficultyLevelOptions } = profileFilterOptions;
 
   // Clear all filters
   const clearFilters = () => {
@@ -525,24 +497,25 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-          className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full"
-        />
-      </div>
-    );
+    return <InterviewSetupSkeleton />;
   }
 
   // Show document upload screen if case requires documents
   if (showDocumentUpload && documentSessionId) {
     return (
-      <DocumentUpload 
-        sessionId={documentSessionId}
-        onContinue={handleDocumentUploadComplete}
-      />
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-muted-foreground">Loading document upload...</p>
+          </div>
+        </div>
+      }>
+        <DocumentUpload 
+          sessionId={documentSessionId}
+          onContinue={handleDocumentUploadComplete}
+        />
+      </Suspense>
     );
   }
 
@@ -875,7 +848,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 <SelectContent>
                   <SelectItem value="all">All Companies</SelectItem>
                   {companyProfiles.map(company => (
-                    <SelectItem key={company.id} value={company.name}>{company.display_name}</SelectItem>
+                    <SelectItem key={company.id} value={company.name || company.display_name}>{company.display_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -1120,7 +1093,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                           {companyProfiles
                             .filter(company => 
                               company.display_name.toLowerCase().includes(companySearchQuery.toLowerCase()) ||
-                              company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
+                              (company.name || '').toLowerCase().includes(companySearchQuery.toLowerCase())
                             )
                             .map(company => (
                               <div
@@ -1183,7 +1156,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                         >
                           <div className="font-semibold text-gray-900 text-sm mb-2">{company.display_name}</div>
                           <div className="text-sm text-gray-600 leading-relaxed">
-                            {getCompanyDescription(company.name)}
+                            {getCompanyDescription(company.name || company.display_name)}
                           </div>
                         </div>
                       );
@@ -1300,7 +1273,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                   <div className="mx-5 mt-5 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-3">
                       <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
-                        {(suggestedProfile.name || suggestedProfile.alias).split(' ').map(n => n[0]).join('').toUpperCase()}
+                        {(suggestedProfile.name || suggestedProfile.alias).split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                       </div>
                       <div className="flex-1">
                         <div className="text-sm font-semibold text-blue-900 mb-1">Exact Match Found!</div>
@@ -1351,7 +1324,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-5 space-y-3">
-                  {getFilteredAvailableProfiles().slice(0, 8).map((profile) => {
+                  {filteredAvailableProfiles.slice(0, 8).map((profile) => {
                     const avatarColors = [
                       "from-purple-500 to-purple-600",
                       "from-blue-500 to-blue-600", 
@@ -1396,7 +1369,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             "w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-semibold bg-gradient-to-br flex-shrink-0",
                             avatarColors[colorIndex]
                           )}>
-                            {(profile.name || profile.alias).split(' ').map(n => n[0]).join('').toUpperCase()}
+                            {(profile.name || profile.alias).split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="font-semibold text-gray-900 text-sm truncate">{profile.name || profile.alias}</div>

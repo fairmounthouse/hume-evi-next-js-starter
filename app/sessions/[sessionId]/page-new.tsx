@@ -191,17 +191,17 @@ export default function SessionViewerPage() {
 
   return (
     <div className="min-h-screen bg-[#fafafa] text-[#0a0a0a] font-sans leading-relaxed">
-      {/* Header - Not Fixed, Works with Sidebar Layout */}
-      <div className="bg-white border-b border-[#e4e4e7] mb-6">
+      {/* Fixed Header */}
+      <div className="fixed top-0 left-0 right-0 z-10 bg-[#fafafa] border-b border-[#e4e4e7]">
         <div className="max-w-7xl mx-auto p-4 lg:p-6">
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 lg:p-6 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <div className="flex items-center gap-4">
-            <Link href="/sessions">
-              <Button variant="ghost" className="flex items-center gap-2">
-                <ArrowLeft className="w-4 h-4" />
-                Back to Sessions
-              </Button>
-            </Link>
+              <Link href="/sessions">
+                <Button variant="ghost" className="flex items-center gap-2">
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to Sessions
+                </Button>
+              </Link>
               <h1 className="text-2xl font-semibold text-[#0a0a0a]">Session Review</h1>
               <span className="text-sm text-[#71717a]">ID: {sessionId}</span>
             </div>
@@ -243,14 +243,15 @@ export default function SessionViewerPage() {
               </Link>
             </div>
           </div>
-              </div>
-              </div>
+        </div>
+      </div>
 
-      {/* Main Content - Standard Layout for Sidebar */}
-      <div className="max-w-7xl mx-auto p-4 lg:p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Left Panel - Session Info & Video */}
-          <div className="lg:col-span-1">
+      {/* Main Content with top padding for fixed header */}
+      <div className="pt-32 lg:pt-36 xl:pl-[22rem] xl:pr-[22rem]">
+        <div className="max-w-7xl mx-auto p-4 lg:p-6">
+          <div className="flex flex-col xl:flex-row gap-4 lg:gap-6">
+            {/* Left Panel - Session Info & Video */}
+            <div className="w-full xl:w-96 xl:flex-shrink-0 xl:fixed xl:left-4 xl:top-36 xl:bottom-4 xl:overflow-y-auto">
               {/* Session Metadata */}
               <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 mb-4">
                 <h3 className="text-sm font-semibold text-[#0a0a0a] mb-3">
@@ -271,10 +272,10 @@ export default function SessionViewerPage() {
               <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 mb-4 h-fit">
                 <h3 className="text-sm font-semibold text-[#0a0a0a] mb-3 flex items-center gap-2">
                   🎥 Interview Recording
-              </h3>
-              
+                </h3>
+                
                 <div className="relative rounded-md overflow-hidden bg-black aspect-video mb-3">
-                {videoUrl ? (
+                  {videoUrl ? (
                     <iframe
                       src={videoUrl.replace('/watch', '/iframe')}
                       className="w-full h-full"
@@ -287,13 +288,13 @@ export default function SessionViewerPage() {
                     <div className="w-full h-full flex flex-col items-center justify-center text-[#71717a] text-sm gap-2">
                       <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-lg">
                         ▶️
-                  </div>
+                      </div>
                       <span>Camera Off</span>
                       <span className="text-xs">{formatDuration(session?.duration_seconds || 0)}</span>
-                  </div>
-                )}
-              </div>
-              
+                    </div>
+                  )}
+                </div>
+                
                 <h4 className="text-sm font-semibold text-[#0a0a0a] mb-3 mt-4 flex items-center gap-2">
                   👤 Session Summary
                 </h4>
@@ -317,8 +318,8 @@ export default function SessionViewerPage() {
               </div>
             </div>
 
-          {/* Middle Panel - Main Content */}
-          <div className="lg:col-span-2 bg-white border border-[#e4e4e7] rounded-lg">
+            {/* Middle Panel - Main Content */}
+            <div className="flex-1 bg-white border border-[#e4e4e7] rounded-lg max-w-5xl mx-auto max-h-[calc(100vh-10rem)] overflow-y-auto xl:fixed xl:top-36 xl:left-[26rem] xl:right-[26rem]">
               {/* Tabs */}
               <div className="flex border-b border-[#e4e4e7] sticky top-0 bg-white z-10">
                 {[
@@ -450,8 +451,8 @@ export default function SessionViewerPage() {
                       <div className="bg-[#fafafa] border border-[#e4e4e7] rounded-md p-5">
                         <h3 className="text-base font-semibold text-[#0a0a0a] mb-4">
                           30-Second Summary
-              </h3>
-              
+                        </h3>
+                        
                         <div className="space-y-4">
                           <div>
                             <div className="text-sm font-semibold text-[#0a0a0a] mb-1 flex items-center gap-1.5">
@@ -632,7 +633,7 @@ export default function SessionViewerPage() {
                           <div className="flex-1">
                             <div className="text-sm text-[#0a0a0a] leading-relaxed mb-1">
                               {action.text}
-                          </div>
+                            </div>
                             <div className={`inline-block text-xs font-medium px-2 py-1 rounded ${
                               action.priority === 'high' 
                                 ? 'bg-[#fee2e2] text-[#dc2626]' 
@@ -654,35 +655,35 @@ export default function SessionViewerPage() {
                     <p className="text-sm text-[#71717a]">
                       This session was completed before the MBB assessment system was implemented.
                     </p>
-                    </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
-              
-          {/* Right Panel - Transcript */}
-          {showTranscript && (
-            <div className="lg:col-span-1 bg-white border border-[#e4e4e7] rounded-lg max-h-[600px] overflow-y-auto">
+            </div>
+
+            {/* Right Panel - Transcript */}
+            {showTranscript && (
+              <div className="w-full xl:w-80 xl:flex-shrink-0 xl:fixed xl:right-4 xl:top-36 xl:bottom-4 xl:overflow-y-auto bg-white border border-[#e4e4e7] rounded-lg">
                 <div className="p-4 border-b border-[#e4e4e7] flex justify-between items-center sticky top-0 bg-white z-10">
                   <h3 className="text-base font-semibold text-[#0a0a0a] flex items-center gap-2">
                     📄 Interview Transcript
                   </h3>
                   <div className="flex gap-2">
-                <Button 
+                    <Button 
                       variant="ghost" 
-                  size="sm"
+                      size="sm"
                       onClick={() => downloadTranscript('txt')}
                       className="text-xs"
                     >
                       📄 TXT
-                </Button>
-                <Button 
+                    </Button>
+                    <Button 
                       variant="ghost" 
-                  size="sm"
+                      size="sm"
                       onClick={() => downloadTranscript('json')}
                       className="text-xs"
                     >
                       📊 JSON
-                </Button>
+                    </Button>
                   </div>
                 </div>
                 <div className="flex-1 p-4">
@@ -713,23 +714,24 @@ export default function SessionViewerPage() {
                 </div>
               </div>
             )}
-        </div>
+          </div>
         </div>
 
-      {/* Session Documents - Full Width Below Main Content */}
-      <div className="max-w-7xl mx-auto p-4 lg:p-6 mt-8">
-          <SessionDocuments sessionId={sessionId} />
-      </div>
-
-      {/* Fallback to Old Analysis if No MBB Data */}
-      {!mbbAssessment && !mbbReport && finalEvaluation && (
+        {/* Session Documents */}
         <div className="max-w-7xl mx-auto p-4 lg:p-6 mt-8">
+          <SessionDocuments sessionId={sessionId} />
+        </div>
+
+        {/* Fallback to Old Analysis if No MBB Data */}
+        {!mbbAssessment && !mbbReport && finalEvaluation && (
+          <div className="max-w-7xl mx-auto p-4 lg:p-6 mt-8">
             <EnhancedDetailedAnalysis 
               evaluation={finalEvaluation}
               confidence={finalEvaluation?.confidence || 0}
             />
-        </div>
-      )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

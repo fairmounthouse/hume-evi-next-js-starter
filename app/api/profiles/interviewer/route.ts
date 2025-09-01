@@ -51,6 +51,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       profiles: interviewerProfiles || []
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=1200',
+        'CDN-Cache-Control': 'public, s-maxage=600',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=600'
+      }
     });
 
   } catch (error) {

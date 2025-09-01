@@ -26,7 +26,13 @@ export async function GET(request: NextRequest) {
     // Get user's usage summary with plan from Supabase
     const usageSummary = await getUserUsageSummaryFromSupabase(userId, planKey);
 
-    return NextResponse.json(usageSummary);
+    return NextResponse.json(usageSummary, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        'CDN-Cache-Control': 'public, s-maxage=300',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=300'
+      }
+    });
 
   } catch (error) {
     console.error("Error getting usage summary:", error);

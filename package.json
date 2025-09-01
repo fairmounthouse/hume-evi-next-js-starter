@@ -50,11 +50,13 @@
     "server-only": "^0.0.1",
     "sonner": "^2.0.5",
     "svix": "^1.74.1",
+    "swr": "^2.3.6",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
     "ts-pattern": "^5.1.2",
     "tus-js-client": "^4.3.1",
     "tw-animate-css": "^1.3.4",
+    "use-debounce": "^10.0.5",
     "uuid": "^11.1.0",
     "zod": "^4.1.1"
   },

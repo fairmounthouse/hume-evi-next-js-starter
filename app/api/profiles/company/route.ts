@@ -21,6 +21,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       profiles: companyProfiles || []
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200',
+        'CDN-Cache-Control': 'public, s-maxage=3600',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=3600'
+      }
     });
 
   } catch (error) {

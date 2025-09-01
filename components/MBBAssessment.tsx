@@ -47,6 +47,7 @@ interface MBBAssessmentData {
 
 interface MBBAssessmentProps {
   transcript: any[];
+  sessionId?: string; // Add sessionId for database storage
   isLoading?: boolean;
   onRetry?: () => void;
   className?: string;
@@ -55,6 +56,7 @@ interface MBBAssessmentProps {
 
 export default function MBBAssessment({ 
   transcript, 
+  sessionId,
   isLoading = false,
   onRetry,
   className,
@@ -136,6 +138,58 @@ export default function MBBAssessment({
       .join('\n');
   };
 
+  const calculateAverageScore = (): number => {
+    if (!assessment) return 0;
+    const scores = [
+      assessment.structure_problem_architecture.score,
+      assessment.analytical_rigor_quantitative_fluency.score,
+      assessment.insight_generation_business_acumen.score,
+      assessment.communication_precision_dialogue_management.score,
+      assessment.adaptive_thinking_intellectual_courage.score
+    ];
+    const avg = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+    return parseFloat(avg.toFixed(1));
+  };
+
+  const saveMBBAssessmentToDatabase = async (assessmentData: MBBAssessmentData) => {
+    if (!sessionId) {
+      console.warn('No sessionId provided, skipping database save');
+      return;
+    }
+
+    try {
+      // Calculate overall score from the assessment data directly
+      const scores = [
+        assessmentData.structure_problem_architecture.score,
+        assessmentData.analytical_rigor_quantitative_fluency.score,
+        assessmentData.insight_generation_business_acumen.score,
+        assessmentData.communication_precision_dialogue_management.score,
+        assessmentData.adaptive_thinking_intellectual_courage.score
+      ];
+      const overallScore = parseFloat((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1));
+      
+      const response = await fetch('/api/sessions/update-mbb-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sessionId: sessionId,
+          mbbAssessmentData: assessmentData,
+          overallScore: overallScore
+        })
+      });
+
+      if (!response.ok) {
+        console.error('Failed to save MBB assessment to database');
+      } else {
+        console.log('✅ MBB assessment saved to database successfully');
+      }
+    } catch (error) {
+      console.error('Error saving MBB assessment to database:', error);
+    }
+  };
+
   const generateAssessment = async () => {
     if (transcript.length === 0) return;
 
@@ -168,6 +222,9 @@ export default function MBBAssessment({
       const assessmentData = await response.json();
       setAssessment(assessmentData);
       
+      // Save MBB assessment to database
+      await saveMBBAssessmentToDatabase(assessmentData);
+      
     } catch (error) {
       console.error('MBB Assessment error:', error);
       setError(error instanceof Error ? error.message : 'Assessment failed');
@@ -181,19 +238,6 @@ export default function MBBAssessment({
     setError(null);
     generateAssessment();
     onRetry?.();
-  };
-
-  const calculateAverageScore = (): number => {
-    if (!assessment) return 0;
-    const scores = [
-      assessment.structure_problem_architecture.score,
-      assessment.analytical_rigor_quantitative_fluency.score,
-      assessment.insight_generation_business_acumen.score,
-      assessment.communication_precision_dialogue_management.score,
-      assessment.adaptive_thinking_intellectual_courage.score
-    ];
-    const avg = scores.reduce((sum, score) => sum + score, 0) / scores.length;
-    return parseFloat(avg.toFixed(1));
   };
 
   const getScoreColor = (score: number) => {

@@ -958,8 +958,28 @@ function ChatInterface({
           if (response.ok) {
             const mbbReport = await response.json();
             console.log("✅ [BACKGROUND] MBB Report generated successfully");
+            
             // Store in session storage for InterviewEndScreen to pick up
             sessionStorage.setItem(`mbb_report_${sessionId}`, JSON.stringify(mbbReport));
+            
+            // Save to database for permanent storage
+            fetch('/api/sessions/update-mbb-report', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: sessionId,
+                mbbReportData: mbbReport
+              })
+            }).then(dbResponse => {
+              if (dbResponse.ok) {
+                console.log("✅ [DATABASE] MBB Report saved to database");
+              } else {
+                console.warn("⚠️ [DATABASE] Failed to save MBB Report to database");
+              }
+            }).catch(dbError => {
+              console.warn("⚠️ [DATABASE] Error saving MBB Report:", dbError);
+            });
+            
             // Trigger custom event to notify InterviewEndScreen
             window.dispatchEvent(new CustomEvent('mbb-report-ready', { detail: { sessionId, data: mbbReport } }));
           } else {
@@ -978,8 +998,38 @@ function ChatInterface({
           if (response.ok) {
             const mbbAssessment = await response.json();
             console.log("✅ [BACKGROUND] MBB Assessment generated successfully");
+            
             // Store in session storage for InterviewEndScreen to pick up
             sessionStorage.setItem(`mbb_assessment_${sessionId}`, JSON.stringify(mbbAssessment));
+            
+            // Save to database
+            const scores = [
+              mbbAssessment.structure_problem_architecture?.score || 0,
+              mbbAssessment.analytical_rigor_quantitative_fluency?.score || 0,
+              mbbAssessment.insight_generation_business_acumen?.score || 0,
+              mbbAssessment.communication_precision_dialogue_management?.score || 0,
+              mbbAssessment.adaptive_thinking_intellectual_courage?.score || 0
+            ];
+            const overallScore = parseFloat((scores.reduce((sum, score) => sum + score, 0) / scores.length).toFixed(1));
+            
+            fetch('/api/sessions/update-mbb-assessment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: sessionId,
+                mbbAssessmentData: mbbAssessment,
+                overallScore: overallScore
+              })
+            }).then(dbResponse => {
+              if (dbResponse.ok) {
+                console.log("✅ [DATABASE] MBB Assessment saved to database");
+              } else {
+                console.warn("⚠️ [DATABASE] Failed to save MBB Assessment to database");
+              }
+            }).catch(dbError => {
+              console.warn("⚠️ [DATABASE] Error saving MBB Assessment:", dbError);
+            });
+            
             // Trigger custom event to notify InterviewEndScreen
             window.dispatchEvent(new CustomEvent('mbb-assessment-ready', { detail: { sessionId, data: mbbAssessment } }));
           } else {

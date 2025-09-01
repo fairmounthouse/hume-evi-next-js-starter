@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('status', 'completed')
+      .not('new_interviewer_profile_id', 'is', null)  // ONLY sessions with new interviewer profiles
       .order('created_at', { ascending: false })
       .limit(limit);
     
@@ -53,13 +54,20 @@ export async function GET(request: NextRequest) {
         difficulty_level: session.interviewer_profiles_new?.difficulty_profiles?.display_name || 'Unknown',
         difficulty_code: session.interviewer_profiles_new?.difficulty_profiles?.level || 'unknown',
         
-        // Extract overall score from detailed analysis (not feedback scores)
+        // Use MBB overall_score (5-point scale) with fallback to old system (converted to 5-point)
         overall_score: (() => {
+          // Prefer new MBB overall_score (5-point scale)
+          if (session.overall_score !== null && session.overall_score !== undefined) {
+            return session.overall_score;
+          }
+          
+          // Fallback to old detailed_analysis score (convert from 10-point to 5-point)
           try {
             const analysis = typeof session.detailed_analysis === 'string' 
               ? JSON.parse(session.detailed_analysis)
               : session.detailed_analysis;
-            return analysis?.summary?.total_score || null;
+            const oldScore = analysis?.summary?.total_score;
+            return oldScore ? parseFloat((oldScore / 2.0).toFixed(1)) : null;
           } catch {
             return null;
           }
@@ -70,6 +78,12 @@ export async function GET(request: NextRequest) {
         detailed_analysis: session.detailed_analysis,
         feedback_data: session.feedback_data
       }))
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=180, stale-while-revalidate=300',
+        'CDN-Cache-Control': 'public, s-maxage=180',
+        'Vercel-CDN-Cache-Control': 'public, s-maxage=180'
+      }
     });
   } catch (error) {
     console.error('Error listing sessions:', error);
