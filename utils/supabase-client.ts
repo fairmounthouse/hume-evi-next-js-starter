@@ -709,8 +709,10 @@ export async function getSessionData(sessionId: string) {
         interview_cases(title, type, industry, difficulty),
         interviewer_profiles_new!new_interviewer_profile_id(
           alias,
+          name,
           company_profiles!company_profile_id(display_name),
-          seniority_profiles!seniority_profile_id(display_name)
+          seniority_profiles!seniority_profile_id(display_name),
+          difficulty_profiles!difficulty_profile_id(display_name)
         )
       `)
       .eq('session_id', sessionId)
@@ -820,7 +822,7 @@ export async function getSessionData(sessionId: string) {
       interviewer_company: sessionData.interviewer_profiles_new?.company_profiles?.display_name || 'Unknown Company',
       interviewer_role: sessionData.interviewer_profiles_new?.seniority_profiles?.display_name || 'Unknown Role',
       
-      difficulty_level: sessionData.difficulty_profiles?.display_name || 'Unknown',
+      difficulty_level: sessionData.interviewer_profiles_new?.difficulty_profiles?.display_name || sessionData.interview_cases?.difficulty || 'Unknown',
       
       // Use MBB overall_score (5-point) with fallback to converted old score
       overall_score: sessionData.overall_score || 

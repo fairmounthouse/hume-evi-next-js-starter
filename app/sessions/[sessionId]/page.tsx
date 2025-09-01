@@ -251,22 +251,59 @@ export default function SessionViewerPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Left Panel - Session Info & Video */}
           <div className="lg:col-span-1">
-              {/* Session Metadata */}
-              <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 mb-4">
-                <h3 className="text-sm font-semibold text-[#0a0a0a] mb-3">
-                  📋 Session Details
-                </h3>
-                <div className="space-y-2 text-xs">
-                  <div><strong>Case:</strong> {session?.case_title}</div>
-                  <div><strong>Type:</strong> {session?.case_type}</div>
-                  <div><strong>Industry:</strong> {session?.case_industry}</div>
-                  <div><strong>Difficulty:</strong> {session?.case_difficulty}</div>
-                  <div><strong>Interviewer:</strong> {session?.interviewer_name}</div>
-                  <div><strong>Alias:</strong> {session?.interviewer_alias}</div>
-                  <div><strong>Company:</strong> {session?.interviewer_company}</div>
-                  <div><strong>Role:</strong> {session?.interviewer_role}</div>
+              {/* Session Metadata - Styled like Interview Setup */}
+              <Card className="mb-4">
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-blue-600" />
+                    Session Details
+                  </h3>
+                  
+                  {/* Case Info */}
+                  <div className="mb-4">
+                    <h4 className="font-semibold text-gray-900 mb-2">{session?.case_title}</h4>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {session?.case_type}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {session?.case_industry}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        {session?.case_difficulty}
+                      </Badge>
+                    </div>
+                  </div>
+
+                  {/* Interviewer Info - Styled like setup cards */}
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-bold">
+                        {(session?.interviewer_name || session?.interviewer_alias || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-gray-900">{session?.interviewer_name || 'Unknown'}</h4>
+                        <p className="text-sm text-gray-500">{session?.interviewer_alias}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                        <Building className="w-3 h-3 mr-1" />
+                        {session?.interviewer_company}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                        <User className="w-3 h-3 mr-1" />
+                        {session?.interviewer_role}
+                      </Badge>
+                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                        <Target className="w-3 h-3 mr-1" />
+                        {session?.difficulty_level}
+                      </Badge>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </Card>
 
               <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 mb-4 h-fit">
                 <h3 className="text-sm font-semibold text-[#0a0a0a] mb-3 flex items-center gap-2">

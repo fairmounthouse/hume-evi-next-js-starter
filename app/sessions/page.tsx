@@ -27,9 +27,9 @@ interface SessionData {
   case_industry: string;
   case_difficulty: string;
   
-  interviewer_name: string;
+  interviewer_alias: string;
   interviewer_company: string;
-  interviewer_role: string;
+  interviewer_seniority: string;
   
   difficulty_level: string;
   difficulty_code: string;
@@ -169,17 +169,19 @@ export default function SessionsPage() {
                     </div>
                   </div>
 
-                  {/* Interviewer Info */}
-                  <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Building className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {session.interviewer_name}
-                      </span>
+                  {/* Interviewer Info - Clean with difficulty */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {session.interviewer_alias}
+                        </span>
+                      </div>
+                      <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
+                        {session.difficulty_level}
+                      </Badge>
                     </div>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">
-                      {session.interviewer_role} at {session.interviewer_company}
-                    </p>
                   </div>
 
                   {/* Session Metadata */}
