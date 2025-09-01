@@ -17,8 +17,6 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .rpc('get_user_quick_stats', { p_clerk_id: userId });
 
-    console.log('🔍 [QUICK-STATS] Debug data:', { userId, data, error });
-
     if (error) {
       console.error('Error fetching quick stats:', error);
       return NextResponse.json(
@@ -27,15 +25,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Fix: RPC returns array, but we need single object
+    const finalStats = Array.isArray(data) && data.length > 0 
+      ? data[0] 
+      : data || {
+          total_sessions: 0,
+          monthly_sessions: 0,
+          average_score: null,
+          improvement_percentage: null
+        };
+
     // Return the stats data without caching for testing
     return NextResponse.json({
       success: true,
-      stats: data || {
-        total_sessions: 0,
-        monthly_sessions: 0,
-        average_score: null,
-        improvement_percentage: null
-      }
+      stats: finalStats
     }, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',

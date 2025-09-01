@@ -78,6 +78,8 @@ export default function DashboardPage() {
     hasError 
   } = useDashboardData();
 
+
+
   const getUsageStatus = (percentage: number) => {
     if (percentage >= 90) return { variant: 'destructive' as const, icon: AlertTriangle };
     if (percentage >= 70) return { variant: 'default' as const, icon: Clock };
@@ -303,7 +305,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium">Total Sessions</span>
                     </div>
                     <p className="text-2xl font-bold">
-                      {quickStats ? quickStats.total_sessions : '...'}
+{quickStats ? quickStats.total_sessions : '...'}
                     </p>
                   </div>
                   
@@ -313,7 +315,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium">This Month</span>
                     </div>
                     <p className="text-2xl font-bold">
-                      {quickStats ? quickStats.monthly_sessions : '...'}
+{quickStats ? quickStats.monthly_sessions : '...'}
                     </p>
                   </div>
                   
@@ -323,7 +325,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium">Avg. Score</span>
                     </div>
                     <p className="text-2xl font-bold">
-                      {quickStats?.average_score ? `${quickStats.average_score}/5.0` : 'No data'}
+{quickStats?.average_score ? `${quickStats.average_score}/5.0` : 'No data'}
                     </p>
                   </div>
                   
@@ -339,7 +341,7 @@ export default function DashboardPage() {
                           : 'text-red-600'
                         : 'text-gray-500'
                     }`}>
-                      {quickStats?.improvement_percentage !== null && quickStats?.improvement_percentage !== undefined
+{quickStats?.improvement_percentage !== null && quickStats?.improvement_percentage !== undefined
                         ? `${quickStats.improvement_percentage >= 0 ? '+' : ''}${quickStats.improvement_percentage}%`
                         : 'No data'
                       }

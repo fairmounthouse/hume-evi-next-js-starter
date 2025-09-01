@@ -81,6 +81,7 @@ export function useDashboardData() {
       revalidateOnReconnect: true,
       refreshInterval: 10000, // 10 seconds for testing
       dedupingInterval: 1000,  // Reduced deduping for testing
+
     }
   );
 
@@ -90,6 +91,8 @@ export function useDashboardData() {
 
   // Derive error state
   const hasError = usageError || subscriptionError || sessionsError || quickStatsError;
+
+
 
   return {
     // Data
