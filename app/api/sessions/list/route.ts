@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         interview_cases(title, type, industry, difficulty),
         interviewer_profiles_new!new_interviewer_profile_id(
           alias,
+          name,
           difficulty_profiles!difficulty_profile_id(display_name, level),
           seniority_profiles!seniority_profile_id(display_name, level),
           company_profiles!company_profile_id(display_name, name)
