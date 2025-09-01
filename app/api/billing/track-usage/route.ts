@@ -15,8 +15,22 @@ export async function POST(request: NextRequest) {
 
     const { usageType, amount, durationMinutes } = await request.json();
 
+    // Validate usageType is provided
+    if (!usageType) {
+      return NextResponse.json(
+        { error: "usageType is required" },
+        { status: 400 }
+      );
+    }
+
     // Special case for interview sessions
-    if (usageType === 'interview_session' && durationMinutes) {
+    if (usageType === 'interview_session') {
+      if (durationMinutes === undefined) {
+        return NextResponse.json(
+          { error: "durationMinutes is required for interview_session usageType" },
+          { status: 400 }
+        );
+      }
       await trackInterviewSession(userId, durationMinutes);
       return NextResponse.json({ 
         success: true,
@@ -25,9 +39,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Regular usage tracking
-    if (!usageType || amount === undefined) {
+    if (amount === undefined) {
       return NextResponse.json(
-        { error: "usageType and amount are required" },
+        { error: "amount is required for non-interview_session usageType" },
         { status: 400 }
       );
     }

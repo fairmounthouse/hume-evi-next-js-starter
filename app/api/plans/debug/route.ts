@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserPlanDetails, getUserLimits, getAllPlans } from "@/utils/plan-config";
+import { getUserPlanKey, getUserPlanDetails } from "@/utils/plan-config";
 
 /**
  * Debug endpoint to show exactly how we fetch plan data from Clerk
@@ -23,21 +23,9 @@ export async function GET(request: NextRequest) {
       // No check for 'free' - it's the default when no paid plan is found
     };
 
-    // 🎯 Step 2: Get usage limits based on inferred plan (our approach)
+    // 🎯 Step 2: Get plan details using updated system
+    const planKey = getUserPlanKey(has);
     const planDetails = getUserPlanDetails(has);
-    const userLimits = getUserLimits(planDetails.plan);
-    const allPlans = getAllPlans();
-
-    // 🎯 Step 4: Show the logical flow
-    const logicalFlow = {
-      step1: "Check Clerk has({ plan: 'premium' })",
-      step1Result: rawClerkChecks.hasPremium,
-      step2: rawClerkChecks.hasPremium ? "User has Premium" : "Check has({ plan: 'professional' })",
-      step2Result: rawClerkChecks.hasPremium ? "Premium detected" : rawClerkChecks.hasProfessional,
-      step3: rawClerkChecks.hasPremium || rawClerkChecks.hasProfessional ? "Plan found" : "Check has({ plan: 'starter' })",
-      step3Result: rawClerkChecks.hasPremium || rawClerkChecks.hasProfessional ? "Plan found" : rawClerkChecks.hasStarter,
-      finalResult: planDetails.plan.name
-    };
 
     return NextResponse.json({
       success: true,
@@ -46,38 +34,17 @@ export async function GET(request: NextRequest) {
       // Raw Clerk API results
       rawClerkChecks,
       
-      // Our usage-based approach
-      currentPlan: planDetails.plan,
-      usageLimits: userLimits,
+      // Current plan information
+      currentPlanKey: planKey,
+      planDetails,
       
-      // Show how we map Clerk plans to usage limits
-      mappingExample: {
-        clerkResult: `has({ plan: '${planDetails.plan.key}' }) = true`,
-        mappedLimits: {
-          minutesPerMonth: userLimits.minutesPerMonth,
-          interviewsPerDay: userLimits.interviewsPerDay,
-          detailedAnalysesPerMonth: userLimits.detailedAnalysesPerMonth,
-          videoReviewsPerMonth: userLimits.videoReviewsPerMonth,
-        },
-        enforcement: "Usage limits are checked in Supabase, not feature flags"
-      },
-      
-      // All available plans with their limits
-      allPlans: allPlans.map(plan => ({
-        ...plan,
-        limits: plan.limits
-      })),
-      
-      // Show the logical decision flow
-      logicalFlow,
-      
-      // Our approach explanation
+      // Updated approach explanation
       approach: {
         step1: "Use Clerk has() to determine user's plan",
-        step2: "Map plan to usage limits in our config",
-        step3: "Enforce limits via Supabase usage tracking",
-        step4: "Features are inferred from usage limits, not feature flags",
-        documentationUrl: "https://clerk.com/docs/nextjs/billing/b2c-saas"
+        step2: "Get plan key that matches Supabase database",
+        step3: "Use Supabase functions to get actual limits and usage",
+        step4: "All plan data now comes from database, not static config",
+        note: "Use getUserUsageSummaryFromSupabase() and getPlanDetails() for actual limits"
       },
       
       timestamp: new Date().toISOString()

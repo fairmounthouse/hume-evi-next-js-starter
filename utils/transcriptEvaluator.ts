@@ -8,7 +8,7 @@ export class TranscriptEvaluator {
   private transcriptHistory: TranscriptEntry[] = [];
   private evaluationInterval: NodeJS.Timeout | null = null;
   private onEvaluationCallback: ((feedback: InInterviewFeedback) => void) | null = null;
-  private readonly ROLLING_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly ROLLING_WINDOW_MS = 1 * 60 * 1000; // 1 minute
   private readonly EVALUATION_INTERVAL_MS = 20 * 1000; // 20 seconds
   private isEvaluating = false;
 
@@ -42,7 +42,7 @@ export class TranscriptEvaluator {
         // Update internal history
         this.updateTranscriptHistory(entries);
         
-        // Get rolling window of last 5 minutes
+        // Get rolling window of last 1 minute
         const rollingWindow = this.getRollingWindow();
         
         console.log("📊 [EVALUATOR] Rolling window entries:", rollingWindow.length);
@@ -143,7 +143,7 @@ export class TranscriptEvaluator {
   private getRollingWindow(): TranscriptEntry[] {
     // Since timestamps are now relative seconds from recording start, 
     // we need to filter based on relative time, not absolute time
-    const rollingWindowSeconds = this.ROLLING_WINDOW_MS / 1000; // Convert to seconds (300 seconds = 5 minutes)
+    const rollingWindowSeconds = this.ROLLING_WINDOW_MS / 1000; // Convert to seconds (60 seconds = 1 minute)
     const latestTimestamp = this.transcriptHistory.length > 0 
       ? Math.max(...this.transcriptHistory.map(e => e.timestamp))
       : 0;
@@ -153,7 +153,7 @@ export class TranscriptEvaluator {
       entry => entry.timestamp >= cutoffTimestamp
     );
     
-    console.log(`🕐 [EVALUATOR] Rolling window: ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 5 minutes only)`);
+    console.log(`🕐 [EVALUATOR] Rolling window: ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 1 minute only)`);
     console.log(`🕐 [EVALUATOR] Full transcript history preserved separately: ${this.transcriptHistory.length} total entries`);
     console.log(`🕐 [EVALUATOR] Rolling window debug:`, {
       rollingWindowSeconds,
@@ -231,7 +231,7 @@ export class TranscriptEvaluator {
       return 'No transcript data available yet.';
     }
 
-    console.log(`📝 [EVALUATOR] Formatting ${entries.length} entries for feedback API (rolling window - last 5 minutes only)`);
+    console.log(`📝 [EVALUATOR] Formatting ${entries.length} entries for feedback API (rolling window - last 1 minute only)`);
     console.log(`📝 [EVALUATOR] NOTE: Master transcript is preserved separately and not truncated`);
 
     return entries.map(entry => {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getUserPlan } from "@/utils/plan-config";
+import { getUserPlanKey } from "@/utils/plan-config";
 
 /**
  * 🎯 Compatibility API - Returns subscription info in the format expected by the original dashboard
@@ -14,14 +14,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user's plan from Clerk using our clean separation
-    const userPlan = getUserPlan(has);
+    // Get user's plan key from Clerk
+    const planKey = getUserPlanKey(has);
     
-    // Return in the format expected by the original dashboard
+    // Static plan data as fallback (matches your Supabase table)
+    const planData = {
+      'free': { name: 'Free', price_dollars: 0 },
+      'free_user': { name: 'Free', price_dollars: 0 }, // Handle both variations
+      'starter': { name: 'Starter', price_dollars: 30 },
+      'professional': { name: 'Professional', price_dollars: 50 },
+      'premium': { name: 'Premium', price_dollars: 99 }
+    };
+    
+    const currentPlan = planData[planKey as keyof typeof planData] || planData.free;
+    
+    // Return subscription info with plan details
     const subscriptionInfo = {
-      plan_name: userPlan.name,
-      plan_key: userPlan.key,
-      plan_price_cents: userPlan.price * 100, // Convert to cents
+      plan_key: planKey,
+      plan_name: currentPlan.name,
+      plan_price_cents: currentPlan.price_dollars * 100, // Convert dollars to cents
       subscription_status: "active",
       current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
     };

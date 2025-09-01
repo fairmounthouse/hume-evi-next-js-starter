@@ -24,7 +24,8 @@ import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
 import TranscriptEvaluator from "@/utils/transcriptEvaluator";
 import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
-import EnhancedDetailedAnalysis from "./EnhancedDetailedAnalysis";
+import MBBAssessment from "./MBBAssessment";
+import InterviewEndScreen from "./InterviewEndScreen";
 import TranscriptDrawer from "./TranscriptDrawer";
 import FloatingTranscriptButton from "./FloatingTranscriptButton";
 import ExhibitModal from "./ExhibitModal";
@@ -111,10 +112,12 @@ function ChatInterface({
 
   const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
 
-  const [finalEvaluation, setFinalEvaluation] = useState<any>(null);
-
-  const [evaluationCache, setEvaluationCache] = useState<Map<string, any>>(new Map());
+  // Old evaluation system removed - now using MBB Assessment
   const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
+  
+  // DUAL TRANSCRIPT SYSTEM:
+  // 1. transcriptEvaluator.getCompleteTranscriptHistory() - NEVER TRUNCATED - Used for downloads and storage
+  // 2. transcriptEvaluator rolling window (1 minute) - TRUNCATED - Used for real-time feedback only
   // MASTER TRANSCRIPT - NEVER TRUNCATED - Contains complete conversation history
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
   const currentMessagesRef = useRef<any[]>([]);
@@ -157,7 +160,6 @@ function ChatInterface({
         // Set all the state to rebuild the end screen
         setStoredTranscript(cachedData.transcript);
         setTranscript(cachedData.transcript);
-        setFinalEvaluation(cachedData.finalEvaluation);
         setFinalVideoUrl(cachedData.videoUrl);
         setShowEndScreen(true);
         setShowVideoReview(false);
@@ -203,7 +205,7 @@ function ChatInterface({
   // Build transcript from messages for evaluation - ENHANCED for complete preservation
   // 
   // CRITICAL: This function builds the MASTER TRANSCRIPT that is NEVER truncated.
-  // The transcript evaluator uses a separate 5-minute rolling window for real-time feedback,
+  // The transcript evaluator uses a separate 1-minute rolling window for real-time feedback,
   // but this master transcript contains the COMPLETE conversation history for download.
   const buildTranscriptFromMessages = (messages: any[]): any[] => {
     console.log("📋 [TRANSCRIPT] Building transcript from", messages.length, "total messages");
@@ -488,7 +490,6 @@ function ChatInterface({
       if (
         showEndScreen && 
         finalVideoUrl && 
-        finalEvaluation && 
         storedTranscript.length > 0 && 
         !endScreenDataStored
       ) {
@@ -499,7 +500,7 @@ function ChatInterface({
           const success = await storeEndScreenData(
             sessionId,
             storedTranscript,
-            finalEvaluation,
+            null, // No longer using old evaluation system
             finalVideoUrl
           );
           
@@ -514,7 +515,7 @@ function ChatInterface({
     };
 
           storeCompleteEndScreenData();
-    }, [showEndScreen, finalVideoUrl, finalEvaluation, storedTranscript, endScreenDataStored, sessionId]);
+    }, [showEndScreen, finalVideoUrl, storedTranscript, endScreenDataStored, sessionId]);
 
   // Poll for video readiness when we have a processing video
   useEffect(() => {
@@ -936,40 +937,57 @@ function ChatInterface({
         console.log("📝 [FEEDBACK] Skipping feedback form - already submitted for this session");
       }
       
-      // Automatically generate detailed analysis (with caching)
+      // Automatically trigger both MBB endpoints in the background
+      console.log("🔚 [END] Interview ended - triggering both MBB Assessment and Report automatically");
+      
+      // Background API calls - don't await, let them run async and update UI when ready
       if (preservedTranscript.length > 0) {
-        const transcriptHash = JSON.stringify(preservedTranscript.map(t => ({ speaker: t.speaker, text: t.text })));
-        const cachedEvaluation = evaluationCache.get(transcriptHash);
-        
-        if (cachedEvaluation) {
-          console.log("🔚 [END] Using cached detailed analysis");
-          setFinalEvaluation(cachedEvaluation);
-          setAnalysisCompletedAt(Date.now()); // Track completion time for cached too
-        } else {
-          console.log("🔚 [END] Starting detailed analysis immediately (so it's ready when user finishes feedback)");
-          // Start analysis immediately - don't wait for useEffect
-          const startAnalysis = async () => {
-            try {
-              const transcriptData = preservedTranscript.length > 0 ? preservedTranscript : buildTranscriptFromMessages(messages);
-              const evaluation = await transcriptEvaluator.getDetailedEvaluation(transcriptData);
-              
-              // Cache the evaluation
-              const newCache = new Map(evaluationCache);
-              newCache.set(transcriptHash, evaluation);
-              setEvaluationCache(newCache);
-              
-              setFinalEvaluation(evaluation);
-              setAnalysisCompletedAt(Date.now()); // Track completion time
-              console.log("✅ [END] Detailed analysis complete and ready at:", new Date().toISOString());
-            } catch (error) {
-              console.error("Error generating detailed analysis:", error);
-              toast.error("Failed to generate detailed analysis");
-            }
-          };
-          
-          // Start analysis in background immediately
-          startAnalysis();
-        }
+        const transcriptText = preservedTranscript.map(entry => {
+          const timestamp = entry.timestamp ? `[${Math.floor(entry.timestamp / 60).toString().padStart(2, '0')}:${(entry.timestamp % 60).toString().padStart(2, '0')}]` : '';
+          const speaker = entry.speaker === 'user' ? 'YOU:' : 'AI INTERVIEWER:';
+          return `${timestamp} ${speaker} ${entry.text}`;
+        }).join('\n');
+
+        // Fire both endpoints in parallel
+        // 1. MBB Report (Detailed Analysis)
+        fetch('/api/transcript/mbb_report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript_text: transcriptText })
+        }).then(async response => {
+          if (response.ok) {
+            const mbbReport = await response.json();
+            console.log("✅ [BACKGROUND] MBB Report generated successfully");
+            // Store in session storage for InterviewEndScreen to pick up
+            sessionStorage.setItem(`mbb_report_${sessionId}`, JSON.stringify(mbbReport));
+            // Trigger custom event to notify InterviewEndScreen
+            window.dispatchEvent(new CustomEvent('mbb-report-ready', { detail: { sessionId, data: mbbReport } }));
+          } else {
+            console.warn("⚠️ [BACKGROUND] MBB Report generation failed");
+          }
+        }).catch(error => {
+          console.warn("⚠️ [BACKGROUND] MBB Report error:", error);
+        });
+
+        // 2. MBB Assessment (Quick Scores)
+        fetch('/api/transcript/mbb_assessment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript_text: transcriptText })
+        }).then(async response => {
+          if (response.ok) {
+            const mbbAssessment = await response.json();
+            console.log("✅ [BACKGROUND] MBB Assessment generated successfully");
+            // Store in session storage for InterviewEndScreen to pick up
+            sessionStorage.setItem(`mbb_assessment_${sessionId}`, JSON.stringify(mbbAssessment));
+            // Trigger custom event to notify InterviewEndScreen
+            window.dispatchEvent(new CustomEvent('mbb-assessment-ready', { detail: { sessionId, data: mbbAssessment } }));
+          } else {
+            console.warn("⚠️ [BACKGROUND] MBB Assessment generation failed");
+          }
+        }).catch(error => {
+          console.warn("⚠️ [BACKGROUND] MBB Assessment error:", error);
+        });
       }
       
       toast.success("Interview ended! Review your session below.");
@@ -986,31 +1004,47 @@ function ChatInterface({
     let transcriptData: any[] = [];
     
     // Try multiple sources in order of preference
-    // 1. Current stored transcript (most up-to-date)
+    // PRIORITY 1: Current stored transcript (has correct timestamps from buildTranscriptFromMessages)
     if (storedTranscript.length > 0) {
       transcriptData = storedTranscript;
-      console.log("✅ [END] Using stored transcript:", transcriptData.length, "entries");
+      console.log("✅ [END] Using stored transcript (with correct timestamps):", transcriptData.length, "entries");
     }
-    // 2. Build from current messages ref (real-time backup)
-    else if (currentMessagesRef.current.length > 0) {
-      transcriptData = buildTranscriptFromMessages(currentMessagesRef.current);
-      console.log("✅ [END] Built from messages ref:", transcriptData.length, "entries");
-    }
-    // 3. Build from messages state (fallback)
-    else if (messages.length > 0) {
-      transcriptData = buildTranscriptFromMessages(messages);
-      console.log("✅ [END] Built from messages state:", transcriptData.length, "entries");
-    }
-    // 4. Try session storage backup
+    // PRIORITY 2: Transcript evaluator's complete history (backup)
     else {
       try {
-        const backupData = sessionStorage.getItem(`transcript_backup_${sessionId}`);
-        if (backupData) {
-          transcriptData = JSON.parse(backupData);
-          console.log("✅ [END] Recovered from session storage backup:", transcriptData.length, "entries");
+        const evaluatorHistory = transcriptEvaluator.getCompleteTranscriptHistory();
+        if (evaluatorHistory.length > 0) {
+          transcriptData = evaluatorHistory;
+          console.log("✅ [END] Using transcript evaluator complete history:", transcriptData.length, "entries");
         }
       } catch (error) {
-        console.warn("Failed to recover from session storage backup:", error);
+        console.warn("⚠️ [END] Failed to get evaluator history:", error);
+      }
+    }
+    
+    // FALLBACK: Try other sources if neither has data
+    if (transcriptData.length === 0) {
+      // 3. Build from current messages ref (real-time backup)
+      if (currentMessagesRef.current.length > 0) {
+        transcriptData = buildTranscriptFromMessages(currentMessagesRef.current);
+        console.log("✅ [END] Built from messages ref:", transcriptData.length, "entries");
+      }
+      // 4. Build from messages state (fallback)
+      else if (messages.length > 0) {
+        transcriptData = buildTranscriptFromMessages(messages);
+        console.log("✅ [END] Built from messages state:", transcriptData.length, "entries");
+      }
+      // 5. Try session storage backup
+      else {
+        try {
+          const backupData = sessionStorage.getItem(`transcript_backup_${sessionId}`);
+          if (backupData) {
+            transcriptData = JSON.parse(backupData);
+            console.log("✅ [END] Recovered from session storage backup:", transcriptData.length, "entries");
+          }
+        } catch (error) {
+          console.warn("Failed to recover from session storage backup:", error);
+        }
       }
     }
     
@@ -1024,7 +1058,8 @@ function ChatInterface({
         userMessages: transcriptData.filter(e => e.speaker === "user").length,
         assistantMessages: transcriptData.filter(e => e.speaker === "assistant").length,
         firstEntry: transcriptData[0]?.text?.substring(0, 50) + "...",
-        lastEntry: transcriptData[transcriptData.length - 1]?.text?.substring(0, 50) + "..."
+        lastEntry: transcriptData[transcriptData.length - 1]?.text?.substring(0, 50) + "...",
+        source: transcriptData.length > 0 ? "transcript_evaluator_complete_history" : "fallback_sources"
       });
     }
     
@@ -1068,25 +1103,43 @@ function ChatInterface({
         let transcriptData: any[] = [];
         
         // Try multiple sources in order of preference (same as handleEndInterview)
+        // PRIORITY 1: Current stored transcript (has correct timestamps from buildTranscriptFromMessages)
         if (storedTranscript.length > 0) {
           transcriptData = storedTranscript;
-          console.log("✅ [DOWNLOAD] Using stored transcript:", transcriptData.length, "entries");
-        } else if (currentMessagesRef.current.length > 0) {
-          transcriptData = buildTranscriptFromMessages(currentMessagesRef.current);
-          console.log("✅ [DOWNLOAD] Built from messages ref:", transcriptData.length, "entries");
-        } else if (messages.length > 0) {
-          transcriptData = buildTranscriptFromMessages(messages);
-          console.log("✅ [DOWNLOAD] Built from messages state:", transcriptData.length, "entries");
-        } else {
-          // Try session storage backup
+          console.log("✅ [DOWNLOAD] Using stored transcript (with correct timestamps):", transcriptData.length, "entries");
+        }
+        // PRIORITY 2: Transcript evaluator's complete history (backup)
+        else {
           try {
-            const backupData = sessionStorage.getItem(`transcript_backup_${sessionId}`);
-            if (backupData) {
-              transcriptData = JSON.parse(backupData);
-              console.log("✅ [DOWNLOAD] Recovered from session storage backup:", transcriptData.length, "entries");
+            const evaluatorHistory = transcriptEvaluator.getCompleteTranscriptHistory();
+            if (evaluatorHistory.length > 0) {
+              transcriptData = evaluatorHistory;
+              console.log("✅ [DOWNLOAD] Using transcript evaluator complete history:", transcriptData.length, "entries");
             }
           } catch (error) {
-            console.warn("Failed to recover from session storage backup:", error);
+            console.warn("⚠️ [DOWNLOAD] Failed to get evaluator history:", error);
+          }
+        }
+        
+        // FALLBACK: Try other sources if neither has data
+        if (transcriptData.length === 0) {
+          if (currentMessagesRef.current.length > 0) {
+            transcriptData = buildTranscriptFromMessages(currentMessagesRef.current);
+            console.log("✅ [DOWNLOAD] Built from messages ref:", transcriptData.length, "entries");
+          } else if (messages.length > 0) {
+            transcriptData = buildTranscriptFromMessages(messages);
+            console.log("✅ [DOWNLOAD] Built from messages state:", transcriptData.length, "entries");
+          } else {
+            // Try session storage backup
+            try {
+              const backupData = sessionStorage.getItem(`transcript_backup_${sessionId}`);
+              if (backupData) {
+                transcriptData = JSON.parse(backupData);
+                console.log("✅ [DOWNLOAD] Recovered from session storage backup:", transcriptData.length, "entries");
+              }
+            } catch (error) {
+              console.warn("Failed to recover from session storage backup:", error);
+            }
           }
         }
         
@@ -1094,12 +1147,19 @@ function ChatInterface({
           const jsonData = {
             session_id: sessionId,
             created_at: new Date().toISOString(),
-            entries: transcriptData,
+            entries: transcriptData.map((entry, index) => ({
+              ...entry,
+              formatted_timestamp: formatRelativeTime(entry.timestamp || 0),
+              _entry_index: index
+            })),
             metadata: {
               total_entries: transcriptData.length,
               duration: transcriptData.length > 0 
                 ? formatRelativeTime(transcriptData[transcriptData.length - 1]?.timestamp || 0)
                 : "00:00",
+              user_messages: transcriptData.filter(e => e.speaker === "user").length,
+              assistant_messages: transcriptData.filter(e => e.speaker === "assistant").length,
+              format: 'complete_transcript'
             }
           };
           const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
@@ -1113,11 +1173,9 @@ function ChatInterface({
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
         } else {
-          const transcriptText = transcriptData.map(entry => {
-            // entry.timestamp is now relative seconds from recording start
-            const mins = Math.floor(entry.timestamp / 60);
-            const secs = Math.floor(entry.timestamp % 60);
-            const timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+          const transcriptText = transcriptData.map((entry, index) => {
+            // Use centralized timestamp formatting (same as used during interview display)
+            const timeStr = formatRelativeTime(entry.timestamp || 0);
             const speaker = entry.speaker === "user" ? "Interviewee" : "AI Interviewer";
             return `[${timeStr}] ${speaker}: ${entry.text}`;
           }).join('\n');
@@ -1228,198 +1286,43 @@ function ChatInterface({
   return (
     <>
       {showEndScreen ? (
-        <div className="interview-end-screen grow flex flex-col h-full pt-14">
-          {/* Top Navigation Bar - Fixed Height, accounting for fixed nav */}
-          <div className="flex-shrink-0 bg-background border-b px-6 py-4">
-            <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold">Interview Complete</h2>
-              <p className="text-sm text-muted-foreground">Session ID: {sessionId}</p>
-            </div>
-            <div className="flex gap-2 items-center">
-              {/* Session Documents - Compact buttons in header */}
-              <SessionDocuments sessionId={sessionId} />
-              
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => downloadTranscript('txt')}
-                disabled={storedTranscript.length === 0}
-              >
-                <Download className="w-4 h-4 mr-1" />
-                Transcript
-              </Button>
-
-               {/* Only show session selector on main interview page, not when viewing a specific session */}
-               {!urlSessionId && (
-                 <SessionSelector 
-                   onSelectSession={loadEndScreenFromCache}
-                   currentSessionId={sessionId}
-                 />
-               )}
-               <Button 
-                variant="outline" 
-                onClick={() => {
-                  // Navigate to dashboard
-                  window.location.href = "/dashboard";
-                }}
-              >
-                <Home className="w-4 h-4 mr-2" />
-                Dashboard
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => {
-                  // Navigate to setup page for new interview
-                  window.location.href = "/interview/setup";
-                }}
-              >
-                Start New Interview
-              </Button>
-            </div>
-            </div>
-          </div>
-          
-          {/* Main Content Area - Scrollable */}
-          <div className="flex-grow overflow-y-auto p-6">
-            {/* Usage Warning - Shows after interview completion */}
-            {showUsageWarning && completedInterviewDuration > 0 && (
-              <div className="mb-4">
-                <PostInterviewUsageWarning 
-                  sessionDurationMinutes={completedInterviewDuration}
-                  onClose={() => setShowUsageWarning(false)}
-                />
-              </div>
-            )}
+        <InterviewEndScreen
+          sessionId={sessionId}
+          duration={(() => {
+            if (storedTranscript.length === 0) return "0 seconds";
+            const totalSeconds = storedTranscript[storedTranscript.length - 1]?.timestamp || 0;
+            if (totalSeconds < 60) {
+              return `${Math.floor(totalSeconds)} seconds`;
+            } else {
+              return `${Math.floor(totalSeconds / 60)} minutes`;
+            }
+          })()}
+          messageCount={storedTranscript.length}
+          hasRecording={!!finalVideoUrl}
+          hasTranscript={storedTranscript.length > 0}
+          finalVideoUrl={finalVideoUrl}
+          detailedEvaluation={undefined}
+          transcriptText={(() => {
+            // Use storedTranscript as primary source (has correct timestamps from buildTranscriptFromMessages)
+            const completeTranscript = storedTranscript;
+            console.log("📄 [END_SCREEN] Using stored transcript (with correct timestamps):", completeTranscript.length, "entries");
             
-            <div 
-              className={cn(
-                "h-full grid gap-4 transition-all duration-300",
-                isTranscriptDrawerOpen 
-                  ? "grid-cols-1 lg:grid-cols-[20%_35%_45%]" 
-                  : "grid-cols-1 lg:grid-cols-[25%_75%]"
-              )}
-            >
-              {/* Left Column - Video and Transcript */}
-              <div className="flex flex-col gap-4">
-                {/* Video Preview with Direct Seeking */}
-                <Card className="p-6 flex flex-col" style={{ minWidth: '280px' }}>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                    <span>🎥</span>
-                    Interview Recording
-                  </h3>
-                  <div className="flex-grow flex flex-col rounded-lg">
-                    {finalVideoUrl ? (
-                      <div className="w-full flex-grow flex flex-col">
-                        {/* Video Player */}
-                        <div className="relative bg-black rounded-lg overflow-hidden mb-3">
-                          {isVideoProcessing ? (
-                            <div className="w-full aspect-video flex items-center justify-center bg-gray-900">
-                              <div className="text-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-                                <p className="text-white text-sm">Processing video...</p>
-                                <p className="text-gray-400 text-xs mt-2">This usually takes 30-60 seconds</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <iframe
-                              src={finalVideoUrl.replace('/watch', '/iframe')}
-                              className="w-full aspect-video"
-                              style={{ border: "none" }}
-                              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                              allowFullScreen
-                              title="Interview Recording"
-                            />
-                          )}
-                        </div>
-                        
-                        {/* Session Summary - Simple Design without Background */}
-                        <div className="rounded-lg p-4 space-y-3">
-                          <h4 className="font-semibold text-sm flex items-center gap-2">
-                            <User className="w-4 h-4" />
-                            Session Summary
-                          </h4>
-                          <div className="space-y-2 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Duration:</span>
-                              <span className="font-medium">
-                                {(() => {
-                                  if (storedTranscript.length === 0) return "0 seconds";
-                                  const totalSeconds = storedTranscript[storedTranscript.length - 1]?.timestamp || 0;
-                                  if (totalSeconds < 60) {
-                                    return `${Math.floor(totalSeconds)} seconds`;
-                                  } else {
-                                    return `${Math.floor(totalSeconds / 60)} minutes`;
-                                  }
-                                })()}
-                              </span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Messages:</span>
-                              <span className="font-medium">{storedTranscript.length} exchanges</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Recording:</span>
-                              <span className="font-medium">✅ Available</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-sm text-muted-foreground">Processing video...</p>
-                      </div>
-                    )}
-                  </div>
-                </Card>
+            return completeTranscript.map(entry => {
+              // Use centralized timestamp formatting (same as used during interview display)
+              const timeStr = formatRelativeTime(entry.timestamp || 0);
+              const speaker = entry.speaker.toUpperCase() === 'USER' ? 'YOU' : 'AI INTERVIEWER';
+              return `[${timeStr}] ${speaker}: ${entry.text}`;
+            }).join('\n');
+          })()}
+          onStartNewInterview={() => {
+            window.location.href = "/interview/setup";
+          }}
+          onViewTranscript={() => downloadTranscript('txt')}
+          onViewDashboard={() => {
+            window.location.href = "/dashboard";
+          }}
+        />
 
-
-              </div>
-
-              {/* Right Column - Detailed Analysis */}
-              <div className="flex flex-col">
-                {finalEvaluation ? (
-                  <EnhancedDetailedAnalysis 
-                    evaluation={finalEvaluation} 
-                    confidence={finalEvaluation.confidence}
-                  />
-                ) : (
-                  <Card className="p-6 flex flex-col h-full">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Detailed Analysis
-                    </h3>
-                    <div className="flex-grow flex items-center justify-center">
-                      <div className="text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                        <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">Generating detailed analysis...</p>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">This may take 30-90 seconds</p>
-                      </div>
-                    </div>
-                  </Card>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Floating Transcript Button */}
-          <FloatingTranscriptButton onClick={() => setIsTranscriptDrawerOpen(true)} />
-          
-          {/* Transcript Drawer */}
-          <TranscriptDrawer
-            isOpen={isTranscriptDrawerOpen}
-            onClose={() => setIsTranscriptDrawerOpen(false)}
-            transcript={storedTranscript.map(entry => ({
-              id: entry.id || `${entry.timestamp}-${entry.speaker}`,
-              speaker: entry.speaker,
-              text: entry.text,
-              timestamp: entry.timestamp, // Keep as relative seconds (no conversion needed)
-              emotions: entry.emotions,
-              confidence: entry.confidence
-            }))}
-          />
-        </div>
       ) : showVideoReview ? (
         <div className="grow flex flex-col overflow-hidden pt-14 p-6">
           <div className="flex justify-between items-center mb-6">
@@ -1453,7 +1356,6 @@ function ChatInterface({
             <VideoReviewInterface
               videoUrl={finalVideoUrl}
               transcript={transcript}
-              evaluation={finalEvaluation}
               className="grow"
             />
           ) : (

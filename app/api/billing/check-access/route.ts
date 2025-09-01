@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { checkUsageLimit } from "@/utils/billing-client";
-import { getUserPlan, getUserLimits } from "@/utils/plan-config";
+import { getUserPlanKey } from "@/utils/plan-config";
 
 /**
  * 🎯 Clean Access Check API - Uses proper separation of responsibilities:
@@ -22,9 +22,8 @@ export async function POST(request: NextRequest) {
 
     const { requiredPlan, usageType, usageAmount } = await request.json();
 
-    // 🎯 Get user's current plan from Clerk (clean separation!)
-    const userPlan = getUserPlan(has);
-    const userLimits = getUserLimits(userPlan);
+    // 🎯 Get user's current plan key from Clerk
+    const planKey = getUserPlanKey(has);
 
     // Check plan-based access if required
     if (requiredPlan) {
@@ -35,19 +34,15 @@ export async function POST(request: NextRequest) {
         premium: 3 
       };
       
-      const userPlanLevel = planHierarchy[userPlan.key as keyof typeof planHierarchy] || 0;
+      const userPlanLevel = planHierarchy[planKey as keyof typeof planHierarchy] || 0;
       const requiredLevel = planHierarchy[requiredPlan as keyof typeof planHierarchy];
       
       if (userPlanLevel < requiredLevel) {
         return NextResponse.json({
           hasAccess: false,
           reason: 'insufficient_plan',
-          currentPlan: userPlan.name,
+          currentPlan: planKey,
           requiredPlan: requiredPlan,
-          planInfo: {
-            current: userPlan,
-            limits: userLimits
-          }
         });
       }
     }
@@ -61,10 +56,7 @@ export async function POST(request: NextRequest) {
           hasAccess: false,
           reason: 'usage_limit_exceeded',
           usageCheck,
-          planInfo: {
-            current: userPlan,
-            limits: userLimits
-          }
+          currentPlan: planKey
         });
       }
     }
@@ -72,10 +64,7 @@ export async function POST(request: NextRequest) {
     // User has access
     return NextResponse.json({
       hasAccess: true,
-      planInfo: {
-        current: userPlan,
-        limits: userLimits
-      }
+      currentPlan: planKey
     });
 
   } catch (error) {

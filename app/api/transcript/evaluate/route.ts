@@ -11,18 +11,25 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    // Call the external API
-    const response = await fetch('https://interviewer-backend-183309496023.us-central1.run.app/api/transcript/evaluate', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        transcript_text
-      }),
-    });
+    // Call the external API with timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 seconds for in-interview feedback
 
-    if (!response.ok) {
+    try {
+      const response = await fetch('https://interviewer-backend-183309496023.us-central1.run.app/api/transcript/evaluate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transcript_text
+        }),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
       const status = response.status;
       const statusText = response.statusText;
       const contentType = response.headers.get('content-type') || '';
@@ -62,8 +69,21 @@ export async function POST(request: NextRequest) {
       finalResponse.confidence = result.confidence;
     }
 
-    // Return the evaluation result
-    return NextResponse.json(finalResponse);
+      // Return the evaluation result
+      return NextResponse.json(finalResponse);
+
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return NextResponse.json(
+          { error: "In-interview evaluation timed out" },
+          { status: 408 }
+        );
+      }
+      
+      throw fetchError;
+    }
 
   } catch (error) {
     console.error("Transcript evaluation error:", error);
