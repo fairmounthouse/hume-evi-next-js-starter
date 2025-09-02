@@ -21,7 +21,7 @@ export default function Hero() {
 
           <div className="relative mb-6 md:mb-8 animate-[slideUp_0.95s_ease-out]">
             <p className="text-base sm:text-2xl font-semibold">
-              3x the results. 10% of the cost. Always on.
+              3x the results. 10% of the cost. Available 24/7.
             </p>
             <img 
               src="/yellow-underline.png" 

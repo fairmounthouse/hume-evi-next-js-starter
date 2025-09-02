@@ -27,6 +27,7 @@ module.exports = {
         'float': 'float 20s infinite ease-in-out',
         'pulse-dot': 'pulse 2s infinite',
         'bounce-dot': 'bounce 1.4s infinite',
+        'infinite-scroll': 'infinite-scroll 25s linear infinite',
       },
       keyframes: {
         float: {
@@ -34,6 +35,10 @@ module.exports = {
           '25%': { transform: 'translateY(-20px) rotate(5deg)' },
           '50%': { transform: 'translateY(0) rotate(10deg)' },
           '75%': { transform: 'translateY(20px) rotate(5deg)' },
+        },
+        'infinite-scroll': {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-100%)' },
         },
       },
     },
