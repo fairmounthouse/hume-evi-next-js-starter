@@ -215,7 +215,15 @@ function ChatInterface({
         onClosePrimaryExhibit(); // Close primary exhibit
         
         // Set all the state to rebuild the end screen
+        // Update both stored transcript and evaluator with cached data
         setStoredTranscript(cachedData.transcript);
+        
+        // Also update the transcript evaluator with the cached data
+        // This ensures both systems are in sync when loading cached sessions
+        if (cachedData.transcript && cachedData.transcript.length > 0) {
+          transcriptEvaluator.updateTranscriptHistory(cachedData.transcript);
+          console.log("📋 [CACHED SESSION] Updated transcript evaluator with cached data:", cachedData.transcript.length, "entries");
+        }
         setTranscript(cachedData.transcript);
         setFinalVideoUrl(cachedData.videoUrl);
         setShowEndScreen(true);
@@ -512,9 +520,13 @@ function ChatInterface({
     if (isCallActive && sessionId) {
       // Backup transcript every 30 seconds during active interview
       backupInterval = setInterval(async () => {
-        const currentTranscript = storedTranscript.length > 0 
+        // Always use the complete transcript from evaluator for backups
+        const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+        const fallbackTranscript = storedTranscript.length > 0 
           ? storedTranscript 
           : buildTranscriptFromMessages(currentMessagesRef.current);
+        
+        const currentTranscript = completeTranscript.length > 0 ? completeTranscript : fallbackTranscript;
         
         if (currentTranscript.length > 0) {
           try {
@@ -524,7 +536,10 @@ function ChatInterface({
               live_transcript_data: currentTranscript,
               updated_at: new Date().toISOString()
             });
-            console.log("💾 Periodic transcript backup completed:", currentTranscript.length, "entries");
+            console.log("💾 Periodic transcript backup completed:", {
+              transcriptEntries: currentTranscript.length,
+              sourceType: completeTranscript.length > 0 ? "COMPLETE_EVALUATOR" : "FALLBACK_STORED"
+            });
           } catch (error) {
             console.warn("Failed to backup transcript periodically:", error);
           }
@@ -608,7 +623,11 @@ function ChatInterface({
           ? buildTranscriptFromMessages(currentMessagesRef.current)
           : buildTranscriptFromMessages(messages);
       
+      // Ensure transcript evaluator has the final complete transcript
+      transcriptEvaluator.updateTranscriptHistory(preservedTranscript);
+      
       console.log("🔚 Preserved transcript:", preservedTranscript.length, "entries");
+      console.log("🔚 Updated transcript evaluator with final complete transcript");
       
       // Process end interview data immediately (no delay)
       handleEndInterviewWithData(preservedTranscript);
@@ -638,9 +657,17 @@ function ChatInterface({
           console.log("💾 All end screen data ready, storing to Supabase...");
           const { storeEndScreenData } = await import("@/utils/supabase-client");
           
+          // Use the TranscriptEvaluator's COMPLETE transcript (never truncated)
+          const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+          console.log("💾 Using COMPLETE transcript from evaluator for storage:", {
+            storedTranscriptLength: storedTranscript.length,
+            completeTranscriptLength: completeTranscript.length,
+            usingCompleteTranscript: true
+          });
+          
           const success = await storeEndScreenData(
             sessionId,
-            storedTranscript,
+            completeTranscript, // Use COMPLETE transcript, not potentially truncated storedTranscript
             null, // No longer using old evaluation system
             finalVideoUrl
           );
@@ -1598,28 +1625,49 @@ function ChatInterface({
         <InterviewEndScreen
           sessionId={sessionId}
           duration={(() => {
-            if (storedTranscript.length === 0) return "0 seconds";
-            const totalSeconds = storedTranscript[storedTranscript.length - 1]?.timestamp || 0;
+            // Use complete transcript from evaluator for accurate duration
+            const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+            const transcriptToUse = completeTranscript.length > 0 ? completeTranscript : storedTranscript;
+            
+            if (transcriptToUse.length === 0) return "0 seconds";
+            const totalSeconds = transcriptToUse[transcriptToUse.length - 1]?.timestamp || 0;
             if (totalSeconds < 60) {
               return `${Math.floor(totalSeconds)} seconds`;
             } else {
               return `${Math.floor(totalSeconds / 60)} minutes`;
             }
           })()}
-          messageCount={storedTranscript.length}
+          messageCount={(() => {
+            const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+            return completeTranscript.length > 0 ? completeTranscript.length : storedTranscript.length;
+          })()}
           hasRecording={!!finalVideoUrl}
-          hasTranscript={storedTranscript.length > 0}
+          hasTranscript={(() => {
+            const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+            return completeTranscript.length > 0 || storedTranscript.length > 0;
+          })()}
           finalVideoUrl={finalVideoUrl}
           detailedEvaluation={undefined}
-          transcript={storedTranscript} // NEW: Pass structured transcript array with interim tracking
-          transcriptText={(() => {
-            // Keep transcriptText for backward compatibility and download functionality
-            const completeTranscript = storedTranscript;
-            console.log("📄 [END_SCREEN] Using stored transcript (with interim tracking):", {
-              entries: completeTranscript.length,
-              userMessagesWithInterim: completeTranscript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length
+          transcript={(() => {
+            // Always use complete transcript from evaluator for end screen
+            const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+            const transcriptToUse = completeTranscript.length > 0 ? completeTranscript : storedTranscript;
+            console.log("📄 [END_SCREEN] Using transcript for display:", {
+              sourceType: completeTranscript.length > 0 ? "COMPLETE_EVALUATOR" : "FALLBACK_STORED",
+              entries: transcriptToUse.length
             });
-            return completeTranscript.map(entry => {
+            return transcriptToUse;
+          })()} // Use COMPLETE transcript from evaluator
+          transcriptText={(() => {
+            // Use the complete transcript from evaluator for download functionality
+            const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+            const transcriptToUse = completeTranscript.length > 0 ? completeTranscript : storedTranscript;
+            console.log("📄 [END_SCREEN] Using complete transcript for download text:", {
+              sourceType: completeTranscript.length > 0 ? "COMPLETE_EVALUATOR" : "FALLBACK_STORED",
+              entries: transcriptToUse.length,
+              userMessagesWithInterim: transcriptToUse.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length
+            });
+            return transcriptToUse.map(entry => {
               // Use centralized timestamp formatting (same as used during interview display)
               const timeStr = formatRelativeTime(entry.timestamp || 0);
               const speaker = entry.speaker.toUpperCase() === 'USER' ? 'YOU' : 'AI INTERVIEWER';
@@ -1788,15 +1836,24 @@ function ChatInterface({
           <TranscriptDrawer
             isOpen={isTranscriptDrawerOpen}
             onClose={() => setIsTranscriptDrawerOpen(false)}
-            transcript={storedTranscript.map(entry => ({
-              id: entry.id || `${entry.timestamp}-${entry.speaker}`,
-              speaker: entry.speaker,
-              text: entry.text,
-              timestamp: entry.timestamp,
-              emotions: entry.emotions,
-              confidence: entry.confidence,
-              isInterim: entry.isInterim
-            }))}
+            transcript={(() => {
+              // Use complete transcript from evaluator for transcript drawer
+              const completeTranscript = transcriptEvaluator.getCompleteTranscriptHistory();
+              const transcriptToUse = completeTranscript.length > 0 ? completeTranscript : storedTranscript;
+              console.log("📄 [TRANSCRIPT_DRAWER] Using complete transcript:", {
+                sourceType: completeTranscript.length > 0 ? "COMPLETE_EVALUATOR" : "FALLBACK_STORED",
+                entries: transcriptToUse.length
+              });
+              return transcriptToUse.map(entry => ({
+                id: entry.id || `${entry.timestamp}-${entry.speaker}`,
+                speaker: entry.speaker,
+                text: entry.text,
+                timestamp: entry.timestamp,
+                emotions: entry.emotions,
+                confidence: entry.confidence,
+                isInterim: entry.isInterim
+              }));
+            })()}
             onSeekVideo={(timestamp) => {
               console.log("🎯 [LIVE TRANSCRIPT] Seeking to timestamp:", timestamp);
               // Store timestamp for video component to pick up

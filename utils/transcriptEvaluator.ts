@@ -5,10 +5,10 @@ import {
 } from './feedbackTypes';
 
 export class TranscriptEvaluator {
-  private transcriptHistory: TranscriptEntry[] = [];
+  private transcriptHistory: TranscriptEntry[] = []; // COMPLETE transcript - NEVER truncated
   private evaluationInterval: NodeJS.Timeout | null = null;
   private onEvaluationCallback: ((feedback: InInterviewFeedback) => void) | null = null;
-  private readonly ROLLING_WINDOW_MS = 1 * 60 * 1000; // 1 minute
+  private readonly ROLLING_WINDOW_MS = 1 * 60 * 1000; // 1 minute - ONLY for real-time feedback
   private readonly EVALUATION_INTERVAL_MS = 20 * 1000; // 20 seconds
   private isEvaluating = false;
 
@@ -120,24 +120,26 @@ export class TranscriptEvaluator {
   }
 
   /**
-   * Update internal transcript history
+   * Update internal transcript history - COMPLETE TRANSCRIPT (never truncated)
+   * This maintains the full conversation history for downloads and storage
    */
-  private updateTranscriptHistory(entries: TranscriptEntry[]): void {
+  public updateTranscriptHistory(entries: TranscriptEntry[]): void {
     // Replace the entire history with new entries
     // CRITICAL: Do NOT truncate the master transcript history!
     // The rolling window is applied separately in getRollingWindow()
     this.transcriptHistory = [...entries];
     
-    console.log(`📚 [EVALUATOR] Updated master transcript history: ${this.transcriptHistory.length} total entries (NEVER truncated)`);
+    console.log(`📚 [EVALUATOR] Updated COMPLETE transcript history: ${this.transcriptHistory.length} total entries (NEVER truncated)`);
+    console.log(`📚 [EVALUATOR] This is the MASTER transcript that gets saved to database`);
   }
 
   /**
-   * Get entries within the 5-minute rolling window
+   * Get entries within the 1-minute rolling window
    * 
    * IMPORTANT: This rolling window is ONLY used for real-time feedback evaluation
    * to improve performance and focus on recent conversation context.
    * 
-   * The master transcript stored in Chat component is NEVER truncated and
+   * The master transcript (transcriptHistory) is NEVER truncated and
    * contains the complete conversation history for download.
    */
   private getRollingWindow(): TranscriptEntry[] {
@@ -153,8 +155,8 @@ export class TranscriptEvaluator {
       entry => entry.timestamp >= cutoffTimestamp
     );
     
-    console.log(`🕐 [EVALUATOR] Rolling window: ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 1 minute only)`);
-    console.log(`🕐 [EVALUATOR] Full transcript history preserved separately: ${this.transcriptHistory.length} total entries`);
+    console.log(`🕐 [EVALUATOR] ROLLING WINDOW (for feedback only): ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 1 minute only)`);
+    console.log(`🕐 [EVALUATOR] COMPLETE TRANSCRIPT (for storage): ${this.transcriptHistory.length} total entries (NEVER truncated)`);
     console.log(`🕐 [EVALUATOR] Rolling window debug:`, {
       rollingWindowSeconds,
       latestTimestamp,
@@ -265,9 +267,11 @@ export class TranscriptEvaluator {
   /**
    * Get the complete transcript history (never truncated)
    * This is what should be used for downloads and final storage
+   * CRITICAL: This is the AUTHORITATIVE source for the complete transcript
    */
   getCompleteTranscriptHistory(): TranscriptEntry[] {
-    console.log(`📚 [EVALUATOR] Returning complete transcript history: ${this.transcriptHistory.length} entries (NEVER truncated)`);
+    console.log(`📚 [EVALUATOR] Returning AUTHORITATIVE complete transcript: ${this.transcriptHistory.length} entries (NEVER truncated)`);
+    console.log(`📚 [EVALUATOR] This transcript should be used for database storage and downloads`);
     return [...this.transcriptHistory];
   }
 

@@ -32,8 +32,28 @@ export async function createSessionWithBilling(
   try {
     // If user info is provided, ensure user exists in billing system
     if (clerkId && email) {
-      await ensureUserExists(clerkId, email);
-      sessionData.user_id = clerkId;
+      console.log("👤 Ensuring user exists in billing system:", { clerkId, email });
+      
+      try {
+        const userUuid = await ensureUserExists(clerkId, email);
+        sessionData.user_id = clerkId; // Keep for backward compatibility
+        sessionData.user_uuid = userUuid; // Set the required UUID for foreign key
+        
+        console.log("✅ User ensured in billing system successfully:", {
+          clerkId,
+          userUuid,
+          hasUserUuid: !!userUuid,
+          userUuidType: typeof userUuid
+        });
+      } catch (userError) {
+        console.error("❌ Failed to ensure user exists:", {
+          error: userError,
+          clerkId,
+          email,
+          errorMessage: userError instanceof Error ? userError.message : 'Unknown error'
+        });
+        throw new Error(`User creation failed: ${userError instanceof Error ? userError.message : 'Unknown error'}`);
+      }
     }
 
     // Validate and fix session data
@@ -42,18 +62,36 @@ export async function createSessionWithBilling(
     console.log("💾 Creating session with billing integration:", {
       sessionId: validatedData.session_id,
       hasClerkId: !!clerkId,
-      hasEmail: !!email
+      hasEmail: !!email,
+      validatedDataKeys: Object.keys(validatedData),
+      validatedData: JSON.stringify(validatedData, null, 2)
     });
 
-    // Create the session
-    const { data, error } = await supabase
+    // Create the session with detailed logging
+    console.log("🔍 About to call Supabase insert...");
+    const insertResult = await supabase
       .from("interview_sessions")
       .insert(validatedData)
       .select()
       .single();
+      
+    const { data, error } = insertResult;
+    console.log("📊 Supabase insert result:", {
+      hasData: !!data,
+      hasError: !!error,
+      dataKeys: data ? Object.keys(data) : [],
+      insertResult: JSON.stringify({ data, error }, null, 2)
+    });
 
     if (error) {
-      console.error("❌ Failed to create session:", error);
+      console.error("❌ Failed to create session - DETAILED ERROR:", {
+        error,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorDetails: error.details,
+        errorHint: error.hint,
+        validatedData: JSON.stringify(validatedData, null, 2)
+      });
       throw error;
     }
 
@@ -268,6 +306,7 @@ export interface InterviewSession {
   
   // USER ASSOCIATION (for Clerk integration)
   user_id?: string; // Clerk user ID for RLS policies
+  user_uuid?: string; // UUID FK to users table (required for database constraints)
   
   // TIMING & STATUS
   ended_at?: string; // timestamp with time zone, must be >= started_at if provided
@@ -298,6 +337,15 @@ export interface InterviewSession {
 
 // Validate and fix session data to ensure database compliance
 function validateAndFixSessionData(data: Partial<InterviewSession>): Partial<InterviewSession> {
+  console.log("🔍 [VALIDATION] Starting validation with input data:", {
+    inputKeys: Object.keys(data),
+    sessionId: data.session_id,
+    hasStartedAt: !!data.started_at,
+    hasUserId: !!data.user_id,
+    hasUserUuid: !!data.user_uuid,
+    status: data.status
+  });
+  
   const fixed = { ...data };
   
   // 1. Ensure required fields are present
@@ -345,6 +393,17 @@ function validateAndFixSessionData(data: Partial<InterviewSession>): Partial<Int
   }
   
   // Note: EVI columns have been removed from the schema
+  
+  console.log("✅ [VALIDATION] Validation completed:", {
+    outputKeys: Object.keys(fixed),
+    sessionId: fixed.session_id,
+    hasStartedAt: !!fixed.started_at,
+    hasUserId: !!fixed.user_id,
+    hasUserUuid: !!fixed.user_uuid,
+    status: fixed.status,
+    caseId: fixed.case_id,
+    interviewerId: fixed.new_interviewer_profile_id
+  });
   
   return fixed;
 }

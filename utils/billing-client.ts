@@ -22,6 +22,8 @@ export interface UsageSummary {
  * Ensure user exists in Supabase (minimal linking only)
  */
 export async function ensureUserExists(clerkId: string, email: string): Promise<string> {
+  console.log("🔍 Calling ensure_user_exists RPC:", { clerkId, email });
+  
   const { data, error } = await supabase
     .rpc('ensure_user_exists', {
       p_clerk_id: clerkId,
@@ -29,9 +31,23 @@ export async function ensureUserExists(clerkId: string, email: string): Promise<
     });
 
   if (error) {
-    console.error('Error ensuring user exists:', error);
+    console.error('❌ RPC ensure_user_exists failed - DETAILED ERROR:', {
+      error,
+      errorMessage: error.message,
+      errorCode: error.code,
+      errorDetails: error.details,
+      errorHint: error.hint,
+      clerkId,
+      email
+    });
     throw new Error(`Failed to create/find user: ${error.message}`);
   }
+
+  console.log("✅ RPC ensure_user_exists succeeded:", {
+    data,
+    dataType: typeof data,
+    clerkId
+  });
 
   return data;
 }
