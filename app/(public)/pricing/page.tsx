@@ -65,7 +65,7 @@ export default function PricingPage() {
             Join thousands of professionals who've landed their dream jobs with Interview AI. 
             Start with our free plan and upgrade as you grow.
           </p>
-          <div className="flex items-center justify-center gap-6 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span>No setup fees</span>
@@ -99,7 +99,7 @@ export default function PricingPage() {
           </p>
         </div>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {features.map((feature, index) => (
             <Card key={index} className="text-center hover:shadow-lg transition-shadow">
               <CardHeader>
@@ -125,7 +125,7 @@ export default function PricingPage() {
           </p>
         </div>
         
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {testimonials.map((testimonial, index) => (
             <Card key={index} className="hover:shadow-lg transition-shadow">
               <CardHeader>

@@ -101,7 +101,7 @@ export default function DashboardPage() {
   const warningUsage = usageData.find(usage => usage.percentage_used >= 70 && usage.percentage_used < 90);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 px-4 sm:px-6 md:px-8">
       {/* Welcome Header */}
       <div className="space-y-4">
         <div className="space-y-2">
@@ -144,7 +144,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card 
           className="hover:shadow-md transition-shadow cursor-pointer group"
           onClick={() => window.location.href = '/interview/setup'}
@@ -216,14 +216,14 @@ export default function DashboardPage() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-3 text-xs sm:text-sm">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
             {/* Current Plan */}
             <Card>
               <CardHeader>
@@ -298,7 +298,7 @@ export default function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Target className="h-4 w-4 text-blue-600" />
@@ -412,10 +412,7 @@ export default function DashboardPage() {
                             {usage.current_usage} / {usage.limit_value}
                           </Badge>
                         </div>
-                        <Progress 
-                          value={usage.percentage_used} 
-                          className="h-3"
-                        />
+                        <Progress value={usage.percentage_used} className="h-2 sm:h-3" />
                         <p className="text-xs text-muted-foreground">
                           {usage.percentage_used.toFixed(1)}% used this period
                         </p>
@@ -460,7 +457,7 @@ export default function DashboardPage() {
               {recentSessions.length > 0 ? (
                 <div className="space-y-4">
                   {recentSessions.map((session, index) => (
-                    <div key={session.session_id || index} className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                    <div key={session.session_id || index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
                       <div className="flex items-center space-x-4">
                         <div className="p-2 bg-muted rounded-lg">
                           <BarChart3 className="h-4 w-4" />
