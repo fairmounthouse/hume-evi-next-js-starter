@@ -1541,10 +1541,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               {/* Right Panel - Available Profiles */}
               <div className="w-96 bg-gray-50 border-l border-gray-200 flex flex-col overflow-hidden">
                 <div className="p-5 border-b border-gray-200 bg-white">
-                  <div className="text-base font-semibold text-gray-700 mb-1">Available Profiles</div>
-                  <div className="text-sm text-gray-600">
-                    {selectedProfile ? "Profile selected - click Continue to use it" : "Or choose from existing profiles"}
-                  </div>
+                  <div className="text-base font-semibold text-gray-700 mb-1">Existing Profiles</div>
                 </div>
 
                 {/* Exact Match Suggestion Banner */}
