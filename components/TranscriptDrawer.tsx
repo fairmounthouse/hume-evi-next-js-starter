@@ -15,6 +15,7 @@ interface TranscriptEntry {
   timestamp: number;
   emotions?: any;
   confidence?: number;
+  isInterim?: boolean; // NEW: Flag for interim messages
 }
 
 interface TranscriptDrawerProps {
@@ -268,7 +269,8 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                             "p-3 rounded-lg border",
                             entry.speaker === "user" 
                               ? "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 ml-4"
-                              : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 mr-4"
+                              : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 mr-4",
+                            entry.isInterim && "opacity-70 border-dashed animate-pulse"
                           )}
                         >
                           <div className="flex items-center gap-2 mb-2">
@@ -287,6 +289,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                                 : "text-gray-700 dark:text-gray-300"
                             )}>
                               {entry.speaker === "user" ? "Interviewee" : "AI Interviewer"}
+                              {entry.isInterim && " (typing...)"}
                             </span>
                             <span className="text-xs text-muted-foreground ml-auto">
                               {formatTimestamp(entry.timestamp)}
@@ -295,6 +298,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                           
                           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                             {entry.text}
+                            {entry.isInterim && <span className="animate-pulse ml-1">|</span>}
                           </p>
                           
                           {entry.confidence && (

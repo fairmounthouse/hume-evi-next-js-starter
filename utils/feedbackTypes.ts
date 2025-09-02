@@ -3,6 +3,7 @@ export interface TranscriptEntry {
   speaker: "user" | "assistant";
   text: string;
   timestamp: number;
+  startSpeakingTimestamp?: number; // For user messages: when they started speaking (from first interim)
   emotions?: any;
   confidence?: number;
 }

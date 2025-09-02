@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, useImperativeHandle, forwardRef } from "react";
 import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 import { Button } from "./ui/button";
 import { TranscriptEntry } from "@/utils/feedbackTypes";
@@ -12,12 +12,20 @@ interface VideoTranscriptPlayerProps {
   className?: string;
 }
 
-export default function VideoTranscriptPlayer({
+export interface VideoPlayerRef {
+  seekTo: (timestamp: number) => void;
+  play: () => void;
+  pause: () => void;
+  getCurrentTime: () => number;
+}
+
+const VideoTranscriptPlayer = forwardRef<VideoPlayerRef, VideoTranscriptPlayerProps>(({
   videoUrl,
   transcript,
   className = "",
-}: VideoTranscriptPlayerProps) {
+}, ref) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   
   const [isPlaying, setIsPlaying] = useState(false);
@@ -25,6 +33,7 @@ export default function VideoTranscriptPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [activeSegmentId, setActiveSegmentId] = useState<string | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
 
   // Update current time as video plays
   useEffect(() => {
@@ -88,30 +97,24 @@ export default function VideoTranscriptPlayer({
   }, [transcript, activeSegmentId]);
 
   const togglePlayPause = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
     if (isPlaying) {
-      video.pause();
+      pauseVideo();
     } else {
-      video.play();
+      playVideo();
     }
   };
 
   const toggleMute = () => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.muted = !video.muted;
-    setIsMuted(video.muted);
-  };
-
-  const seekToTime = (timestamp: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.currentTime = timestamp;
-    setCurrentTime(timestamp);
+    if (!isCloudflareStream) {
+      const video = videoRef.current;
+      if (video) {
+        video.muted = !video.muted;
+        setIsMuted(video.muted);
+        logVideoOperation('HTML5_TOGGLE_MUTE', { wasMuted: isMuted, nowMuted: video.muted });
+      }
+    } else {
+      logVideoOperation('CLOUDFLARE_MUTE_INFO', { message: 'Use built-in iframe controls for mute/unmute' });
+    }
   };
 
   const { formatRelativeTime } = useRecordingAnchor();
@@ -138,16 +141,114 @@ export default function VideoTranscriptPlayer({
     return emotionColors[maxEmotion[0]] || "text-gray-600";
   };
 
-  // Extract video ID from Cloudflare Stream URL
-  const getVideoIdFromUrl = (url: string): string | null => {
-    // Handle different Cloudflare Stream URL formats
-    // Format: https://customer-{code}.cloudflarestream.com/{videoId}/watch
-    const match = url.match(/cloudflarestream\.com\/([^\/]+)\/watch/);
-    return match ? match[1] : null;
-  };
+  // Extract video ID from Cloudflare Stream URL - memoized for performance
+  const { videoId, isCloudflareStream } = useMemo(() => {
+    const getVideoIdFromUrl = (url: string): string | null => {
+      // Handle different Cloudflare Stream URL formats
+      // Format: https://customer-{code}.cloudflarestream.com/{videoId}/watch
+      const match = url.match(/cloudflarestream\.com\/([^\/]+)\/watch/);
+      return match ? match[1] : null;
+    };
 
-  const videoId = getVideoIdFromUrl(videoUrl);
-  const isCloudflareStream = !!videoId;
+    const id = getVideoIdFromUrl(videoUrl);
+    return {
+      videoId: id,
+      isCloudflareStream: !!id
+    };
+  }, [videoUrl]);
+
+  // Memoized iframe src to prevent unnecessary reloads
+  const iframeSrc = useMemo(() => {
+    if (!isCloudflareStream || !videoId) return '';
+    return `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true`;
+  }, [videoId, isCloudflareStream]);
+
+  // Enhanced logging utility
+  const logVideoOperation = useCallback((operation: string, details: any) => {
+    const timestamp = new Date().toISOString();
+    console.log(`🎬 [VideoPlayer:${timestamp}] ${operation}:`, {
+      videoId,
+      isCloudflareStream,
+      playerReady,
+      currentTime,
+      ...details
+    });
+  }, [videoId, isCloudflareStream, playerReady, currentTime]);
+
+  // Note: We use the official startTime parameter instead of postMessage for seeking
+
+  // Official Cloudflare Stream seeking using startTime parameter with 0.5s buffer
+  const seekToTime = useCallback((timestamp: number) => {
+    logVideoOperation('SEEK_REQUEST', { timestamp, targetTime: timestamp });
+    
+    if (isCloudflareStream && videoId && iframeRef.current) {
+      // Add 0.5s AFTER the timestamp for better positioning
+      const originalTimestamp = timestamp;
+      const bufferedTimestamp = originalTimestamp + 2;
+      const seekTime = Math.floor(bufferedTimestamp * 10) / 10; // Keep one decimal place
+      
+      // Use official Cloudflare Stream startTime parameter with autoplay and +0.5s offset
+      const newSrc = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&startTime=${seekTime}&autoplay=true`;
+      iframeRef.current.src = newSrc;
+      setCurrentTime(originalTimestamp);
+      logVideoOperation('CLOUDFLARE_STARTTIME_OFFSET_SUCCESS', { 
+        originalTimestamp, 
+        bufferedTimestamp, 
+        seekTime, 
+        newSrc 
+      });
+    } else if (!isCloudflareStream) {
+      // HTML5 video fallback
+      const video = videoRef.current;
+      if (video) {
+        video.currentTime = timestamp;
+        setCurrentTime(timestamp);
+        logVideoOperation('HTML5_SEEK_SUCCESS', { timestamp });
+      } else {
+        logVideoOperation('HTML5_SEEK_FAILED', { timestamp, reason: 'No video element' });
+      }
+    } else {
+      logVideoOperation('SEEK_FAILED', { timestamp, reason: 'Missing videoId or iframe ref' });
+    }
+  }, [isCloudflareStream, videoId, logVideoOperation]);
+
+  // Player control methods (Note: Cloudflare Stream iframe has built-in controls)
+  const playVideo = useCallback(() => {
+    if (!isCloudflareStream && videoRef.current) {
+      videoRef.current.play();
+      logVideoOperation('HTML5_PLAY_COMMAND', {});
+    } else {
+      logVideoOperation('CLOUDFLARE_PLAY_INFO', { message: 'Use built-in iframe controls for play/pause' });
+    }
+  }, [isCloudflareStream, logVideoOperation]);
+
+  const pauseVideo = useCallback(() => {
+    if (!isCloudflareStream && videoRef.current) {
+      videoRef.current.pause();
+      logVideoOperation('HTML5_PAUSE_COMMAND', {});
+    } else {
+      logVideoOperation('CLOUDFLARE_PAUSE_INFO', { message: 'Use built-in iframe controls for play/pause' });
+    }
+  }, [isCloudflareStream, logVideoOperation]);
+
+  // Handle initial timestamp jump from sessionStorage
+  useEffect(() => {
+    const jumpTimestamp = sessionStorage.getItem('jumpToTimestamp');
+    if (jumpTimestamp && isCloudflareStream) {
+      const timestamp = parseFloat(jumpTimestamp);
+      setTimeout(() => seekToTime(timestamp), 500); // Small delay for iframe load
+      sessionStorage.removeItem('jumpToTimestamp');
+      logVideoOperation('INITIAL_TIMESTAMP_JUMP', { timestamp });
+    }
+  }, [isCloudflareStream, seekToTime, logVideoOperation]);
+
+  // Expose methods via imperative handle
+  useImperativeHandle(ref, () => ({
+    seekTo: seekToTime,
+    play: playVideo,
+    pause: pauseVideo,
+    getCurrentTime: () => currentTime,
+  }), [seekToTime, playVideo, pauseVideo, currentTime]);
 
   return (
     <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 h-full ${className}`}>
@@ -155,30 +256,30 @@ export default function VideoTranscriptPlayer({
       <div className="space-y-4">
         <div className="relative bg-black rounded-lg overflow-hidden">
           {isCloudflareStream ? (
-            // Use Cloudflare Stream iframe for better performance and features
+            // Use Cloudflare Stream iframe with postMessage API - NO MORE RELOADS!
             <div className="relative w-full aspect-video">
               <iframe
-                src={`https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true`}
+                ref={iframeRef}
+                src={iframeSrc}
                 className="absolute inset-0 w-full h-full"
                 style={{ border: "none" }}
                 allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                 allowFullScreen
                 title="Interview Recording"
                 onLoad={() => {
-                  // Check for timestamp jump after iframe loads
-                  const jumpTimestamp = sessionStorage.getItem('jumpToTimestamp');
-                  if (jumpTimestamp) {
-                    const timestamp = parseFloat(jumpTimestamp);
-                    // For Cloudflare Stream iframe, we'll use URL parameter
-                    const iframe = document.querySelector('iframe[title="Interview Recording"]') as HTMLIFrameElement;
-                    if (iframe) {
-                      iframe.src = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&t=${Math.floor(timestamp)}s`;
-                    }
-                    sessionStorage.removeItem('jumpToTimestamp');
-                    console.log(`🎬 Cloudflare Stream: Jumped to timestamp: ${timestamp}s`);
-                  }
+                  logVideoOperation('IFRAME_LOADED', { 
+                    src: iframeSrc,
+                    playerReady 
+                  });
                 }}
               />
+              
+              {/* Player status indicator for debugging */}
+              {process.env.NODE_ENV === 'development' && (
+                <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                  {playerReady ? '🟢 Ready' : '🟡 Loading...'}
+                </div>
+              )}
             </div>
           ) : (
             // Fallback to HTML5 video for non-Cloudflare URLs
@@ -267,17 +368,14 @@ export default function VideoTranscriptPlayer({
                   : "bg-white border-gray-200 hover:border-gray-300"
               }`}
               onClick={() => {
-                if (isCloudflareStream) {
-                  // For Cloudflare Stream, reload iframe with timestamp
-                  const iframe = document.querySelector('iframe[title="Interview Recording"]') as HTMLIFrameElement;
-                  if (iframe && videoId) {
-                    iframe.src = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&t=${Math.floor(segment.timestamp)}s`;
-                    console.log(`🎬 Cloudflare Stream: Seeking to ${segment.timestamp}s`);
-                  }
-                } else {
-                  // For HTML5 video, use normal seek
-                  seekToTime(segment.timestamp);
-                }
+                // Use unified seeking method - works for both Cloudflare and HTML5
+                logVideoOperation('TRANSCRIPT_CLICK', { 
+                  segmentId: segment.id, 
+                  timestamp: segment.timestamp,
+                  speaker: segment.speaker,
+                  text: segment.text.substring(0, 50) + '...'
+                });
+                seekToTime(segment.timestamp);
               }}
             >
               <div className="flex items-start gap-3">
@@ -337,4 +435,8 @@ export default function VideoTranscriptPlayer({
       </div>
     </div>
   );
-}
+});
+
+VideoTranscriptPlayer.displayName = "VideoTranscriptPlayer";
+
+export default VideoTranscriptPlayer;

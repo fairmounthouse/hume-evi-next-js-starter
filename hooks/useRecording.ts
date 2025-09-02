@@ -159,7 +159,8 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
         setIsRecording(false);
         setIsPaused(false);
         setDuration(0);
-        setRecordingStartTime(null);
+        // DON'T clear recording start time - needed for transcript timestamp calculation
+        // setRecordingStartTime(null);
         
         if (durationIntervalRef.current) {
           clearInterval(durationIntervalRef.current);

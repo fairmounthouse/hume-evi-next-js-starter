@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { motion } from 'framer-motion';
@@ -39,6 +39,9 @@ export default function SessionViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'verdict' | 'analysis' | 'nextsteps'>('verdict');
+  
+  // Ref for video iframe control
+  const videoPlayerRef = useRef<HTMLIFrameElement>(null);
 
 
   useEffect(() => {
@@ -328,11 +331,12 @@ export default function SessionViewerPage() {
               <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 mb-4 h-fit">
                 <h3 className="text-sm font-semibold text-[#0a0a0a] mb-3 flex items-center gap-2">
                   🎥 Interview Recording
-              </h3>
-              
+                </h3>
+                
                 <div className="relative rounded-md overflow-hidden bg-black aspect-video mb-3">
-                {videoUrl ? (
+                  {videoUrl ? (
                     <iframe
+                      ref={videoPlayerRef}
                       src={videoUrl.replace('/watch', '/iframe')}
                       className="w-full h-full"
                       style={{ border: "none" }}
@@ -344,12 +348,12 @@ export default function SessionViewerPage() {
                     <div className="w-full h-full flex flex-col items-center justify-center text-[#71717a] text-sm gap-2">
                       <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-lg">
                         ▶️
-                  </div>
+                      </div>
                       <span>Camera Off</span>
                       <span className="text-xs">{formatDuration(session?.duration_seconds || 0)}</span>
-                  </div>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
               
                 <h4 className="text-sm font-semibold text-[#0a0a0a] mb-3 mt-4 flex items-center gap-2">
                   👤 Session Summary
@@ -804,9 +808,52 @@ export default function SessionViewerPage() {
                                   `${Math.floor(entry.timestamp / 60).toString().padStart(2, '0')}:${(entry.timestamp % 60).toString().padStart(2, '0')}` : 
                                   '';
                                 
+                                // Calculate absolute index in the transcript
+                                const absoluteIndex = group.startIndex + entryIndex;
+                                const isFirstMessage = absoluteIndex === 0;
+                                
                                 return (
-                                  <div key={group.startIndex + entryIndex} className={`p-3 rounded-lg ${isUser ? 'bg-blue-50 border-l-2 border-blue-300' : 'bg-gray-50 border-l-2 border-gray-300'}`}>
-                                    <div className="text-xs text-gray-500 mb-1">{timestamp}</div>
+                                  <div 
+                                    key={group.startIndex + entryIndex} 
+                                    className={`p-3 rounded-lg cursor-pointer transition-all hover:shadow-sm ${isUser ? 'bg-blue-50 border-l-2 border-blue-300 hover:bg-blue-100' : 'bg-gray-50 border-l-2 border-gray-300 hover:bg-gray-100'}`}
+                                    onClick={() => {
+                                      if (entry.timestamp && videoUrl && videoPlayerRef.current) {
+                                        const originalTimestamp = entry.timestamp;
+                                        const isUserMessage = entry.speaker === 'user';
+                                        
+                                        // Buffer logic: First message = no buffer, User messages = -2s buffer, AI messages = +2s buffer
+                                        let bufferedTimestamp;
+                                        let bufferMessage;
+                                        
+                                        if (isFirstMessage) {
+                                          bufferedTimestamp = originalTimestamp; // No buffer for first message
+                                          bufferMessage = 'no buffer (first message)';
+                                        } else if (isUserMessage) {
+                                          bufferedTimestamp = Math.max(0, originalTimestamp - 2); // Go back 2s for context
+                                          bufferMessage = '-2s buffer (user message)';
+                                        } else {
+                                          bufferedTimestamp = originalTimestamp + 2; // Go forward 2s for AI messages
+                                          bufferMessage = '+2s buffer (AI message)';
+                                        }
+                                        
+                                        const seekTime = Math.floor(bufferedTimestamp * 10) / 10; // Keep one decimal place for precision
+                                        console.log(`🎬 [SESSIONS] Seeking to ${originalTimestamp}s (${bufferMessage}) = ${seekTime}s using official startTime parameter`);
+                                        
+                                        // Extract video ID from URL
+                                        const videoId = videoUrl.match(/cloudflarestream\.com\/([^\/]+)\/watch/)?.[1];
+                                        if (videoId) {
+                                          // Use official Cloudflare Stream startTime parameter with autoplay
+                                          const newSrc = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&startTime=${seekTime}&autoplay=true`;
+                                          videoPlayerRef.current.src = newSrc;
+                                          console.log(`✅ [SESSIONS] Auto-playing at ${seekTime}s (${bufferMessage}) with startTime + autoplay`);
+                                        }
+                                      }
+                                    }}
+                                    title={entry.timestamp ? `Click to jump to ${timestamp}` : 'Timestamp not available'}
+                                  >
+                                    <div className={`text-xs mb-1 font-mono ${entry.timestamp ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500'}`}>
+                                      {timestamp} {entry.timestamp && '🎬'}
+                                    </div>
                                     <p className="text-sm text-gray-800 leading-relaxed">{entry.text}</p>
                                   </div>
                                 );

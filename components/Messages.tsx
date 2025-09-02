@@ -28,14 +28,40 @@ const Messages = forwardRef<
               msg.type === "user_message" ||
               msg.type === "assistant_message"
             ) {
+              const isInterim = (msg as any).interim === true;
+              const isUserMessage = msg.type === "user_message";
+              
+              // For user messages, try to get first interim timestamp from globals
+              let displayTimestamp = msg.receivedAt?.getTime() || Date.now();
+              if (isUserMessage && !isInterim) {
+                // For final user messages, check if we have a cached first interim
+                const interimCache: Record<number, number> = (window as any).__firstInterimByFinalMs || {};
+                const cachedFirstInterim = interimCache[displayTimestamp];
+                if (cachedFirstInterim !== undefined && (window as any).__recordingStartTime) {
+                  // Use the cached first interim relative seconds, convert back to absolute
+                  const recordingStart = (window as any).__recordingStartTime;
+                  displayTimestamp = recordingStart + (cachedFirstInterim * 1000);
+                }
+              } else if (isUserMessage && isInterim) {
+                // For interim messages, use the global first interim time if available
+                const firstInterimAbs = (window as any).__currentUserStartTime as number | undefined;
+                if (firstInterimAbs) {
+                  displayTimestamp = firstInterimAbs;
+                }
+              }
+              
+              // Use a stable key for interim messages so they update in place
+              const messageKey = isInterim ? `${msg.type}_interim_${msg.message?.content?.length || 0}` : `${msg.type}_${index}`;
+              
               return (
                 <motion.div
-                  key={msg.type + index}
+                  key={messageKey}
                   className={cn(
                     "w-[80%]",
                     "bg-card",
                     "border border-border rounded-xl",
-                    msg.type === "user_message" ? "ml-auto" : ""
+                    msg.type === "user_message" ? "ml-auto" : "",
+                    isInterim && "opacity-70 border-dashed"
                   )}
                   initial={{
                     opacity: 0,
@@ -57,16 +83,20 @@ const Messages = forwardRef<
                       )}
                     >
                       {msg.message.role}
+                      {isInterim && " (typing...)"}
                     </div>
                     <div
                       className={cn(
                         "text-xs capitalize font-medium leading-none opacity-50 tracking-tight"
                       )}
                     >
-                      {formatRelativeTime(getRelativeTime(msg.receivedAt?.getTime() || Date.now()))}
+                      {formatRelativeTime(getRelativeTime(displayTimestamp))}
                     </div>
                   </div>
-                  <div className={"pb-3 px-3"}>{msg.message.content}</div>
+                  <div className={"pb-3 px-3"}>
+                    {msg.message.content}
+                    {isInterim && <span className="animate-pulse">|</span>}
+                  </div>
                   <Expressions values={{ ...msg.models.prosody?.scores }} />
                 </motion.div>
               );
@@ -81,3 +111,4 @@ const Messages = forwardRef<
 });
 
 export default Messages;
+

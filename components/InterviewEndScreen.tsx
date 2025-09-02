@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card } from "./ui/card";
@@ -65,7 +65,8 @@ interface InterviewEndScreenProps {
   hasTranscript: boolean;
   finalVideoUrl?: string;
   detailedEvaluation?: DetailedEvaluation;
-  transcriptText?: string;
+  transcriptText?: string; // Keep for backward compatibility
+  transcript?: any[]; // NEW: Structured transcript array (preferred)
   onStartNewInterview: () => void;
   onViewTranscript: () => void;
   onViewDashboard: () => void;
@@ -88,6 +89,7 @@ export default function InterviewEndScreen({
   finalVideoUrl,
   detailedEvaluation,
   transcriptText,
+  transcript, // NEW: Structured transcript array
   onStartNewInterview,
   onViewTranscript,
   onViewDashboard
@@ -97,6 +99,9 @@ export default function InterviewEndScreen({
   const [isLoadingMbbReport, setIsLoadingMbbReport] = useState(false);
   const [mbbReportError, setMbbReportError] = useState<string | null>(null);
   const [timelineFilter, setTimelineFilter] = useState<'all' | 'critical' | 'warning' | 'positive'>('all');
+  
+  // Ref for video iframe control (same as sessions page)
+  const videoPlayerRef = useRef<HTMLIFrameElement>(null);
 
   const [mbbAssessment, setMbbAssessment] = useState<any | null>(null);
   const [isLoadingMbbAssessment, setIsLoadingMbbAssessment] = useState(false);
@@ -479,6 +484,7 @@ export default function InterviewEndScreen({
               <div className="relative rounded-md overflow-hidden bg-black aspect-video mb-3">
                 {finalVideoUrl ? (
                   <iframe
+                    ref={videoPlayerRef}
                     src={finalVideoUrl.replace('/watch', '/iframe')}
                     className="w-full h-full aspect-video"
                     style={{ border: "none" }}
@@ -1046,66 +1052,127 @@ export default function InterviewEndScreen({
                   </div>
                 </div>
                 <div className="flex-1 p-4">
-                {transcriptText ? (
-                  <div className="space-y-3">
-                    {(() => {
-                      // Parse and group messages by speaker
-                      const lines = transcriptText.split('\n').filter(line => line.trim());
-                      const groups: Array<{speaker: string, messages: Array<{timestamp: string, content: string}>, startIndex: number}> = [];
-                      let currentGroup: {speaker: string, messages: Array<{timestamp: string, content: string}>, startIndex: number} | null = null;
-                      
-                      lines.forEach((line, index) => {
-                        const isUser = line.includes('YOU:');
-                        const speaker = isUser ? 'user' : 'assistant';
-                        const timeMatch = line.match(/\[([^\]]+)\]/);
-                        const timestamp = timeMatch ? timeMatch[1] : '';
-                        const content = line.replace(/\[[^\]]+\]/, '').replace(/^(YOU:|AI INTERVIEWER:)/, '').trim();
-                        
-                        if (!currentGroup || currentGroup.speaker !== speaker) {
-                          if (currentGroup) groups.push(currentGroup);
-                          currentGroup = { speaker, messages: [{timestamp, content}], startIndex: index };
-                        } else {
-                          currentGroup.messages.push({timestamp, content});
-                        }
-                      });
-                      if (currentGroup) groups.push(currentGroup);
-                      
-                      return groups.map((group, groupIndex) => {
-                        const isUser = group.speaker === "user";
-                        const speakerLabel = isUser ? "You" : "AI Interviewer";
-                        const speakerIcon = isUser ? "👤" : "🤖";
-                        
-                        return (
-                          <div key={groupIndex} className="space-y-2">
-                            {/* Speaker heading */}
-                            <div className="flex items-center gap-2 mt-4 first:mt-0">
-                              <span className="text-lg">{speakerIcon}</span>
-                              <h4 className={`text-sm font-medium ${isUser ? 'text-blue-700' : 'text-gray-700'}`}>
-                                {speakerLabel}
-                              </h4>
-                              <div className={`flex-1 h-px ${isUser ? 'bg-blue-200' : 'bg-gray-200'}`}></div>
-                            </div>
+                  {(transcript || transcriptText) ? (
+                    <div className="space-y-3">
+                      {(() => {
+                        // Use structured transcript if available, otherwise parse transcriptText
+                        const transcriptData = transcript || (transcriptText ? 
+                          transcriptText.split('\n').filter(line => line.trim()).map((line, index) => {
+                            const isUser = line.includes('YOU:');
+                            const timeMatch = line.match(/\[([^\]]+)\]/);
+                            const timestamp = timeMatch ? timeMatch[1] : '';
+                            const content = line.replace(/\[[^\]]+\]/, '').replace(/^(YOU:|AI INTERVIEWER:)/, '').trim();
                             
-                            {/* Messages in this group */}
-                            {group.messages.map((msg, msgIndex) => (
-                              <div key={group.startIndex + msgIndex} className={`p-3 rounded-lg ${isUser ? 'bg-blue-50 border-l-2 border-blue-300' : 'bg-gray-50 border-l-2 border-gray-300'}`}>
-                                <div className="text-xs text-gray-500 mb-1">{msg.timestamp}</div>
-                                <p className="text-sm text-gray-800 leading-relaxed">{msg.content}</p>
+                            // Convert MM:SS timestamp to seconds for video seeking
+                            const [mins, secs] = timestamp.split(':').map(Number);
+                            const timestampSeconds = (mins || 0) * 60 + (secs || 0);
+                            
+                            return {
+                              id: `entry-${index}`,
+                              speaker: isUser ? 'user' : 'assistant',
+                              text: content,
+                              timestamp: timestampSeconds
+                            };
+                          }) : []);
+                        
+                        // Group consecutive messages by speaker for cleaner display (same as sessions page)
+                        const groups: Array<{speaker: string, entries: any[], startIndex: number}> = [];
+                        let currentGroup: {speaker: string, entries: any[], startIndex: number} | null = null;
+                        
+                        transcriptData.forEach((entry: any, index: number) => {
+                          if (!currentGroup || currentGroup.speaker !== entry.speaker) {
+                            if (currentGroup) groups.push(currentGroup);
+                            currentGroup = { speaker: entry.speaker, entries: [entry], startIndex: index };
+                          } else {
+                            currentGroup.entries.push(entry);
+                          }
+                        });
+                        if (currentGroup) groups.push(currentGroup);
+                        
+                        return groups.map((group, groupIndex) => {
+                          const isUser = group.speaker === "user";
+                          const speakerLabel = isUser ? "You" : "AI Interviewer";
+                          const speakerIcon = isUser ? "👤" : "🤖";
+                          
+                          return (
+                            <div key={groupIndex} className="space-y-2">
+                              {/* Speaker heading */}
+                              <div className="flex items-center gap-2 mt-4 first:mt-0">
+                                <span className="text-lg">{speakerIcon}</span>
+                                <h4 className={`text-sm font-medium ${isUser ? 'text-blue-700' : 'text-gray-700'}`}>
+                                  {speakerLabel}
+                                </h4>
+                                <div className={`flex-1 h-px ${isUser ? 'bg-blue-200' : 'bg-gray-200'}`}></div>
                               </div>
-                            ))}
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-center py-12 text-gray-500">
-                    <div className="text-center">
-                      <p className="text-sm">No transcript available</p>
-                      <p className="text-xs mt-1">Transcript will be generated after the interview</p>
+                              
+                              {/* Messages in this group - CLICKABLE like sessions page */}
+                              {group.entries.map((entry: any, entryIndex: number) => {
+                                const timestamp = entry.timestamp ? 
+                                  `${Math.floor(entry.timestamp / 60).toString().padStart(2, '0')}:${(entry.timestamp % 60).toString().padStart(2, '0')}` : 
+                                  '';
+                                
+                                // Calculate absolute index in the transcript
+                                const absoluteIndex = group.startIndex + entryIndex;
+                                const isFirstMessage = absoluteIndex === 0;
+                                const isUserMessage = entry.speaker === 'user';
+                                
+                                return (
+                                  <div 
+                                    key={group.startIndex + entryIndex} 
+                                    className={`p-3 rounded-lg cursor-pointer transition-all hover:shadow-sm ${isUser ? 'bg-blue-50 border-l-2 border-blue-300 hover:bg-blue-100' : 'bg-gray-50 border-l-2 border-gray-300 hover:bg-gray-100'}`}
+                                    onClick={() => {
+                                      if (entry.timestamp && finalVideoUrl && videoPlayerRef.current) {
+                                        const originalTimestamp = entry.timestamp;
+                                        
+                                        // Same buffer logic as sessions page: First = no buffer, User = -2s, AI = +2s
+                                        let bufferedTimestamp;
+                                        let bufferMessage;
+                                        
+                                        if (isFirstMessage) {
+                                          bufferedTimestamp = originalTimestamp; // No buffer for first message
+                                          bufferMessage = 'no buffer (first message)';
+                                        } else if (isUserMessage) {
+                                          bufferedTimestamp = Math.max(0, originalTimestamp - 2); // Go back 2s for context
+                                          bufferMessage = '-2s buffer (user message)';
+                                        } else {
+                                          bufferedTimestamp = originalTimestamp + 2; // Go forward 2s for AI messages
+                                          bufferMessage = '+2s buffer (AI message)';
+                                        }
+                                        
+                                        const seekTime = Math.floor(bufferedTimestamp * 10) / 10;
+                                        console.log(`🎬 [END_SCREEN] Seeking to ${originalTimestamp}s (${bufferMessage}) = ${seekTime}s using official startTime parameter`);
+                                        
+                                        // Extract video ID from URL (same logic as sessions page)
+                                        const videoId = finalVideoUrl.match(/cloudflarestream\.com\/([^\/]+)\/watch/)?.[1];
+                                        if (videoId) {
+                                          const newSrc = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&startTime=${seekTime}&autoplay=true`;
+                                          videoPlayerRef.current.src = newSrc;
+                                          console.log(`✅ [END_SCREEN] Auto-playing at ${seekTime}s (${bufferMessage}) with startTime + autoplay`);
+                                        }
+                                      }
+                                    }}
+                                    title={entry.timestamp ? `Click to jump to ${timestamp}` : 'Timestamp not available'}
+                                  >
+                                    <div className={`text-xs mb-1 font-mono ${entry.timestamp ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500'}`}>
+                                      {timestamp} {entry.timestamp && '🎬'}
+                                    </div>
+                                    <p className="text-sm text-gray-800 leading-relaxed">{entry.text}</p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        });
+                      })()}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex items-center justify-center py-12 text-gray-500">
+                      <div className="text-center">
+                        <p className="text-sm">No transcript available</p>
+                        <p className="text-xs mt-1">Transcript will be generated after the interview</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
             </div>
           )}

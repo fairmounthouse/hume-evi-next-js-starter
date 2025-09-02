@@ -245,6 +245,9 @@ export default function StartCall({
         auth: { type: "accessToken", value: accessToken },
         configId,
         sessionSettings,
+        // Enable verbose transcription to get interim messages for accurate user start-speaking timestamps
+        // Note: verboseTranscription defaults to true, but being explicit for clarity
+        verboseTranscription: true,
         // Ensure Hume's mic capture is boosted and cleaned up by the browser
         audioConstraints: {
           autoGainControl: true,

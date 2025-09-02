@@ -72,7 +72,14 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
       sessionId,
       entryCount: transcript.length,
       userMessages: transcript.filter(e => e.speaker === "user").length,
-      assistantMessages: transcript.filter(e => e.speaker === "assistant").length
+      assistantMessages: transcript.filter(e => e.speaker === "assistant").length,
+      userMessagesWithInterim: transcript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length,
+      interimTrackingEnabled: true,
+      avgSpeakingDuration: transcript
+        .filter(e => e.speaker === "user" && e.startSpeakingTimestamp && e._finalTimestamp)
+        .map(e => e._finalTimestamp - e.startSpeakingTimestamp!)
+        .reduce((sum, duration, _, arr) => arr.length > 0 ? sum + duration / arr.length : 0, 0)
+        .toFixed(1) + 's'
     });
     
     // Validate transcript data before upload
@@ -81,7 +88,7 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
       return null;
     }
     
-    // Create transcript text content with enhanced formatting
+    // Create transcript text content with enhanced formatting including interim tracking
     const transcriptText = transcript.map((entry, index) => {
       // Format timestamp as MM:SS (entry.timestamp is now relative seconds)
       const mins = Math.floor(entry.timestamp / 60);
@@ -103,6 +110,12 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
         metadata += ` [Confidence: ${entry.confidence.toFixed(2)}]`;
       }
       
+      // Add interim tracking info for user messages
+      if (entry.speaker === "user" && entry.startSpeakingTimestamp && entry._finalTimestamp) {
+        const speakingDuration = (entry._finalTimestamp - entry.startSpeakingTimestamp).toFixed(1);
+        metadata += ` [Speaking: ${speakingDuration}s]`;
+      }
+      
       return `[${timeStr}] ${speaker}: ${entry.text}${metadata}`;
     }).join('\n');
 
@@ -119,6 +132,7 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
         speakers: {
           user_messages: transcript.filter(e => e.speaker === "user").length,
           assistant_messages: transcript.filter(e => e.speaker === "assistant").length,
+          user_messages_with_interim: transcript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length,
         },
         // Enhanced metadata for debugging (now using relative timestamps)
         first_message_timestamp: transcript[0]?.timestamp, // Relative seconds from recording start
@@ -126,7 +140,20 @@ export async function uploadTranscriptToStorage(sessionId: string, transcript: a
         has_emotions: transcript.some(e => e.emotions && Object.keys(e.emotions).length > 0),
         has_confidence: transcript.some(e => e.confidence),
         upload_timestamp: Date.now(),
-        preservation_mode: "COMPLETE_TRANSCRIPT"
+        preservation_mode: "COMPLETE_TRANSCRIPT",
+        // Interim tracking statistics
+        interim_tracking: {
+          enabled: true,
+          user_messages_with_start_timestamp: transcript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length,
+          avg_speaking_duration: transcript
+            .filter(e => e.speaker === "user" && e.startSpeakingTimestamp && e._finalTimestamp)
+            .map(e => e._finalTimestamp - e.startSpeakingTimestamp!)
+            .reduce((sum, duration, _, arr) => arr.length > 0 ? sum + duration / arr.length : 0, 0),
+          max_speaking_duration: Math.max(...transcript
+            .filter(e => e.speaker === "user" && e.startSpeakingTimestamp && e._finalTimestamp)
+            .map(e => e._finalTimestamp - e.startSpeakingTimestamp!), 0),
+          timestamp_improvements: transcript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp && e._finalTimestamp).length
+        }
       }
     };
 

@@ -37,6 +37,8 @@ import { submitSessionFeedback, submitAnalysisFeedback } from "@/utils/supabase-
 import RecordingControls from "./RecordingControls";
 import SessionDocuments from "./SessionDocuments";
 
+// Simple interim tracking - just enhance existing system
+
 // Chat interface component with voice interaction capabilities
 function ChatInterface({
   sessionId,
@@ -78,7 +80,7 @@ function ChatInterface({
   onOpenDeviceSetup,
 }: any) {
   const { messages, sendSessionSettings, status, sendToolMessage, micFft, isMuted, mute, unmute } = useVoice();
-  const { getRelativeTime, formatRelativeTime } = useRecordingAnchor();
+  const { getRelativeTime, formatRelativeTime, recordingStartTime } = useRecordingAnchor();
   
   // Transcript scrolling refs and state
   const transcriptScrollRef = useRef<HTMLDivElement>(null);
@@ -102,11 +104,15 @@ function ChatInterface({
   // Expose coaching mode globally for other components (local state only)
   useEffect(() => {
     (window as any).__getCurrentCoachingMode = () => coachingMode;
+    (window as any).__getRelativeTime = getRelativeTime;
+    (window as any).__recordingStartTime = recordingStartTime;
     
     return () => {
       delete (window as any).__getCurrentCoachingMode;
+      delete (window as any).__getRelativeTime;
+      delete (window as any).__recordingStartTime;
     };
-  }, [coachingMode]);
+  }, [coachingMode, getRelativeTime, recordingStartTime]);
 
 
   const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
@@ -126,8 +132,45 @@ function ChatInterface({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [assistantSpeaking, setAssistantSpeaking] = useState(false);
   const lastAssistantIndexRef = useRef<number>(-1);
+  
+  // Simple interim tracking - just store first interim until AI speaks
+  const currentUserStartTime = useRef<number | null>(null);
+  
+  // Initialize cache to persist first-interim per FINAL user message (keyed by final absolute ms)
+  useEffect(() => {
+    if (!(window as any).__firstInterimByFinalMs) {
+      (window as any).__firstInterimByFinalMs = {} as Record<number, number>;
+    }
+  }, []);
+  
   // Simple instant detection – flash when audio is present
   const assistantLastTriggerMsRef = useRef<number>(0);
+  
+  // Check for first interim from global variable and convert to relative time
+  useEffect(() => {
+    if (!messages || messages.length === 0) return;
+    
+    // Check if we have a global first interim ABS timestamp to convert to REL seconds
+    if ((window as any).__currentUserStartTime && currentUserStartTime.current === null) {
+      const globalTimestamp = (window as any).__currentUserStartTime as number; // absolute ms
+      const relativeTimestamp = getRelativeTime(globalTimestamp);
+      currentUserStartTime.current = relativeTimestamp;
+      console.log(`🔄 [GLOBAL->RELATIVE] Converted first interim: ${new Date(globalTimestamp).toISOString()} → ${relativeTimestamp}s`);
+    }
+    
+    const latestMessage = messages[messages.length - 1];
+    
+    // Clear when AI speaks or session ends
+    if (latestMessage?.type === "assistant_message" || latestMessage?.type === "assistant_end") {
+      if (currentUserStartTime.current !== null) {
+        console.log(`🤖 [AI SPOKE] Clearing user start time, ready for next speaking session`);
+        currentUserStartTime.current = null;
+        // Clear global tracker too
+        delete (window as any).__currentUserStartTime;
+        delete (window as any).__currentUserStartContent;
+      }
+    }
+  }, [messages, getRelativeTime]);
   const sessionStorageKey = useMemo(
     () => `pipPos_${sessionId || urlSessionId || 'default'}`,
     [sessionId, urlSessionId]
@@ -224,7 +267,7 @@ function ChatInterface({
   const buildTranscriptFromMessages = (messages: any[]): any[] => {
     console.log("📋 [TRANSCRIPT] Building transcript from", messages.length, "total messages");
     
-    // Filter for actual conversation messages with content - be more inclusive to avoid data loss
+    // Filter for actual conversation messages with content - INCLUDE INTERIM MESSAGES FOR UI
     const conversationMessages = messages.filter(msg => {
       // Safety checks for message structure
       if (!msg || typeof msg !== 'object') {
@@ -236,6 +279,13 @@ function ChatInterface({
                         typeof msg.message.content === 'string' && 
                         msg.message.content.trim().length > 0;
       const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
+      const isInterim = (msg as any).interim === true;
+      
+      // NEW: Include interim messages for live UI display
+      if (isInterim) {
+        console.log("📝 [TRANSCRIPT] Including interim message for UI:", msg.type, msg.message?.content?.substring(0, 30) + "...");
+        return true;
+      }
       
       // Log all message types for debugging (but only first few to avoid spam)
       if (messages.indexOf(msg) < 5 || isConversation) {
@@ -244,17 +294,76 @@ function ChatInterface({
         } else if (!hasContent) {
           console.log("⚠️ [TRANSCRIPT] Skipping empty message:", msg.type, "content:", msg.message?.content);
         } else {
-          console.log("✅ [TRANSCRIPT] Including message:", msg.type, msg.message.content.substring(0, 50) + "...");
+          console.log("✅ [TRANSCRIPT] Including FINAL message:", msg.type, msg.message.content.substring(0, 50) + "...");
         }
       }
       
-      return isConversation && hasContent;
+      return isConversation && hasContent; // Now includes both interim and final
     });
     
-    // Build transcript entries with enhanced metadata preservation
+    // Build transcript entries with enhanced metadata preservation and interim tracking
     const transcript = conversationMessages.map((msg, index) => {
       const absoluteTimestamp = msg.receivedAt?.getTime() || Date.now();
       const relativeSeconds = getRelativeTime(absoluteTimestamp);
+      const isInterim = (msg as any).interim === true;
+      
+      // For user messages, check if we have an earlier interim timestamp
+      let startSpeakingTimestamp: number | undefined = undefined;
+      let actualTimestamp = relativeSeconds;
+      
+      if (msg.type === "user_message" && msg.message?.content) {
+        const content = msg.message.content.trim();
+        
+        if (isInterim) {
+          // For interim messages, use the global first interim time if available
+          const firstInterimAbs = (window as any).__currentUserStartTime as number | undefined;
+          if (firstInterimAbs && recordingStartTime) {
+            actualTimestamp = Math.max(0, Math.floor((firstInterimAbs - recordingStartTime) / 1000));
+            console.log('🎤 [INTERIM] Using first interim timestamp for interim message', {
+              firstInterimAbs,
+              actualTimestamp
+            });
+          }
+        } else {
+          // For final messages, check cached first interim
+          const interimCache: Record<number, number> = (window as any).__firstInterimByFinalMs || {};
+          const cachedFirst = interimCache[absoluteTimestamp];
+          
+          if (typeof cachedFirst === 'number') {
+            // Use persisted first-interim for this final message if present
+            startSpeakingTimestamp = cachedFirst;
+            actualTimestamp = cachedFirst;
+            console.log('🔒 [INTERIM CACHE HIT] Using cached first interim for final user message', {
+              absoluteMs: absoluteTimestamp,
+              cachedFirst
+            });
+          } else if (currentUserStartTime.current !== null && currentUserStartTime.current < relativeSeconds) {
+            // Use current first-interim and persist it for this final user message
+            startSpeakingTimestamp = currentUserStartTime.current;
+            actualTimestamp = currentUserStartTime.current; // Use the first interim timestamp as the main timestamp
+            (window as any).__firstInterimByFinalMs = {
+              ...interimCache,
+              [absoluteTimestamp]: currentUserStartTime.current,
+            } as Record<number, number>;
+            console.log('📝 [INTERIM CACHE SET] Stored first interim for final user message', {
+              absoluteMs: absoluteTimestamp,
+              firstInterim: currentUserStartTime.current
+            });
+            
+            console.log(`🎤 [USING FIRST INTERIM] Final message uses first interim timestamp:`, {
+              finalTimestamp: relativeSeconds,
+              firstInterimTimestamp: currentUserStartTime.current,
+              speakingDuration: (relativeSeconds - currentUserStartTime.current).toFixed(1) + 's',
+              content: content.substring(0, 30) + "..."
+            });
+          }
+        }
+      } else if (msg.type === "assistant_message") {
+        // Explicitly log that we do NOT apply interim-based adjustment to assistant
+        if (index < 3) {
+          console.log('⏭️ [INTERIM NOT APPLIED] Assistant message timestamp unchanged');
+        }
+      }
       
       // Debug logging for timestamp conversion (only first few messages to avoid spam)
       if (index < 3) {
@@ -263,7 +372,9 @@ function ChatInterface({
           absoluteMs: absoluteTimestamp,
           currentTime: new Date().toISOString(),
           relativeSeconds,
-          relativeFormatted: formatRelativeTime(relativeSeconds),
+          actualTimestamp,
+          startSpeakingTimestamp,
+          relativeFormatted: formatRelativeTime(actualTimestamp),
           messagePreview: msg.message?.content?.substring(0, 30) + "..."
         });
       }
@@ -272,14 +383,17 @@ function ChatInterface({
         id: `msg-${index}`,
         speaker: msg.type === "user_message" ? "user" : "assistant",
         text: msg.message?.content || "",
-        timestamp: relativeSeconds, // Now using relative seconds from recording start
+        timestamp: actualTimestamp, // Use interim timestamp for user messages when available
+        startSpeakingTimestamp, // Store the interim timestamp separately for reference
         emotions: msg.models?.prosody?.scores || undefined,
         confidence: msg.models?.language?.confidence || undefined,
+        isInterim, // NEW: Flag for UI styling
         // Preserve original message metadata for debugging
         _originalType: msg.type,
         _originalTimestamp: msg.receivedAt?.toISOString(),
         _absoluteTimestamp: Math.floor(absoluteTimestamp / 1000),
-        _messageIndex: index
+        _messageIndex: index,
+        _finalTimestamp: relativeSeconds, // Keep the original final timestamp for debugging
       };
       
       // Validate entry completeness
@@ -296,12 +410,22 @@ function ChatInterface({
       transcriptEntries: transcript.length,
       userMessages: transcript.filter(e => e.speaker === "user").length,
       assistantMessages: transcript.filter(e => e.speaker === "assistant").length,
+      userMessagesWithInterim: transcript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length,
       firstEntry: transcript[0]?.text?.substring(0, 30) + "..." || "none",
       lastEntry: transcript[transcript.length - 1]?.text?.substring(0, 30) + "..." || "none",
-      // Timestamp debugging
+      // Timestamp debugging with interim tracking
       firstTimestamp: transcript[0]?.timestamp,
       lastTimestamp: transcript[transcript.length - 1]?.timestamp,
-      timestampFormat: "relative_seconds_from_recording_start"
+      timestampFormat: "relative_seconds_from_recording_start",
+      interimTrackingStats: {
+        currentUserStartTime: currentUserStartTime.current,
+        userMessagesWithInterim: transcript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length,
+        avgSpeakingDuration: transcript
+          .filter(e => e.speaker === "user" && e.startSpeakingTimestamp && e._finalTimestamp)
+          .map(e => e._finalTimestamp - e.startSpeakingTimestamp!)
+          .reduce((sum, duration, _, arr) => arr.length > 0 ? sum + duration / arr.length : 0, 0)
+          .toFixed(1) + 's'
+      }
     });
     
     // Additional validation - but don't alarm for normal startup messages
@@ -1487,10 +1611,14 @@ function ChatInterface({
           hasTranscript={storedTranscript.length > 0}
           finalVideoUrl={finalVideoUrl}
           detailedEvaluation={undefined}
+          transcript={storedTranscript} // NEW: Pass structured transcript array with interim tracking
           transcriptText={(() => {
-            // Use storedTranscript as primary source (has correct timestamps from buildTranscriptFromMessages)
+            // Keep transcriptText for backward compatibility and download functionality
             const completeTranscript = storedTranscript;
-            console.log("📄 [END_SCREEN] Using stored transcript (with correct timestamps):", completeTranscript.length, "entries");
+            console.log("📄 [END_SCREEN] Using stored transcript (with interim tracking):", {
+              entries: completeTranscript.length,
+              userMessagesWithInterim: completeTranscript.filter(e => e.speaker === "user" && e.startSpeakingTimestamp).length
+            });
             return completeTranscript.map(entry => {
               // Use centralized timestamp formatting (same as used during interview display)
               const timeStr = formatRelativeTime(entry.timestamp || 0);
@@ -2224,10 +2352,62 @@ export default function ClientComponent({
         onMessage={(msg: any) => {
           console.log("📨 Message received from Hume:", {
             type: msg?.type,
-            hasContent: !!msg?.content,
-            contentLength: msg?.content?.length || 0,
-            timestamp: new Date().toISOString()
+            hasContent: !!msg?.message?.content,
+            contentSnippet: msg?.message?.content?.substring?.(0, 30) || undefined,
+            isInterim: msg?.interim,
+            timestampIso: new Date().toISOString(),
+            tag: "HUME_STREAM"
           });
+          
+          // CRITICAL: Capture the very first interim message here (before it gets to messages array)
+          if (msg?.type === "user_message" && msg.interim === true && msg?.message?.content) {
+            const content = msg.message.content.trim();
+            console.log(`🎤 [ONMESSAGE INTERIM] Received interim: "${content.substring(0, 30)}..."`);
+            
+            // Store in a simple global variable for ChatInterface to pick up
+            if (!(window as any).__currentUserStartTime) {
+              const now = Date.now();
+              (window as any).__currentUserStartTime = now;
+              (window as any).__currentUserStartContent = content.substring(0, 10); // For debugging
+              console.log(`🎤 [FIRST INTERIM CAPTURED] Very first interim at ${new Date(now).toISOString()}`);
+            }
+          }
+
+          // 🏁 FINAL USER MESSAGE HANDLING
+          if (msg?.type === "user_message" && msg.interim === false) {
+            const finalAbs = Date.now();
+            const firstAbs = (window as any).__currentUserStartTime as number | undefined;
+            if (firstAbs) {
+              // Convert first interim absolute time to relative seconds manually
+              const currentRecordingStart = ((window as any).__getRelativeTime)?.(Date.now()) !== undefined ?
+                Date.now() - (((window as any).__getRelativeTime)?.(Date.now()) * 1000) : null;
+              const firstRel = currentRecordingStart ? 
+                Math.max(0, Math.floor((firstAbs - currentRecordingStart) / 1000)) : 
+                0;
+              const interimCache: Record<number, number> = (window as any).__firstInterimByFinalMs || {};
+              // Persist mapping of *this* final absolute ms → first interim relative seconds
+              interimCache[finalAbs] = firstRel;
+              (window as any).__firstInterimByFinalMs = interimCache;
+
+              console.log("🗂️ [INTERIM→FINAL MAP STORED]", {
+                tag: "HUME_STREAM",
+                finalAbs,
+                firstAbs,
+                firstRel,
+                contentSnippet: msg?.message?.content?.substring?.(0, 30) || undefined
+              });
+
+              // Clear globals for next turn
+              delete (window as any).__currentUserStartTime;
+              delete (window as any).__currentUserStartContent;
+            } else {
+              console.log("⚠️ [NO INTERIM FOUND BEFORE FINAL]", {
+                tag: "HUME_STREAM",
+                finalAbs,
+                contentSnippet: msg?.message?.content?.substring?.(0, 30) || undefined
+              });
+            }
+          }
 
           if (timeout.current) {
             window.clearTimeout(timeout.current);
