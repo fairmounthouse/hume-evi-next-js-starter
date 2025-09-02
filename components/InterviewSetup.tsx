@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User, AlertCircle } from "lucide-react";
+import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User, AlertCircle, FileText, DollarSign, Tag, Factory, Package, BarChart3, Rocket, Handshake, PieChart } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
@@ -308,7 +308,19 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
   // Memoized filtered cases for better performance with debounced search
   const filteredCases = useMemo(() => {
-    return cases.filter(case_ => {
+    const normalize = (v: string) => (v || "").toLowerCase().trim();
+    const getTypePriority = (type?: string) => {
+      const t = normalize(type || "");
+      if (/profit/.test(t)) return 0; // Profitability
+      if (/market\s*entry/.test(t)) return 1; // Market Entry
+      if (/(growth\s*strategy|revenue\s*growth|growth)/.test(t)) return 2; // Growth Strategy
+      if (/(merger|acquisition|m&a)/.test(t)) return 3; // M&A
+      if (/pricing/.test(t)) return 4; // Pricing
+      if (/(market\s*sizing|sizing)/.test(t)) return 5; // Market Sizing
+      return 999;
+    };
+
+    const filtered = cases.filter(case_ => {
       const matchesSearch = case_.title.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
                            case_.overview.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
                            case_.industry?.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
@@ -320,6 +332,20 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       
       return matchesSearch && matchesType && matchesDifficulty && matchesIndustry && matchesFormat;
     });
+
+    // Default sort by case type priority, then by title for stability
+    return filtered
+      .slice()
+      .sort((a, b) => {
+        const pa = getTypePriority(a.type);
+        const pb = getTypePriority(b.type);
+        if (pa !== pb) return pa - pb;
+        const ta = (a.title || "").toLowerCase();
+        const tb = (b.title || "").toLowerCase();
+        if (ta < tb) return -1;
+        if (ta > tb) return 1;
+        return 0;
+      });
   }, [cases, debouncedSearchQuery, typeFilter, difficultyFilter, industryFilter, formatFilter]);
 
   // Memoized filter options to avoid recalculating on every render
@@ -483,6 +509,84 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
     ];
     return colors[Math.abs(type.charCodeAt(0)) % colors.length];
+  };
+
+  // Map difficulty to 1-3 star rating for simple visual scale
+  const getDifficultyStars = (difficultyName?: string, difficultyLevel?: string): number => {
+    const source = (difficultyName || difficultyLevel || "").toLowerCase();
+    if (!source) return 1;
+    if (/(easy|junior|beginner|level\s*1)/.test(source)) return 1;
+    if (/(medium|mid|intermediate|level\s*2|level\s*3)/.test(source)) return 2;
+    // Treat hard/expert/extreme as 3
+    if (/(hard|senior|expert|extreme|level\s*4|level\s*5)/.test(source)) return 3;
+    return 2;
+  };
+
+  const getInitials = (fullName: string) => {
+    return fullName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
+
+  // Pick an icon based on case type
+  const getCaseTypeIcon = (type?: string) => {
+    const t = (type || "").toLowerCase();
+    if (/(revenue|growth|growth\s*strategy)/.test(t)) return TrendingUp; // Growth Strategy
+    if (/(profit|profitability)/.test(t)) return DollarSign; // Profitability
+    if (/(market\s*entry)/.test(t)) return Rocket; // Market Entry
+    if (/(merger|acquisition|m&a)/.test(t)) return Handshake; // M&A
+    if (/(pricing)/.test(t)) return Tag; // Pricing
+    if (/(market\s*sizing|sizing)/.test(t)) return PieChart; // Market Sizing
+    if (t.includes("operations") || t.includes("process")) return Factory;
+    if (t.includes("supply") || t.includes("product")) return Package;
+    if (t.includes("data") || t.includes("analytics") || t.includes("forecast")) return BarChart3;
+    return FileText;
+  };
+
+  // Compute color classes for category/type to keep icon + pill in sync
+  const getCategoryColor = (type?: string) => {
+    const t = (type || "").toLowerCase();
+    // Defaults (blue)
+    let bg = "bg-blue-50";
+    let border = "border-blue-200";
+    let text = "text-blue-700";
+    let hoverBg = "hover:bg-blue-100";
+
+    if (/(profit|profitability)/.test(t)) {
+      // Profitability: green
+      bg = "bg-green-50"; border = "border-green-200"; text = "text-green-700"; hoverBg = "hover:bg-green-100";
+    } else if (/(revenue|growth|growth\s*strategy)/.test(t)) {
+      // Growth strategy: indigo
+      bg = "bg-indigo-50"; border = "border-indigo-200"; text = "text-indigo-700"; hoverBg = "hover:bg-indigo-100";
+    } else if (/(market\s*entry)/.test(t)) {
+      // Market entry: sky
+      bg = "bg-sky-50"; border = "border-sky-200"; text = "text-sky-700"; hoverBg = "hover:bg-sky-100";
+    } else if (/(merger|acquisition|m&a)/.test(t)) {
+      // M&A: amber
+      bg = "bg-amber-50"; border = "border-amber-200"; text = "text-amber-700"; hoverBg = "hover:bg-amber-100";
+    } else if (/(pricing)/.test(t)) {
+      // Pricing: purple
+      bg = "bg-purple-50"; border = "border-purple-200"; text = "text-purple-700"; hoverBg = "hover:bg-purple-100";
+    } else if (/(market\s*sizing|sizing)/.test(t)) {
+      // Market sizing: teal
+      bg = "bg-teal-50"; border = "border-teal-200"; text = "text-teal-700"; hoverBg = "hover:bg-teal-100";
+    } else if (/(behavioral)/.test(t)) {
+      bg = "bg-blue-50"; border = "border-blue-200"; text = "text-blue-700"; hoverBg = "hover:bg-blue-100";
+    } else if (/(pricing)/.test(t)) {
+      bg = "bg-purple-50"; border = "border-purple-200"; text = "text-purple-700"; hoverBg = "hover:bg-purple-100";
+    } else if (/(operations|process)/.test(t)) {
+      bg = "bg-green-50"; border = "border-green-200"; text = "text-green-700"; hoverBg = "hover:bg-green-100";
+    } else if (/(market|entry|supply|product)/.test(t)) {
+      bg = "bg-blue-50"; border = "border-blue-200"; text = "text-blue-700"; hoverBg = "hover:bg-blue-100";
+    } else if (/(data|analytics|forecast)/.test(t)) {
+      bg = "bg-indigo-50"; border = "border-indigo-200"; text = "text-indigo-700"; hoverBg = "hover:bg-indigo-100";
+    }
+
+    return { bg, border, text, hoverBg };
   };
 
   // Create a short, readable summary from the difficulty description bullets
@@ -686,87 +790,123 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   <AnimatePresence>
                     {filteredCases.map((case_, index) => (
-                  <motion.div
-                    key={case_.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
-                    transition={{ delay: index * 0.05 }}
-                  >
-                    <Card 
-                      className={cn(
-                        "h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
-                        selectedCase === case_.id 
-                          ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
-                          : "hover:border-blue-200"
-                      )}
-                      onClick={() => setSelectedCase(case_.id)}
-                    >
-                      <CardContent className="p-6 h-full flex flex-col">
-                        {/* Clean Header - Only Priority Info */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex gap-2">
-                            {case_.difficulty && (
-                              <Badge className={getDifficultyColor(case_.difficulty)} variant="secondary">
-                                {case_.difficulty}
-                              </Badge>
-                            )}
-                            {case_.requires_documents && (
-                              <Badge variant="outline" className="text-xs">
-                                📄
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-xs text-gray-400 font-medium">
-                            {case_.type}
-                          </div>
-                        </div>
-
-                        {/* Title & Enhanced Meta */}
-                        <div className="mb-4">
-                          <h3 className="font-semibold text-lg leading-tight mb-3 line-clamp-2">
-                            {case_.title}
-                          </h3>
-                          
-                          {/* Primary Meta Row */}
-                          <div className="flex items-center gap-3 text-sm text-gray-500 mb-2">
-                            {case_.industry && (
-                              <>
-                                <span>{case_.industry}</span>
-                                <span>•</span>
-                              </>
-                            )}
-                            <span>{case_.total_time || "30 min"}</span>
-                          </div>
-                          
-                          {/* Secondary Meta Row - Format */}
-                          {case_.format && (
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-xs text-blue-600 border-blue-200 bg-blue-50/50">
-                                {case_.format}
-                              </Badge>
-                            </div>
+                      <motion.div
+                        key={case_.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <Card
+                          className={cn(
+                            "h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
+                            selectedCase === case_.id
+                              ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
+                              : "hover:border-blue-200"
                           )}
-                        </div>
-
-                        {/* Description */}
-                        <p className="text-sm text-gray-600 mb-6 flex-grow line-clamp-3 leading-relaxed">
-                          {case_.overview}
-                        </p>
-
-                        {/* Clean Footer */}
-                        <div className="flex items-center justify-between">
-                          {case_.stretch_area && (
-                            <div className="text-xs text-gray-400 flex items-center gap-1">
-                              <Target className="w-3 h-3" />
-                              {case_.stretch_area}
+                          onClick={() => setSelectedCase(case_.id)}
+                        >
+                          <CardContent className="p-6 h-full flex flex-col">
+                            {/* Header: Icon + Title */}
+                            <div className="flex items-start gap-4 mb-2">
+                              <div className={cn(
+                                "w-12 h-12 rounded-md border flex items-center justify-center",
+                                getCategoryColor(case_.type).bg,
+                                getCategoryColor(case_.type).border,
+                                getCategoryColor(case_.type).text
+                              )}>
+                                {(() => {
+                                  const Icon = getCaseTypeIcon(case_.type);
+                                  return <Icon className="w-5 h-5" />;
+                                })()}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-semibold text-lg leading-tight line-clamp-2 text-gray-900">
+                                  {case_.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                  {case_.industry && <span>{case_.industry}</span>}
+                                  <span>•</span>
+                                  <span>{case_.total_time || "30 min"}</span>
+                                </div>
+                              </div>
                             </div>
-                          )}
-                          <div className="flex-1" />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+
+                            {/* Type + Format (swapped) */}
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="flex items-center gap-2">
+                                {case_.type && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "text-xs",
+                                      getCategoryColor(case_.type).text,
+                                      getCategoryColor(case_.type).border,
+                                      getCategoryColor(case_.type).bg,
+                                      getCategoryColor(case_.type).hoverBg
+                                    )}
+                                  >
+                                    {case_.type}
+                                  </Badge>
+                                )}
+                                {case_.requires_documents && (
+                                  <Badge variant="outline" className="text-xs text-purple-700 border-purple-200 bg-purple-50">
+                                    📄
+                                  </Badge>
+                                )}
+                              </div>
+                              {case_.format && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
+                                >
+                                  {case_.format}
+                                </Badge>
+                              )}
+                            </div>
+
+                            {/* Overview with fixed min height for alignment */}
+                            <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2 min-h-[48px]">
+                              {case_.overview}
+                            </p>
+
+                            {/* Bottom-aligned section for consistent layout */}
+                            <div className="mt-auto">
+                              {/* Divider */}
+                              <div className="border-t border-gray-200 my-2" />
+
+                              {/* Difficulty stars */}
+                              <div className="flex items-center justify-between py-2">
+                                <div className="text-sm text-gray-600">Difficulty</div>
+                                <div className="flex items-center gap-1">
+                                  {[1,2,3].map((i) => (
+                                    <Star
+                                      key={i}
+                                      className={cn(
+                                        "w-4 h-4",
+                                        i <= getDifficultyStars(case_.difficulty) ? "fill-current text-indigo-600" : "text-indigo-200"
+                                      )}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Divider */}
+                              <div className="border-t border-gray-200 my-2" />
+
+                              {/* Stretch area or spacer for alignment */}
+                              {case_.stretch_area ? (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <Target className="w-4 h-4 text-gray-400" />
+                                  <span className="text-sm">{case_.stretch_area}</span>
+                                </div>
+                              ) : (
+                                <div className="h-6" />
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
                     ))}
                   </AnimatePresence>
                 </div>
@@ -920,57 +1060,84 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             >
               <div className="container mx-auto px-6 pt-48 pb-24">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {filteredProfiles.map((profile) => (
-                  <Card
-                    key={profile.id}
-                    data-profile-card="true"
-                    className={cn(
-                      "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative",
-                      selectedProfile === profile.id 
-                        ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
-                        : "hover:border-blue-200"
-                    )}
-                    onClick={() => {
-                      setSelectedProfile(prev => (prev === profile.id ? "" : profile.id));
-                    }}
-                  >
-                    <CardContent className="p-6 text-center">
-                      {selectedProfile === profile.id && (
-                        <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-500" />
-                      )}
-                      
-                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-bold mx-auto mb-4">
-                        {(profile.name || profile.alias).split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </div>
-                      
-                      <h4 className="font-semibold text-gray-900 mb-1">{profile.name || profile.alias}</h4>
-                      <p className="text-sm text-gray-500 mb-2">{profile.alias}</p>
-                      
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap gap-1 justify-center">
-                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
-                            <Building className="w-3 h-3 mr-1" />
-                            {profile.company_profiles.display_name}
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
-                            <Users className="w-3 h-3 mr-1" />
-                            {profile.seniority_profiles.display_name}
-                          </Badge>
-                          <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-800">
-                            <Target className="w-3 h-3 mr-1" />
-                            {profile.difficulty_profiles.display_name || profile.difficulty_profiles.level}
-                          </Badge>
-                        </div>
-                        {profile.user_id !== null && (
-                          <Badge variant="default" className="text-xs bg-purple-100 text-purple-800 w-fit mx-auto">
-                            <Crown className="w-3 h-3 mr-1" />
-                            Custom Profile
-                          </Badge>
+                  {filteredProfiles.map((profile) => {
+                    const displayName = profile.name || profile.alias;
+                    const companyName = profile.company_profiles.display_name;
+                    const companyInitial = (companyName || "").slice(0, 1).toUpperCase();
+                    const seniorityDisplay = profile.seniority_profiles.display_name;
+                    const difficultyDisplay = profile.difficulty_profiles.display_name || profile.difficulty_profiles.level;
+                    const stars = getDifficultyStars(difficultyDisplay, profile.difficulty_profiles.level);
+
+                    return (
+                      <Card
+                        key={profile.id}
+                        data-profile-card="true"
+                        className={cn(
+                          "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg relative",
+                          selectedProfile === profile.id 
+                            ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200" 
+                            : "hover:border-blue-200"
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  ))}
+                        onClick={() => {
+                          setSelectedProfile(prev => (prev === profile.id ? "" : profile.id));
+                        }}
+                      >
+                        <CardContent className="p-6">
+                          {selectedProfile === profile.id && (
+                            <CheckCircle className="absolute top-2 right-2 w-5 h-5 text-green-500" />
+                          )}
+
+                          {/* Header: Avatar, Name, Custom badge */}
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-semibold shadow-sm">
+                                {getInitials(displayName)}
+                              </div>
+                              <div>
+                                <div className="text-base font-semibold text-gray-900">{displayName}</div>
+                                <div className="text-sm text-gray-600">{profile.seniority_profiles.display_name}</div>
+                              </div>
+                            </div>
+                            {profile.user_id !== null && (
+                              <div className="px-3 py-1 bg-purple-100 text-purple-800 text-xs rounded-full border border-purple-200">Custom</div>
+                            )}
+                          </div>
+
+                          {/* Meta row: Company chip and Seniority pill */}
+                          <div className="flex items-center justify-between mt-4">
+                            <div className="inline-flex items-center gap-2 text-sm text-blue-800">
+                              <div className="w-7 h-7 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs flex items-center justify-center font-semibold">
+                                {companyInitial}
+                              </div>
+                              <span>{companyName}</span>
+                            </div>
+                            <div className="px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-medium border border-green-200">
+                              {seniorityDisplay}
+                            </div>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="my-4 border-t border-gray-200" />
+
+                          {/* Difficulty stars */}
+                          <div className="flex items-center justify-between">
+                            <div className="text-sm text-gray-700">Difficulty</div>
+                            <div className="flex items-center gap-1">
+                              {[1,2,3].map((i) => (
+                                <Star
+                                  key={i}
+                                  className={cn(
+                                    "w-4 h-4",
+                                    i <= stars ? "fill-current text-purple-600" : "text-purple-200"
+                                  )}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               </div>
             </ScrollFadeIndicator>
