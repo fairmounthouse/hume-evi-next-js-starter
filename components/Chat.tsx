@@ -466,6 +466,9 @@ function ChatInterface({
       // IMMEDIATELY set end screen to prevent Start Call button from showing
       console.log("🔚 IMMEDIATELY setting showEndScreen=true to prevent UI flicker");
       setShowEndScreen(true);
+      try {
+        window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
+      } catch {}
       setIsCallActive(false);
       
       // Immediately close exhibit when call ends
@@ -914,6 +917,9 @@ function ChatInterface({
       setIsCallActive(false); // Ensure it's set (may already be set)
       setForceShowRecording(false);
       setShowEndScreen(true); // Ensure it's set (may already be set)
+      try {
+        window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
+      } catch {}
       
       // Reset ending state
       setIsEndingInterview(false);
@@ -1370,6 +1376,26 @@ function ChatInterface({
     };
   }, []);
 
+  // Stop camera when interview ends or call becomes inactive
+  useEffect(() => {
+    if (showEndScreen || !isCallActive) {
+      try {
+        videoRef.current?.stopVideo();
+      } catch (e) {
+        console.warn("Camera stop failed (non-critical)", e);
+      }
+    }
+  }, [showEndScreen, isCallActive]);
+
+  // Belt-and-suspenders: force-stop recording when end screen appears
+  useEffect(() => {
+    if (showEndScreen) {
+      try {
+        window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
+      } catch {}
+    }
+  }, [showEndScreen]);
+
   // Initialize PiP position to bottom-right with safe margins
   useEffect(() => {
     const setInitial = () => {
@@ -1573,7 +1599,7 @@ function ChatInterface({
               </div>
             </>
           ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl scale-90">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-[1728px]">
           {/* Interviewer window */}
           <div ref={stageRef} className={cn(
             "relative bg-black rounded-xl overflow-hidden shadow-2xl aspect-video",
@@ -1601,32 +1627,36 @@ function ChatInterface({
 
           {/* Collapsible sidebar trigger handled by top-right icon */}
           {/* Gear (devices) next to transcript button */}
-          {/* Top-right actions: Coach toggle, Transcript, Settings (no white header) */}
-          <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
-            <button
-              onClick={() => handleCoachingToggle(!coachingMode)}
-              className={cn("p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white", coachingMode && "bg-blue-600 text-white hover:bg-blue-700")}
-              title="Hints (Coach)"
-            >
-              <GraduationCap className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setIsTranscriptDrawerOpen(true)}
-              className="p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white"
-              title="View transcript"
-            >
-              <FileText className="w-4 h-4" />
-            </button>
-            <button
-              onClick={onOpenDeviceSetup}
-              className="p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white"
-              title="Device settings"
-            >
-              <Settings className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Controls moved to page-level fixed container (see below) */}
           </div>
           )}
+          {/* Page-level controls: Top-right of the page, not inside video window */}
+          {!showEndScreen && (
+            <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+              <button
+                onClick={() => handleCoachingToggle(!coachingMode)}
+                className={cn("p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white", coachingMode && "bg-blue-600 text-white hover:bg-blue-700")}
+                title="Hints (Coach)"
+              >
+                <GraduationCap className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setIsTranscriptDrawerOpen(true)}
+                className="p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white"
+                title="View transcript"
+              >
+                <FileText className="w-4 h-4" />
+              </button>
+              <button
+                onClick={onOpenDeviceSetup}
+                className="p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white"
+                title="Device settings"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           <TranscriptDrawer
             isOpen={isTranscriptDrawerOpen}
             onClose={() => setIsTranscriptDrawerOpen(false)}
