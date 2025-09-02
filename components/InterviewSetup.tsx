@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/
 import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User, AlertCircle, FileText, DollarSign, Tag, Factory, Package, BarChart3, Rocket, Handshake, PieChart } from "lucide-react";
+import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Sparkles, ArrowLeft, ArrowRight, CheckCircle, X, Star, Zap, Target, Crown, Settings, Home, User, AlertCircle, FileText, DollarSign, Tag, Factory, Package, BarChart3, Rocket, Handshake, PieChart, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
@@ -565,6 +565,25 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       text: "text-gray-800",
       border: "border-gray-200",
     };
+  };
+
+  // Rank seniority into 1..4 bubbles: Entry(1), Mid(2), Senior(3), Principal(4)
+  const getSeniorityRank = (seniorityDisplay?: string): number => {
+    const t = (seniorityDisplay || "").toLowerCase();
+    if (/entry|junior|intern/.test(t)) return 1;
+    if (/mid|intermediate|associate/.test(t)) return 2;
+    if (/senior/.test(t)) return 3;
+    if (/principal|staff|lead/.test(t)) return 4;
+    return 2; // sensible default
+  };
+
+  // Order difficulty: Easy(1), Medium(2), Hard(3)
+  const getDifficultyOrder = (difficultyDisplay?: string): number => {
+    const t = (difficultyDisplay || "").toLowerCase();
+    if (/easy/.test(t)) return 1;
+    if (/medium/.test(t)) return 2;
+    if (/hard/.test(t)) return 3;
+    return 2;
   };
 
   const getInitials = (fullName: string) => {
@@ -1219,6 +1238,25 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                       </Card>
                     );
                   })}
+
+                  {/* Empty card to create a custom interviewer */}
+                  <Card
+                    className={cn(
+                      "cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg border-2 border-dashed",
+                      "bg-gradient-to-br from-blue-50/40 to-purple-50/40 hover:from-blue-100/40 hover:to-purple-100/40"
+                    )}
+                    onClick={goToCustomProfilePage}
+                  >
+                    <CardContent className="p-6 h-full flex flex-col items-center justify-center text-center">
+                      <div className="w-14 h-14 rounded-xl bg-white text-blue-600 border border-blue-200 flex items-center justify-center shadow-sm mb-3">
+                        <Plus className="w-6 h-6" />
+                      </div>
+                      <div className="text-base font-semibold text-gray-900">Create Custom Interviewer</div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        Combine company, seniority, and difficulty to craft your own
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             </ScrollFadeIndicator>
@@ -1402,7 +1440,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             }
                           }}
                         >
-                          <div className="font-semibold text-gray-900 text-sm mb-2">{company.display_name}</div>
+                          <div className="font-semibold text-gray-900 text-sm mb-2 text-center">{company.display_name}</div>
                           <div className="text-sm text-gray-600 leading-relaxed">
                             {getCompanyDescription(company.name || company.display_name)}
                           </div>
@@ -1431,8 +1469,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                       <Users className="w-4 h-4 text-indigo-600" />
                       <h2 className="text-sm font-semibold text-gray-700">Seniority Level</h2>
                     </div>
-                    <div className="grid grid-cols-5 gap-3">
-                      {seniorityProfiles.map((seniority, index) => (
+                    <div className="grid grid-cols-4 gap-3">
+                      {[...seniorityProfiles].sort((a,b) => getSeniorityRank(a.display_name) - getSeniorityRank(b.display_name)).map((seniority) => {
+                        const rank = getSeniorityRank(seniority.display_name);
+                        const colors = getSeniorityPillColors(seniority.display_name);
+                        return (
                         <div
                           key={seniority.id}
                           className={cn(
@@ -1443,20 +1484,12 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                           )}
                           onClick={() => setCustomSeniorityId(prev => prev === seniority.id ? "" : seniority.id)}
                         >
-                          <div className="text-sm text-gray-700 mb-2">{seniority.display_name}</div>
-                          <div className="flex gap-1 justify-center">
-                            {[...Array(5)].map((_, dotIndex) => (
-                              <div
-                                key={dotIndex}
-                                className={cn(
-                                  "w-1.5 h-1.5 rounded-full",
-                                  dotIndex <= index ? "bg-indigo-600" : "bg-gray-300"
-                                )}
-                              />
-                            ))}
+                          <div className="text-sm font-semibold text-gray-900 mb-2 text-center">{seniority.display_name}</div>
+                          <div className="text-xs text-gray-600 whitespace-pre-line min-h-[1rem]">
+                            {seniority.description || ''}
                           </div>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
 
@@ -1466,15 +1499,10 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                       <Target className="w-4 h-4 text-indigo-600" />
                       <h2 className="text-sm font-semibold text-gray-700">Difficulty Level</h2>
                     </div>
-                    <div className="grid grid-cols-5 gap-3">
-                      {difficultyProfiles.map((difficulty, index) => {
-                        const colors = [
-                          "bg-green-500", // Easy
-                          "bg-yellow-500", // Medium  
-                          "bg-red-500", // Hard
-                          "bg-red-600", // Expert
-                          "bg-red-800" // Extreme
-                        ];
+                    <div className="grid grid-cols-3 gap-3">
+                      {[...difficultyProfiles].filter(d => /(easy|medium|hard)/i.test(d.display_name || d.level)).sort((a,b) => getDifficultyOrder(a.display_name || a.level) - getDifficultyOrder(b.display_name || b.level)).map((difficulty) => {
+                        const level = (difficulty.display_name || difficulty.level || '').toLowerCase();
+                        const stars = level.includes('easy') ? 1 : level.includes('medium') ? 2 : 3;
                         return (
                           <div
                             key={difficulty.id}
@@ -1486,17 +1514,20 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             )}
                             onClick={() => setCustomDifficultyId(prev => prev === difficulty.id ? "" : difficulty.id)}
                           >
-                            <div className="text-sm text-gray-700 mb-2">{difficulty.display_name}</div>
-                            <div className="flex gap-1 justify-center">
-                              {[...Array(5)].map((_, dotIndex) => (
-                                <div
-                                  key={dotIndex}
+                            <div className="text-sm font-semibold text-gray-900 mb-2 text-center">{difficulty.display_name}</div>
+                            <div className="flex items-center gap-1 justify-center">
+                              {[1,2,3].map((i) => (
+                                <Star
+                                  key={i}
                                   className={cn(
-                                    "w-1.5 h-1.5 rounded-full",
-                                    dotIndex <= index ? colors[index] : "bg-gray-300"
+                                    "w-4 h-4",
+                                    i <= stars ? "fill-current text-purple-600" : "text-purple-200"
                                   )}
                                 />
                               ))}
+                            </div>
+                            <div className="text-xs text-gray-600 whitespace-pre-line mt-1 min-h-[1rem]">
+                              {difficulty.description || ''}
                             </div>
                           </div>
                         );
@@ -1520,7 +1551,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 {suggestedProfile && !selectedProfile && (
                   <div className="mx-5 mt-5 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white text-xs font-semibold flex-shrink-0">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 bg-gradient-to-br from-blue-500 to-purple-600">
                         {(suggestedProfile.name || suggestedProfile.alias).split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                       </div>
                       <div className="flex-1">
@@ -1573,22 +1604,30 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
                 <div className="flex-1 overflow-y-auto p-5 space-y-3">
                   {filteredAvailableProfiles.slice(0, 8).map((profile) => {
-                    const avatarColors = [
-                      "from-purple-500 to-purple-600",
-                      "from-blue-500 to-blue-600", 
-                      "from-green-500 to-green-600",
-                      "from-pink-500 to-pink-600",
-                      "from-yellow-500 to-yellow-600",
-                      "from-red-500 to-red-600",
-                      "from-indigo-500 to-indigo-600"
-                    ];
-                    const colorIndex = parseInt(profile.id) % avatarColors.length;
+                    const avatarGradient = "from-blue-500 to-purple-600";
+                    const displayName = profile.name || profile.alias;
+                    const companyName = profile.company_profiles.display_name;
+                    const seniorityDisplay = profile.seniority_profiles.display_name;
+                    const difficultyDisplay = profile.difficulty_profiles.display_name || profile.difficulty_profiles.level;
+                    const stars = getDifficultyStars(difficultyDisplay, profile.difficulty_profiles.level);
+                    const companyDescription =
+                      (profile.company_profiles && profile.company_profiles.description) ||
+                      (companyProfiles.find(c =>
+                        c.display_name === profile.company_profiles.display_name ||
+                        (c.name || "") === (profile.company_profiles as any).name
+                      )?.description) || "";
+                    const seniorityDescription =
+                      (profile.seniority_profiles && profile.seniority_profiles.description) ||
+                      (seniorityProfiles.find(s =>
+                        s.display_name === profile.seniority_profiles.display_name ||
+                        (s.level || "") === (profile.seniority_profiles as any).level
+                      )?.description) || "";
                     
                     return (
                       <div
                         key={profile.id}
                         className={cn(
-                          "p-3 border rounded-lg cursor-pointer transition-all duration-200 hover:translate-x-1",
+                          "p-4 border rounded-lg cursor-pointer transition-all duration-200 hover:translate-x-1 hover:shadow-sm",
                           selectedProfile === profile.id
                             ? "border-blue-500 bg-blue-50 shadow-md"
                             : "border-gray-200 bg-white hover:border-indigo-500 hover:bg-indigo-25"
@@ -1612,16 +1651,16 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                           }
                         }}
                       >
-                        <div className="flex items-start gap-3 mb-2">
+                        <div className="flex items-start gap-3 mb-3">
                           <div className={cn(
-                            "w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-semibold bg-gradient-to-br flex-shrink-0",
-                            avatarColors[colorIndex]
+                            "w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-semibold bg-gradient-to-br flex-shrink-0",
+                            avatarGradient
                           )}>
-                            {(profile.name || profile.alias).split(' ').map((n: string) => n[0]).join('').toUpperCase()}
+                            {displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className="font-semibold text-gray-900 text-sm truncate">{profile.name || profile.alias}</div>
-                            <div className="text-xs text-gray-600 truncate">{profile.alias}</div>
+                            <div className="font-semibold text-gray-900 text-sm truncate">{displayName}</div>
+                            <div className="text-xs text-gray-600 truncate">{seniorityDisplay}</div>
                           </div>
                           <div className="flex items-center gap-2">
                             {profile.user_id && (
@@ -1634,26 +1673,50 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             )}
                           </div>
                         </div>
-                        
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-1">
-                            <Building className="w-3 h-3 text-blue-600" />
-                            <span className="text-xs text-blue-700 font-medium">{profile.company_profiles.display_name}</span>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="inline-flex items-center gap-1 text-[11px] text-blue-800">
+                            <div className="w-5 h-5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[10px] flex items-center justify-center font-semibold">
+                              {(companyName || '').slice(0,1).toUpperCase()}
+                            </div>
+                            <span>{companyName}</span>
                           </div>
-                          {(() => {
-                            const colors = getSeniorityPillColors(profile.seniority_profiles.display_name);
-                            return (
-                              <div className="flex items-center gap-1">
-                                <Users className={cn("w-3 h-3", colors.text)} />
-                                <span className={cn("text-xs font-medium", colors.text)}>{profile.seniority_profiles.display_name}</span>
-                              </div>
-                            );
-                          })()}
+                          {(() => { const colors = getSeniorityPillColors(seniorityDisplay); return (
+                            <div className={cn("px-2 py-0.5 rounded-full text-[10px] font-medium border", colors.bg, colors.text, colors.border)}>
+                              {seniorityDisplay}
+                            </div>
+                          ); })()}
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-gray-700">Difficulty</div>
                           <div className="flex items-center gap-1">
-                            <Target className="w-3 h-3 text-orange-600" />
-                            <span className="text-xs text-orange-700 font-medium">{profile.difficulty_profiles.display_name}</span>
+                            {[1,2,3].map((i) => (
+                              <Star
+                                key={i}
+                                className={cn(
+                                  "w-3.5 h-3.5",
+                                  i <= stars ? "fill-current text-purple-600" : "text-purple-200"
+                                )}
+                              />
+                            ))}
                           </div>
                         </div>
+
+                        {(companyDescription || seniorityDescription) && (
+                          <>
+                            <div className="my-2 border-t border-gray-200" />
+                            {companyDescription && (
+                              <div className="text-[11px] text-gray-600 mb-1 whitespace-pre-line line-clamp-3">
+                                {companyDescription}
+                              </div>
+                            )}
+                            {seniorityDescription && (
+                              <div className="text-[11px] text-gray-600 whitespace-pre-line line-clamp-3">
+                                {seniorityDescription}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
                     );
                   })}
