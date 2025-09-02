@@ -38,7 +38,7 @@ export default function Navigation() {
     }`}>
       <nav className="max-w-7xl mx-auto px-8 py-5 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-3 text-2xl font-black text-black">
-          <Logo width={32} height={64} />
+          <Logo width={38} height={77} />
           skillflo
         </Link>
         
