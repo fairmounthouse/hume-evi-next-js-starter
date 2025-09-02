@@ -40,7 +40,7 @@ export default function Stats() {
         </div>
 
         <div className="mt-12">
-          <h3 className="text-center text-base md:text-lg font-semibold tracking-wide text-black mb-6">
+          <h3 className="text-center text-xl md:text-2xl font-semibold tracking-wide text-black mb-6">
             Trusted by students from
           </h3>
 
