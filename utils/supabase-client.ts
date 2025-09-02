@@ -553,20 +553,30 @@ export async function getEndScreenData(sessionId: string): Promise<{
       return null;
     }
     
-    // Get transcript from storage
+    // Get transcript from storage (prefer JSON complete), with safe fallbacks
     let transcript: any[] = [];
-    if (sessionData.transcript_path) {
-      try {
-        const transcriptUrl = await getTranscriptDownloadUrl(sessionId);
-        if (transcriptUrl) {
-          const response = await fetch(transcriptUrl);
-          const transcriptData = await response.json();
-          transcript = transcriptData.entries || [];
+    try {
+      // Prefer JSON complete file
+      const jsonUrl = await getTranscriptDownloadUrl(sessionId, 'json');
+      if (jsonUrl) {
+        const resp = await fetch(jsonUrl);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && Array.isArray(data.entries)) {
+            transcript = data.entries;
+          }
         }
-      } catch (error) {
-        console.error('Error fetching transcript from storage:', error);
-        // Note: transcript_data column has been removed - we only use transcript_path now
-        console.log("⚠️ Failed to load transcript from storage, no fallback available");
+      }
+      // If JSON missing/empty, fallback to TXT by ignoring for structured UI, then to live_transcript_data
+      if ((!transcript || transcript.length === 0) && sessionData.live_transcript_data && Array.isArray(sessionData.live_transcript_data)) {
+        transcript = sessionData.live_transcript_data;
+      }
+    } catch (error) {
+      console.error('Error fetching transcript from storage:', error);
+      if (sessionData.live_transcript_data && Array.isArray(sessionData.live_transcript_data)) {
+        console.log('♻️ Falling back to live_transcript_data from DB');
+        transcript = sessionData.live_transcript_data;
+      } else {
         transcript = [];
       }
     }

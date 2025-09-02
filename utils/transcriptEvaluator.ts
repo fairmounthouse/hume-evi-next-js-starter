@@ -5,12 +5,13 @@ import {
 } from './feedbackTypes';
 
 export class TranscriptEvaluator {
-  private transcriptHistory: TranscriptEntry[] = []; // COMPLETE transcript - NEVER truncated
+  private masterTranscript: TranscriptEntry[] = []; // MASTER append-only transcript - NEVER truncated
   private evaluationInterval: NodeJS.Timeout | null = null;
   private onEvaluationCallback: ((feedback: InInterviewFeedback) => void) | null = null;
-  private readonly ROLLING_WINDOW_MS = 1 * 60 * 1000; // 1 minute - ONLY for real-time feedback
+  private readonly ROLLING_WINDOW_MS = 3 * 60 * 1000; // 3 minutes - ONLY for real-time feedback
   private readonly EVALUATION_INTERVAL_MS = 20 * 1000; // 20 seconds
   private isEvaluating = false;
+  private sessionId: string | null = null; // Used for local persistence
 
   constructor() {}
 
@@ -120,17 +121,30 @@ export class TranscriptEvaluator {
   }
 
   /**
-   * Update internal transcript history - COMPLETE TRANSCRIPT (never truncated)
-   * This maintains the full conversation history for downloads and storage
+   * APPEND new entries to master transcript (append-only, never replace)
+   * This is the authoritative source for complete conversation history
+   */
+  public appendToMasterTranscript(newEntries: TranscriptEntry[]): void {
+    // Only append entries that don't already exist (by ID)
+    const existingIds = new Set(this.masterTranscript.map(e => e.id));
+    const uniqueNewEntries = newEntries.filter(entry => !existingIds.has(entry.id));
+    
+    if (uniqueNewEntries.length > 0) {
+      this.masterTranscript.push(...uniqueNewEntries);
+      console.log(`📚 [MASTER TRANSCRIPT] Appended ${uniqueNewEntries.length} new entries. Total: ${this.masterTranscript.length} (NEVER truncated)`);
+
+      // Persist to localStorage for resilience across UI mounts (not dependent on any drawer)
+      this.persistToLocalStorage();
+    }
+  }
+
+  /**
+   * DEPRECATED: Use appendToMasterTranscript instead
    */
   public updateTranscriptHistory(entries: TranscriptEntry[]): void {
-    // Replace the entire history with new entries
-    // CRITICAL: Do NOT truncate the master transcript history!
-    // The rolling window is applied separately in getRollingWindow()
-    this.transcriptHistory = [...entries];
-    
-    console.log(`📚 [EVALUATOR] Updated COMPLETE transcript history: ${this.transcriptHistory.length} total entries (NEVER truncated)`);
-    console.log(`📚 [EVALUATOR] This is the MASTER transcript that gets saved to database`);
+    console.log(`⚠️ [DEPRECATED] updateTranscriptHistory called - use appendToMasterTranscript instead`);
+    // For backward compatibility, replace the master transcript
+    this.masterTranscript = [...entries];
   }
 
   /**
@@ -139,31 +153,23 @@ export class TranscriptEvaluator {
    * IMPORTANT: This rolling window is ONLY used for real-time feedback evaluation
    * to improve performance and focus on recent conversation context.
    * 
-   * The master transcript (transcriptHistory) is NEVER truncated and
-   * contains the complete conversation history for download.
+   * The master transcript is NEVER truncated and contains the complete conversation history.
    */
   private getRollingWindow(): TranscriptEntry[] {
     // Since timestamps are now relative seconds from recording start, 
     // we need to filter based on relative time, not absolute time
-    const rollingWindowSeconds = this.ROLLING_WINDOW_MS / 1000; // Convert to seconds (60 seconds = 1 minute)
-    const latestTimestamp = this.transcriptHistory.length > 0 
-      ? Math.max(...this.transcriptHistory.map(e => e.timestamp))
+    const rollingWindowSeconds = this.ROLLING_WINDOW_MS / 1000; // Convert to seconds (180 seconds = 3 minutes)
+    const latestTimestamp = this.masterTranscript.length > 0 
+      ? Math.max(...this.masterTranscript.map(e => e.timestamp))
       : 0;
     const cutoffTimestamp = Math.max(0, latestTimestamp - rollingWindowSeconds);
     
-    const rollingEntries = this.transcriptHistory.filter(
+    const rollingEntries = this.masterTranscript.filter(
       entry => entry.timestamp >= cutoffTimestamp
     );
     
-    console.log(`🕐 [EVALUATOR] ROLLING WINDOW (for feedback only): ${rollingEntries.length}/${this.transcriptHistory.length} entries (last 1 minute only)`);
-    console.log(`🕐 [EVALUATOR] COMPLETE TRANSCRIPT (for storage): ${this.transcriptHistory.length} total entries (NEVER truncated)`);
-    console.log(`🕐 [EVALUATOR] Rolling window debug:`, {
-      rollingWindowSeconds,
-      latestTimestamp,
-      cutoffTimestamp,
-      allTimestamps: this.transcriptHistory.map(e => e.timestamp),
-      filteredTimestamps: rollingEntries.map(e => e.timestamp)
-    });
+    console.log(`🕐 [ROLLING WINDOW] ${rollingEntries.length}/${this.masterTranscript.length} entries (last 3 minutes for feedback only)`);
+    console.log(`📚 [MASTER TRANSCRIPT] ${this.masterTranscript.length} total entries (COMPLETE, never truncated)`);
     
     return rollingEntries;
   }
@@ -233,7 +239,7 @@ export class TranscriptEvaluator {
       return 'No transcript data available yet.';
     }
 
-    console.log(`📝 [EVALUATOR] Formatting ${entries.length} entries for feedback API (rolling window - last 1 minute only)`);
+    console.log(`📝 [EVALUATOR] Formatting ${entries.length} entries for feedback API (rolling window - last 3 minutes only)`);
     console.log(`📝 [EVALUATOR] NOTE: Master transcript is preserved separately and not truncated`);
 
     return entries.map(entry => {
@@ -265,14 +271,20 @@ export class TranscriptEvaluator {
   }
 
   /**
-   * Get the complete transcript history (never truncated)
-   * This is what should be used for downloads and final storage
-   * CRITICAL: This is the AUTHORITATIVE source for the complete transcript
+   * Get the complete master transcript (never truncated)
+   * This is the authoritative source for downloads and storage
+   */
+  getMasterTranscript(): TranscriptEntry[] {
+    console.log(`📚 [MASTER TRANSCRIPT] Returning complete transcript: ${this.masterTranscript.length} entries (NEVER truncated)`);
+    return [...this.masterTranscript];
+  }
+
+  /**
+   * DEPRECATED: Use getMasterTranscript instead
    */
   getCompleteTranscriptHistory(): TranscriptEntry[] {
-    console.log(`📚 [EVALUATOR] Returning AUTHORITATIVE complete transcript: ${this.transcriptHistory.length} entries (NEVER truncated)`);
-    console.log(`📚 [EVALUATOR] This transcript should be used for database storage and downloads`);
-    return [...this.transcriptHistory];
+    console.log(`⚠️ [DEPRECATED] getCompleteTranscriptHistory called - use getMasterTranscript instead`);
+    return this.getMasterTranscript();
   }
 
   /**
@@ -281,7 +293,48 @@ export class TranscriptEvaluator {
   destroy(): void {
     this.stopPeriodicEvaluation();
     this.onEvaluationCallback = null;
-    this.transcriptHistory = [];
+    this.masterTranscript = [];
+  }
+
+  /**
+   * Bind to a session and attempt to recover any locally persisted master transcript.
+   * Does not depend on any UI component; safe to call on Chat mount.
+   */
+  setSession(sessionId: string): void {
+    if (!sessionId) return;
+    if (this.sessionId === sessionId) return;
+    this.sessionId = sessionId;
+
+    try {
+      const key = `master_transcript_${sessionId}`;
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+      if (raw) {
+        const parsed: TranscriptEntry[] = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Deduplicate by id while preserving existing entries
+          const existingIds = new Set(this.masterTranscript.map(e => e.id));
+          const newOnes = parsed.filter(e => !existingIds.has(e.id));
+          if (newOnes.length > 0) {
+            this.masterTranscript.push(...newOnes);
+            console.log(`♻️  [MASTER TRANSCRIPT] Recovered ${newOnes.length}/${parsed.length} entries from localStorage for session ${sessionId}`);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[MASTER TRANSCRIPT] Failed to recover from localStorage', e);
+    }
+  }
+
+  private persistToLocalStorage(): void {
+    if (!this.sessionId) return;
+    try {
+      const key = `master_transcript_${this.sessionId}`;
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(key, JSON.stringify(this.masterTranscript));
+      }
+    } catch (e) {
+      console.warn('[MASTER TRANSCRIPT] Failed to persist to localStorage', e);
+    }
   }
 }
 

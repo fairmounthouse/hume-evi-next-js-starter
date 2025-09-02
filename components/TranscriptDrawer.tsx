@@ -292,7 +292,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                                 : "text-gray-700 dark:text-gray-300"
                             )}>
                               {entry.speaker === "user" ? "Interviewee" : "AI Interviewer"}
-                              {entry.isInterim && " (typing...)"}
+                              {entry.isInterim && " (speaking...)"}
                             </span>
                             <span 
                               className={cn(

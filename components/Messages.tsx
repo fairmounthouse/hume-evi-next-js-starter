@@ -83,19 +83,34 @@ const Messages = forwardRef<
                       )}
                     >
                       {msg.message.role}
-                      {isInterim && " (typing...)"}
+                      {isInterim && " (speaking...)"}
                     </div>
                     <div
                       className={cn(
                         "text-xs capitalize font-medium leading-none opacity-50 tracking-tight"
                       )}
                     >
-                      {formatRelativeTime(getRelativeTime(displayTimestamp))}
+                      {(() => {
+                        const relativeSeconds = getRelativeTime(displayTimestamp);
+                        const formatted = formatRelativeTime(relativeSeconds);
+                        
+                        // Debug logging for first few messages
+                        if (index < 3) {
+                          console.log(`🕐 [MESSAGES UI] Timestamp debug ${index}:`, {
+                            displayTimestamp,
+                            relativeSeconds,
+                            formatted,
+                            msgReceivedAt: msg.receivedAt?.getTime(),
+                            recordingStartTime: (window as any).__recordingStartTime
+                          });
+                        }
+                        
+                        return formatted;
+                      })()}
                     </div>
                   </div>
                   <div className={"pb-3 px-3"}>
                     {msg.message.content}
-                    {isInterim && <span className="animate-pulse">|</span>}
                   </div>
                   <Expressions values={{ ...msg.models.prosody?.scores }} />
                 </motion.div>
