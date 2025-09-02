@@ -13,6 +13,7 @@ import VideoTranscriptPlayer from '@/components/VideoTranscriptPlayer';
 import EnhancedDetailedAnalysis from '@/components/EnhancedDetailedAnalysis';
 import TranscriptDrawer from '@/components/TranscriptDrawer';
 import SessionDocuments from '@/components/SessionDocuments';
+import { Timeline, VerticalTimeline } from '@/components/ui/timeline';
 import { Protect } from '@clerk/nextjs';
 
 interface DimensionScore {
@@ -39,9 +40,48 @@ export default function SessionViewerPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'verdict' | 'analysis' | 'nextsteps'>('verdict');
+  const [timelineFilter, setTimelineFilter] = useState<'all' | 'critical' | 'warning' | 'positive'>('all');
   
   // Ref for video iframe control
   const videoPlayerRef = useRef<HTMLIFrameElement>(null);
+
+  // Helper functions for timeline filtering (same as end screen)
+  const getMomentType = (category: string): 'critical' | 'warning' | 'positive' => {
+    switch (category) {
+      case 'Critical Issues':
+        return 'critical';
+      case 'Warnings':
+        return 'warning';
+      case 'Positive Moments':
+        return 'positive';
+      default:
+        return 'critical';
+    }
+  };
+
+  const getFilteredMoments = () => {
+    const mbbReport = sessionData?.mbbReport;
+    if (!mbbReport || !mbbReport.unified_moments || !Array.isArray(mbbReport.unified_moments)) return [];
+    if (timelineFilter === 'all') return mbbReport.unified_moments;
+    
+    return mbbReport.unified_moments.filter((moment: any) => {
+      const type = getMomentType(moment.category);
+      return type === timelineFilter;
+    });
+  };
+
+  const getMomentCounts = () => {
+    const mbbReport = sessionData?.mbbReport;
+    const moments = Array.isArray(mbbReport?.unified_moments) ? mbbReport.unified_moments : [];
+    const counts = { all: moments.length, critical: 0, warning: 0, positive: 0 } as Record<'all' | 'critical' | 'warning' | 'positive', number>;
+    moments.forEach((moment: any) => {
+      const type = getMomentType(moment.category);
+      if (type === 'critical' || type === 'warning' || type === 'positive') {
+        counts[type]++;
+      }
+    });
+    return counts;
+  };
 
 
   useEffect(() => {
@@ -574,6 +614,97 @@ export default function SessionViewerPage() {
                       </div>
                     </div>
 
+                    {/* Critical Moments Timeline - Same as End Screen */}
+                    {mbbReport.unified_moments && (
+                      <div className="mb-8">
+                        <div className="flex justify-between items-center mb-6">
+                          <h2 className="text-lg font-semibold text-[#0a0a0a]">
+                            Critical Moments Timeline
+                          </h2>
+                          
+                          {/* Filter Buttons - Same as End Screen */}
+                          <div className="flex gap-2">
+                            {(['all', 'critical', 'warning', 'positive'] as const).map(filter => {
+                              const counts = getMomentCounts();
+                              return (
+                                <button
+                                  key={filter}
+                                  onClick={() => setTimelineFilter(filter)}
+                                  className={`px-3 py-1 text-xs font-medium rounded-full transition-all duration-200 ${
+                                    timelineFilter === filter
+                                      ? 'bg-[#0a0a0a] text-white'
+                                      : 'bg-[#f4f4f5] text-[#71717a] hover:bg-[#e4e4e7]'
+                                  }`}
+                                >
+                                  {filter === 'all' ? 'All' : 
+                                   filter === 'critical' ? 'Critical' :
+                                   filter === 'warning' ? 'Warning' : 'Positive'} ({counts[filter]})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        
+                        {/* Mobile Timeline */}
+                        <div className="block lg:hidden">
+                                                      <VerticalTimeline 
+                              events={getFilteredMoments()
+                                .sort((a: any, b: any) => {
+                                  // Parse timestamps (MM:SS format) for proper sorting
+                                  const parseTime = (timeStr: string) => {
+                                    const parts = timeStr.split(':').map(Number);
+                                    return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+                                  };
+                                  return parseTime(a.timestamp) - parseTime(b.timestamp);
+                                })
+                                .map((moment: any) => ({
+                                  timestamp: moment.timestamp,
+                                  title: moment.title,
+                                  description: moment.description,
+                                  type: getMomentType(moment.category)
+                                }))}
+                            transcript={transcript}
+                            onSeekVideo={(timestamp) => {
+                              console.log("🎯 [SESSIONS VERTICAL TIMELINE] Seeking video to:", timestamp);
+                              sessionStorage.setItem('seekToTimestamp', timestamp.toString());
+                              window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
+                                detail: { timestamp } 
+                              }));
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Desktop Timeline */}
+                        <div className="hidden lg:block">
+                                                      <Timeline 
+                              events={getFilteredMoments()
+                                .sort((a: any, b: any) => {
+                                  // Parse timestamps (MM:SS format) for proper sorting
+                                  const parseTime = (timeStr: string) => {
+                                    const parts = timeStr.split(':').map(Number);
+                                    return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+                                  };
+                                  return parseTime(a.timestamp) - parseTime(b.timestamp);
+                                })
+                                .map((moment: any) => ({
+                                  timestamp: moment.timestamp,
+                                  title: moment.title,
+                                  description: moment.description,
+                                  type: getMomentType(moment.category)
+                                }))}
+                            transcript={transcript}
+                            onSeekVideo={(timestamp) => {
+                              console.log("🎯 [SESSIONS TIMELINE] Seeking video to:", timestamp);
+                              sessionStorage.setItem('seekToTimestamp', timestamp.toString());
+                              window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
+                                detail: { timestamp } 
+                              }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {/* Primary Pattern Analysis */}
                     {mbbReport.primary_pattern && (
                       <div className="bg-[#fafafa] border border-[#e4e4e7] rounded-lg p-6">
@@ -625,16 +756,60 @@ export default function SessionViewerPage() {
                       </div>
                     )}
 
-                    {/* Timeline Moments */}
+                    {/* Detailed Timeline Moments */}
                     {mbbReport.unified_moments && (
                       <div>
                         <h2 className="text-lg font-semibold text-[#0a0a0a] mb-5">
-                          Key Timeline Moments
+                          Key Timeline Moments with AI Coaching
                         </h2>
                         
                         <div className="space-y-6">
-                          {(mbbReport.unified_moments || []).slice(0, 5).map((moment: any, index: number) => (
-                            <Card key={index} className="p-6">
+                          {getFilteredMoments().map((moment: any, index: number) => (
+                            <Card 
+                              key={index} 
+                              className="p-6 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all duration-200"
+                              onClick={() => {
+                                // Parse timestamp (MM:SS format) to seconds
+                                const parts = moment.timestamp.split(':').map(Number);
+                                const originalTimestamp = parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+                                
+                                // Apply speaker-based buffer logic
+                                const isFirstMessage = originalTimestamp === 0;
+                                const correspondingEntry = transcript?.find((entry: any) => Math.abs(entry.timestamp - originalTimestamp) < 2);
+                                const isUserMessage = correspondingEntry?.speaker === 'user';
+                                
+                                let bufferedTimestamp;
+                                let bufferMessage;
+                                
+                                if (isFirstMessage) {
+                                  bufferedTimestamp = originalTimestamp;
+                                  bufferMessage = 'no buffer (first message)';
+                                } else if (isUserMessage) {
+                                  bufferedTimestamp = Math.max(0, originalTimestamp - 1);
+                                  bufferMessage = '-1s buffer (user message)';
+                                } else {
+                                  bufferedTimestamp = originalTimestamp + 2;
+                                  bufferMessage = '+2s buffer (AI message)';
+                                }
+                                
+                                console.log("🎯 [MOMENT CARD CLICK] Seeking video:", {originalTimestamp, bufferedTimestamp, bufferMessage, speaker: correspondingEntry?.speaker});
+                                
+                                // Store timestamp for video component to pick up
+                                sessionStorage.setItem('jumpToTimestamp', bufferedTimestamp.toString());
+                                
+                                // Try direct iframe manipulation if available
+                                const iframe = document.querySelector('iframe[src*="cloudflarestream.com"]') as HTMLIFrameElement;
+                                if (iframe && iframe.src.includes('cloudflarestream.com')) {
+                                  const videoId = iframe.src.match(/cloudflarestream\.com\/([^\/]+)\/iframe/)?.[1];
+                                  if (videoId) {
+                                    const seekTime = Math.floor(bufferedTimestamp * 10) / 10;
+                                    const newSrc = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&startTime=${seekTime}&autoplay=true`;
+                                    iframe.src = newSrc;
+                                    console.log("🎯 [MOMENT CARD DIRECT] Updated iframe src for seeking:", seekTime);
+                                  }
+                                }
+                              }}
+                            >
                               <div className="mb-4">
                                 <Badge variant="outline" className="text-xs font-medium">
                                   {moment.timestamp}
@@ -725,10 +900,10 @@ export default function SessionViewerPage() {
                             </div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                 {/* No Assessment Available */}
                 {!mbbAssessment && !mbbReport && (
@@ -829,11 +1004,11 @@ export default function SessionViewerPage() {
                                           bufferedTimestamp = originalTimestamp; // No buffer for first message
                                           bufferMessage = 'no buffer (first message)';
                                         } else if (isUserMessage) {
-                                          bufferedTimestamp = Math.max(0, originalTimestamp - 2); // Go back 2s for context
-                                          bufferMessage = '-2s buffer (user message)';
+                                          bufferedTimestamp = Math.max(0, originalTimestamp - 1); // Go back 2s for context
+                                          bufferMessage = '-1s buffer (user message)';
                                         } else {
-                                          bufferedTimestamp = originalTimestamp + 2; // Go forward 2s for AI messages
-                                          bufferMessage = '+2s buffer (AI message)';
+                                          bufferedTimestamp = originalTimestamp + 1; // Go forward 2s for AI messages
+                                          bufferMessage = '+1s buffer (AI message)';
                                         }
                                         
                                         const seekTime = Math.floor(bufferedTimestamp * 10) / 10; // Keep one decimal place for precision

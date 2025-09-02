@@ -25,6 +25,8 @@ interface TranscriptDrawerProps {
   className?: string;
   // Optional content shown under a "Hints" tab (e.g., live feedback)
   hintsContent?: React.ReactNode;
+  // Video seeking callback
+  onSeekVideo?: (timestamp: number) => void;
 }
 
 export default function TranscriptDrawer({ 
@@ -33,6 +35,7 @@ export default function TranscriptDrawer({
   transcript,
   className = "",
   hintsContent,
+  onSeekVideo,
 }: TranscriptDrawerProps) {
   const { formatRelativeTime } = useRecordingAnchor();
   // Close drawer when clicking backdrop
@@ -291,7 +294,36 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                               {entry.speaker === "user" ? "Interviewee" : "AI Interviewer"}
                               {entry.isInterim && " (typing...)"}
                             </span>
-                            <span className="text-xs text-muted-foreground ml-auto">
+                            <span 
+                              className={cn(
+                                "text-xs text-muted-foreground ml-auto",
+                                onSeekVideo && !entry.isInterim && "cursor-pointer hover:text-blue-600 hover:underline"
+                              )}
+                              onClick={onSeekVideo && !entry.isInterim ? () => {
+                                const originalTimestamp = entry.timestamp;
+                                const isFirstMessage = originalTimestamp === 0;
+                                const isUserMessage = entry.speaker === 'user';
+                                
+                                // Apply speaker-based buffer logic
+                                let bufferedTimestamp;
+                                let bufferMessage;
+                                
+                                if (isFirstMessage) {
+                                  bufferedTimestamp = originalTimestamp; // No buffer for first message
+                                  bufferMessage = 'no buffer (first message)';
+                                } else if (isUserMessage) {
+                                  bufferedTimestamp = Math.max(0, originalTimestamp - 1); // Go back 1s for user context
+                                  bufferMessage = '-1s buffer (user message)';
+                                } else {
+                                  bufferedTimestamp = originalTimestamp + 2; // Go forward 2s for AI messages
+                                  bufferMessage = '+2s buffer (AI message)';
+                                }
+                                
+                                console.log("🎯 [TRANSCRIPT CLICK] Seeking video:", {originalTimestamp, bufferedTimestamp, bufferMessage, speaker: entry.speaker});
+                                onSeekVideo(bufferedTimestamp);
+                              } : undefined}
+                              title={onSeekVideo && !entry.isInterim ? "Click to jump to this moment in video" : undefined}
+                            >
                               {formatTimestamp(entry.timestamp)}
                             </span>
                           </div>

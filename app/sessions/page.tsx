@@ -38,8 +38,7 @@ interface SessionData {
   overall_score: number | null;
   analysis_summary: string | null;
   
-  // Raw data
-  detailed_analysis: any;
+  // Raw data - detailed_analysis removed
   feedback_data: any;
 }
 

@@ -783,23 +783,61 @@ export default function InterviewEndScreen({
                         {/* Use Timeline component for desktop, VerticalTimeline for mobile */}
                         <div className="block lg:hidden">
                           <VerticalTimeline 
-                            events={getFilteredMoments().map(moment => ({
-                              timestamp: moment.timestamp,
-                              title: moment.title,
-                              description: moment.description,
-                              type: getMomentType(moment.category)
-                            }))}
+                            events={getFilteredMoments()
+                              .sort((a, b) => {
+                                // Parse timestamps (MM:SS format) for proper sorting
+                                const parseTime = (timeStr: string) => {
+                                  const parts = timeStr.split(':').map(Number);
+                                  return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+                                };
+                                return parseTime(a.timestamp) - parseTime(b.timestamp);
+                              })
+                              .map(moment => ({
+                                timestamp: moment.timestamp,
+                                title: moment.title,
+                                description: moment.description,
+                                type: getMomentType(moment.category)
+                              }))}
+                            transcript={transcript}
+                            onSeekVideo={(timestamp) => {
+                              console.log("🎯 [VERTICAL TIMELINE] Seeking video to:", timestamp);
+                              // Store timestamp for video component to pick up
+                              sessionStorage.setItem('seekToTimestamp', timestamp.toString());
+                              // Trigger custom event for video components to listen to
+                              window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
+                                detail: { timestamp } 
+                              }));
+                            }}
                           />
                         </div>
                         
                         <div className="hidden lg:block">
                           <Timeline 
-                            events={getFilteredMoments().map(moment => ({
-                              timestamp: moment.timestamp,
-                              title: moment.title,
-                              description: moment.description,
-                              type: getMomentType(moment.category)
-                            }))}
+                            events={getFilteredMoments()
+                              .sort((a, b) => {
+                                // Parse timestamps (MM:SS format) for proper sorting
+                                const parseTime = (timeStr: string) => {
+                                  const parts = timeStr.split(':').map(Number);
+                                  return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+                                };
+                                return parseTime(a.timestamp) - parseTime(b.timestamp);
+                              })
+                              .map(moment => ({
+                                timestamp: moment.timestamp,
+                                title: moment.title,
+                                description: moment.description,
+                                type: getMomentType(moment.category)
+                              }))}
+                            transcript={transcript}
+                            onSeekVideo={(timestamp) => {
+                              console.log("🎯 [TIMELINE] Seeking video to:", timestamp);
+                              // Store timestamp for video component to pick up
+                              sessionStorage.setItem('seekToTimestamp', timestamp.toString());
+                              // Trigger custom event for video components to listen to
+                              window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
+                                detail: { timestamp } 
+                              }));
+                            }}
                           />
                         </div>
                       </div>
@@ -861,7 +899,51 @@ export default function InterviewEndScreen({
                         
                         <div className="space-y-6">
                           {(Array.isArray(mbbReport.unified_moments) ? mbbReport.unified_moments : []).map((moment, index) => (
-                            <Card key={index} className="p-6">
+                            <Card 
+                              key={index} 
+                              className="p-6 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all duration-200"
+                              onClick={() => {
+                                // Parse timestamp (MM:SS format) to seconds
+                                const parts = moment.timestamp.split(':').map(Number);
+                                const originalTimestamp = parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+                                
+                                // Apply speaker-based buffer logic
+                                const isFirstMessage = originalTimestamp === 0;
+                                const correspondingEntry = transcript?.find((entry: any) => Math.abs(entry.timestamp - originalTimestamp) < 2);
+                                const isUserMessage = correspondingEntry?.speaker === 'user';
+                                
+                                let bufferedTimestamp;
+                                let bufferMessage;
+                                
+                                if (isFirstMessage) {
+                                  bufferedTimestamp = originalTimestamp;
+                                  bufferMessage = 'no buffer (first message)';
+                                } else if (isUserMessage) {
+                                  bufferedTimestamp = Math.max(0, originalTimestamp - 1);
+                                  bufferMessage = '-1s buffer (user message)';
+                                } else {
+                                  bufferedTimestamp = originalTimestamp + 2;
+                                  bufferMessage = '+2s buffer (AI message)';
+                                }
+                                
+                                console.log("🎯 [END SCREEN MOMENT CARD CLICK] Seeking video:", {originalTimestamp, bufferedTimestamp, bufferMessage, speaker: correspondingEntry?.speaker});
+                                
+                                // Store timestamp for video component to pick up
+                                sessionStorage.setItem('jumpToTimestamp', bufferedTimestamp.toString());
+                                
+                                // Try direct iframe manipulation if available
+                                const iframe = document.querySelector('iframe[src*="cloudflarestream.com"]') as HTMLIFrameElement;
+                                if (iframe && iframe.src.includes('cloudflarestream.com')) {
+                                  const videoId = iframe.src.match(/cloudflarestream\.com\/([^\/]+)\/iframe/)?.[1];
+                                  if (videoId) {
+                                    const seekTime = Math.floor(bufferedTimestamp * 10) / 10;
+                                    const newSrc = `https://customer-sm0204x4lu04ck3x.cloudflarestream.com/${videoId}/iframe?preload=metadata&controls=true&startTime=${seekTime}&autoplay=true`;
+                                    iframe.src = newSrc;
+                                    console.log("🎯 [END SCREEN MOMENT CARD DIRECT] Updated iframe src for seeking:", seekTime);
+                                  }
+                                }
+                              }}
+                            >
                               <div className="mb-4">
                                 <Badge variant="outline" className="text-xs font-medium">
                                   {moment.timestamp}
@@ -1132,11 +1214,11 @@ export default function InterviewEndScreen({
                                           bufferedTimestamp = originalTimestamp; // No buffer for first message
                                           bufferMessage = 'no buffer (first message)';
                                         } else if (isUserMessage) {
-                                          bufferedTimestamp = Math.max(0, originalTimestamp - 2); // Go back 2s for context
-                                          bufferMessage = '-2s buffer (user message)';
+                                          bufferedTimestamp = Math.max(0, originalTimestamp - 1); // Go back 1s for context
+                                          bufferMessage = '-1s buffer (user message)';
                                         } else {
-                                          bufferedTimestamp = originalTimestamp + 2; // Go forward 2s for AI messages
-                                          bufferMessage = '+2s buffer (AI message)';
+                                          bufferedTimestamp = originalTimestamp + 1; // Go forward 1s for AI messages
+                                          bufferMessage = '+1s buffer (AI message)';
                                         }
                                         
                                         const seekTime = Math.floor(bufferedTimestamp * 10) / 10;

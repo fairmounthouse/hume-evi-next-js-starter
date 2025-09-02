@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('status', 'completed')
-      .not('new_interviewer_profile_id', 'is', null)  // ONLY sessions with new interviewer profiles
       .order('created_at', { ascending: false })
       .limit(limit);
     
@@ -36,7 +35,7 @@ export async function GET(request: NextRequest) {
         created_at: session.created_at,
         started_at: session.started_at,
         duration_seconds: session.duration_seconds,
-        has_detailed_analysis: !!(session.detailed_analysis) || !!(session.mbb_assessment_data) || !!(session.mbb_report_data),
+        has_detailed_analysis: !!(session.mbb_assessment_data) || !!(session.mbb_report_data),
         has_video: !!(session.video_url),
         status: session.status,
         transcript_path: session.transcript_path,
@@ -55,28 +54,11 @@ export async function GET(request: NextRequest) {
         difficulty_level: session.interviewer_profiles_new?.difficulty_profiles?.display_name || 'Unknown',
         difficulty_code: session.interviewer_profiles_new?.difficulty_profiles?.level || 'unknown',
         
-        // Use MBB overall_score (5-point scale) with fallback to old system (converted to 5-point)
-        overall_score: (() => {
-          // Prefer new MBB overall_score (5-point scale)
-          if (session.overall_score !== null && session.overall_score !== undefined) {
-            return session.overall_score;
-          }
-          
-          // Fallback to old detailed_analysis score (convert from 10-point to 5-point)
-          try {
-            const analysis = typeof session.detailed_analysis === 'string' 
-              ? JSON.parse(session.detailed_analysis)
-              : session.detailed_analysis;
-            const oldScore = analysis?.summary?.total_score;
-            return oldScore ? parseFloat((oldScore / 2.0).toFixed(1)) : null;
-          } catch {
-            return null;
-          }
-        })(),
-        analysis_summary: session.detailed_analysis?.summary?.overall_performance || null,
+        // Use MBB overall_score (5-point scale)
+        overall_score: session.overall_score,
+        analysis_summary: null, // Removed - using MBB system now
         
         // Raw data for session viewer
-        detailed_analysis: session.detailed_analysis,
         feedback_data: session.feedback_data
       }))
     }, {

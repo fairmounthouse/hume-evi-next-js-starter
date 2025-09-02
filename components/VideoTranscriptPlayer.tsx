@@ -36,6 +36,20 @@ const VideoTranscriptPlayer = forwardRef<VideoPlayerRef, VideoTranscriptPlayerPr
   const [playerReady, setPlayerReady] = useState(false);
 
   // Update current time as video plays
+  // Listen for seek events from other components (TranscriptDrawer, Timeline)
+  useEffect(() => {
+    const handleSeekEvent = (event: CustomEvent) => {
+      const { timestamp } = event.detail;
+      console.log("🎯 [VIDEO PLAYER] Received seek event:", timestamp);
+      seekToTime(timestamp);
+    };
+
+    window.addEventListener('seekToTimestamp', handleSeekEvent as EventListener);
+    return () => {
+      window.removeEventListener('seekToTimestamp', handleSeekEvent as EventListener);
+    };
+  }, []);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;

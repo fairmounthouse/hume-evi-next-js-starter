@@ -19,7 +19,7 @@ interface SessionSummary {
   created_at: string;
   started_at?: string;
   duration_seconds: number;
-  has_detailed_analysis: boolean;
+  has_detailed_analysis: boolean; // Now based on MBB data, not old detailed_analysis
   has_video: boolean;
   status: string;
   transcript_path?: string;

@@ -1794,8 +1794,18 @@ function ChatInterface({
               text: entry.text,
               timestamp: entry.timestamp,
               emotions: entry.emotions,
-              confidence: entry.confidence
+              confidence: entry.confidence,
+              isInterim: entry.isInterim
             }))}
+            onSeekVideo={(timestamp) => {
+              console.log("🎯 [LIVE TRANSCRIPT] Seeking to timestamp:", timestamp);
+              // Store timestamp for video component to pick up
+              sessionStorage.setItem('seekToTimestamp', timestamp.toString());
+              // Trigger custom event for video components to listen to
+              window.dispatchEvent(new CustomEvent('seekToTimestamp', { 
+                detail: { timestamp } 
+              }));
+            }}
             hintsContent={(
               <div className="space-y-3">
                 <div className="flex items-center gap-2">

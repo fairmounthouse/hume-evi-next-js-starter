@@ -285,8 +285,7 @@ export interface InterviewSession {
   transcript_path?: string; // Complete Supabase Storage URL to transcript file (TXT format)
   live_transcript_data?: any[]; // Live session transcript format (same as Chat component)
   
-  // AI ANALYSIS RESULTS
-  detailed_analysis?: Record<string, any>; // Complete AI evaluation with factors, summary, confidence
+  // AI ANALYSIS RESULTS - REMOVED: detailed_analysis (replaced by MBB assessment system)
   
   // FEEDBACK SURVEYS
   feedback_data?: Record<string, any>; // Post-interview feedback (NPS, realism, etc.)
@@ -354,8 +353,7 @@ export async function upsertInterviewSession(sessionData: Partial<InterviewSessi
   try {
     // Validate and fix data before database operation
     const validatedData = validateAndFixSessionData(sessionData);
-    const jsonFields: Array<keyof Pick<InterviewSession, 'detailed_analysis' | 'feedback_data' | 'analysis_feedback_data' | 'live_transcript_data'>> = [
-      'detailed_analysis',
+    const jsonFields: Array<keyof Pick<InterviewSession, 'feedback_data' | 'analysis_feedback_data' | 'live_transcript_data'>> = [
       'feedback_data', 
       'analysis_feedback_data',
       'live_transcript_data',
@@ -446,8 +444,7 @@ export async function storeEndScreenData(
       .from('interview_sessions')
       .update({
         transcript_path: transcriptPath || undefined,
-        detailed_analysis: finalEvaluation, // Store evaluation in existing field
-        // Note: has_detailed_analysis column removed - check detailed_analysis IS NOT NULL instead
+        // Note: detailed_analysis removed - using MBB assessment system now
         status: 'completed' as const,
         updated_at: new Date().toISOString(),
       })
@@ -459,28 +456,8 @@ export async function storeEndScreenData(
       console.error('Error updating session with end screen data:', error);
     }
     
-    // TODO: Add video_url and final_evaluation columns to database
-    // For now, we'll store video URL in detailed_analysis.video_url
-    if (success && finalEvaluation) {
-      const enhancedEvaluation = {
-        ...finalEvaluation,
-        video_url: videoUrl, // Store video URL inside the evaluation object
-        cached_at: new Date().toISOString()
-      };
-      
-      // Update with enhanced evaluation that includes video URL
-      const { error: updateError } = await supabase
-        .from('interview_sessions')
-        .update({
-          detailed_analysis: enhancedEvaluation,
-          updated_at: new Date().toISOString()
-        })
-        .eq('session_id', sessionId);
-      
-      if (updateError) {
-        console.error('Error updating session with enhanced evaluation:', updateError);
-      }
-    }
+    // Video URL handling removed - detailed_analysis column no longer exists
+    // Video URLs are stored in video_url column directly via other functions
     
     if (success) {
       console.log(`✅ End screen data stored successfully for session: ${sessionId}`);
@@ -539,21 +516,7 @@ export async function getEndScreenData(sessionId: string): Promise<{
     let finalEvaluation = null;
     let videoUrl = '';
     
-    if (sessionData.detailed_analysis) {
-      try {
-        const analysis = typeof sessionData.detailed_analysis === 'string' 
-          ? JSON.parse(sessionData.detailed_analysis)
-          : sessionData.detailed_analysis;
-        
-        // Check if this is actually an evaluation object (has factors and summary)
-        if (analysis && analysis.factors && analysis.summary) {
-          finalEvaluation = analysis;
-          videoUrl = analysis.video_url || ''; // Extract video URL from evaluation
-        }
-      } catch (error) {
-        console.error('Error parsing detailed analysis:', error);
-      }
-    }
+    // detailed_analysis field removed - finalEvaluation now comes from MBB assessment system
     
     // Fallback to separate fields if they exist
     if (!finalEvaluation && sessionData.final_evaluation) {
@@ -797,17 +760,8 @@ export async function getSessionData(sessionId: string) {
       }
     }
     
-    // Extract final evaluation
+    // Extract final evaluation - detailed_analysis removed, using MBB system now
     let finalEvaluation = null;
-    if (sessionData.detailed_analysis) {
-      try {
-        finalEvaluation = typeof sessionData.detailed_analysis === 'string' 
-          ? JSON.parse(sessionData.detailed_analysis)
-          : sessionData.detailed_analysis;
-      } catch (error) {
-        console.error('Error parsing final evaluation:', error);
-      }
-    }
     
     // Parse MBB assessment data
     let mbbAssessment = null;
@@ -851,10 +805,8 @@ export async function getSessionData(sessionId: string) {
       
       difficulty_level: sessionData.interviewer_profiles_new?.difficulty_profiles?.display_name || sessionData.interview_cases?.difficulty || 'Unknown',
       
-      // Use MBB overall_score (5-point) with fallback to converted old score
-      overall_score: sessionData.overall_score || 
-                    (finalEvaluation?.summary?.total_score ? 
-                      parseFloat((finalEvaluation.summary.total_score / 2.0).toFixed(1)) : null),
+      // Use MBB overall_score (5-point scale)
+      overall_score: sessionData.overall_score || null,
     };
     
     const result = {
