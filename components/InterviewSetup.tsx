@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, lazy, Suspense } from "react";
 import { useDebouncedCallback } from 'use-debounce';
 import { useRouter } from "next/navigation";
 import { useInterviewSetupData } from "@/hooks/useInterviewSetupData";
@@ -13,6 +13,8 @@ import { Search, Clock, Users, TrendingUp, Building, Filter, ChevronRight, Spark
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/utils";
 import SessionSelector from "./SessionSelector";
+// Lazy load heavy components
+const DocumentUpload = lazy(() => import("./DocumentUpload"));
 import ScrollFadeIndicator from "./ScrollFadeIndicator";
 import { InterviewSetupSkeleton } from "./ui/enhanced-skeleton";
 
@@ -201,13 +203,14 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const [profileDifficultyFilter, setProfileDifficultyFilter] = useState<string>("all");
   
 
-  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Profile Selection, 3 = Device Setup
-
+  const [currentPage, setCurrentPage] = useState(1); // 1 = Case Selection, 2 = Profile Selection, 3 = Custom Profile Creation, 4 = Documents (optional), 5 = Device Setup
+  const [showDocumentUpload, setShowDocumentUpload] = useState(false);
+  const [documentSessionId, setDocumentSessionId] = useState<string>("");
   
   // Get selected case data to determine if documents are required
   const selectedCaseData = cases.find(c => c.id === selectedCase);
   const requiresDocuments = selectedCaseData?.requires_documents || false;
-  const totalSteps = 3; // Case -> Profile -> Device (simplified to 3 steps)
+  const totalSteps = requiresDocuments ? 5 : 4; // Case -> Profile -> [Custom Profile] -> [Documents] -> Device
   
   // Removed scroll detection state - now handled by ScrollFadeIndicator
 
@@ -219,28 +222,6 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   };
 
   // Scroll handling now managed by ScrollFadeIndicator component
-
-  // Browser back navigation handling
-  useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      event.preventDefault();
-      if (currentPage > 1) {
-        setCurrentPage(prev => prev - 1);
-        window.history.pushState(null, '', window.location.pathname);
-      } else {
-        // If on first page, allow navigation to dashboard
-        router.push('/dashboard');
-      }
-    };
-
-    // Push initial state to prevent going back to dashboard immediately
-    window.history.pushState(null, '', window.location.pathname);
-    window.addEventListener('popstate', handlePopState);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [currentPage, router]);
 
   // Data is now loaded via SWR hooks - no manual fetching needed
 
@@ -283,11 +264,19 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
         console.log("✅ Created custom profile:", result.profile.alias);
         
         // Directly proceed to interview with the new profile ID
-        onStartInterview({
-          caseId: selectedCase,
-          interviewerProfileId: result.profile.id, // Use the new profile ID directly
-          sessionId: undefined
-        });
+        if (requiresDocuments) {
+          setCurrentPage(4);
+          const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          setDocumentSessionId(sessionId);
+          setShowDocumentUpload(true);
+        } else {
+          // Directly call onStartInterview with the new profile ID
+          onStartInterview({
+            caseId: selectedCase,
+            interviewerProfileId: result.profile.id, // Use the new profile ID directly
+            sessionId: undefined
+          });
+        }
       } else {
         alert(`Failed to create profile: ${result.error}`);
       }
@@ -396,15 +385,34 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   const hasActiveFilters = searchQuery || typeFilter !== "all" || difficultyFilter !== "all" || industryFilter !== "all" || formatFilter !== "all";
   const hasActiveProfileFilters = profileTypeFilter !== "all";
 
-  // Navigation functions - simplified for 3-step process
+  // Navigation functions
   const goToNextPage = () => {
     if (currentPage === 1 && selectedCase) {
       setCurrentPage(2);
     } else if (currentPage === 2 && selectedProfile) {
-      // Skip documents and go directly to interview
-      proceedToInterview();
+      if (requiresDocuments) {
+        // Go to documents page (step 4)
+        setCurrentPage(4);
+        // Generate session ID for document upload
+        const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        setDocumentSessionId(sessionId);
+        setShowDocumentUpload(true);
+      } else {
+        // Skip documents, go directly to device setup or start interview
+        proceedToInterview();
+      }
     } else if (currentPage === 3) {
-      // Device setup or final step
+      // From custom profile creation, should not reach here as it handles its own navigation
+      if (requiresDocuments) {
+        setCurrentPage(4);
+        const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        setDocumentSessionId(sessionId);
+        setShowDocumentUpload(true);
+      } else {
+        proceedToInterview();
+      }
+    } else if (currentPage === 4) {
+      // From documents to device setup or interview
       proceedToInterview();
     }
   };
@@ -417,6 +425,9 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
   const goToPreviousPage = () => {
     if (currentPage > 1) {
+      if (currentPage === 4) {
+        setShowDocumentUpload(false);
+      }
       setCurrentPage(currentPage - 1);
     }
   };
@@ -427,13 +438,15 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     console.log("🚀 Proceeding to interview with configuration:", {
       caseId: selectedCase,
       interviewerProfileId: selectedProfile,
-      profileAlias: selectedProfileData?.alias
+      profileAlias: selectedProfileData?.alias,
+      sessionId: documentSessionId,
+      hasDocuments: requiresDocuments
     });
     
-    onStartInterview({
-      caseId: selectedCase,
+        onStartInterview({
+          caseId: selectedCase,
       interviewerProfileId: selectedProfile,
-      sessionId: undefined
+      sessionId: requiresDocuments ? documentSessionId : undefined
     });
   };
 
@@ -463,7 +476,21 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentPage, canProceedFromPage1, canProceedFromPage2]);
 
-
+  // Handle document upload completion
+  const handleDocumentUploadComplete = () => {
+    console.log("📋 Documents processed - proceeding to interview", { 
+      documentSessionId,
+      hasDocumentData: !!documentSessionId 
+    });
+    setShowDocumentUpload(false);
+    
+    // Use the same session ID that was used for document processing
+    onStartInterview({
+      caseId: selectedCase,
+      interviewerProfileId: selectedProfile,
+      sessionId: documentSessionId // Pass the session ID that has the document data
+    });
+  };
 
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty?.toLowerCase()) {
@@ -641,7 +668,24 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
     return <InterviewSetupSkeleton />;
   }
 
-
+  // Show document upload screen if case requires documents
+  if (showDocumentUpload && documentSessionId) {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="text-muted-foreground">Loading document upload...</p>
+          </div>
+        </div>
+      }>
+        <DocumentUpload 
+          sessionId={documentSessionId}
+          onContinue={handleDocumentUploadComplete}
+        />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-hidden flex flex-col">
@@ -824,11 +868,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                               ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
                               : "hover:border-blue-200"
                           )}
-                          onClick={() => {
-                            setSelectedCase(case_.id);
-                            // Auto-advance to next step after selection
-                            setTimeout(() => setCurrentPage(2), 300);
-                          }}
+                          onClick={() => setSelectedCase(case_.id)}
                         >
                           <CardContent className="p-6 h-full flex flex-col">
                             {/* Header: Icon + Title */}
@@ -953,7 +993,23 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               </div>
             )}
 
-            {/* Removed floating continue button - cards auto-advance */}
+            {/* Floating Action Button - Continue */}
+            {selectedCase && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="fixed bottom-8 right-8 z-50"
+              >
+                <Button
+                  size="lg"
+                  onClick={goToNextPage}
+                  className="rounded-full h-14 px-6 bg-blue-600 hover:bg-blue-700 shadow-lg"
+                >
+                  Continue
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </motion.div>
+            )}
 
           </motion.div>
         )}
@@ -1101,19 +1157,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             : "hover:border-blue-200"
                         )}
                         onClick={() => {
-                          const newSelection = selectedProfile === profile.id ? "" : profile.id;
-                          setSelectedProfile(newSelection);
-                          // Auto-advance to next step after selection (only if selecting, not deselecting)
-                          if (newSelection) {
-                            setTimeout(() => {
-                              // Skip document upload and go directly to interview
-                              onStartInterview({
-                                caseId: selectedCase,
-                                interviewerProfileId: newSelection,
-                                sessionId: undefined
-                              });
-                            }, 300);
-                          }
+                          setSelectedProfile(prev => (prev === profile.id ? "" : profile.id));
                         }}
                       >
                         <CardContent className="p-6">
@@ -1718,7 +1762,23 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 >
                   Back
                 </Button>
-                {!selectedProfile && (
+                {selectedProfile ? (
+                  <Button
+                    onClick={() => {
+                      if (requiresDocuments) {
+                        setCurrentPage(4);
+                        const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                        setDocumentSessionId(sessionId);
+                        setShowDocumentUpload(true);
+                      } else {
+                        proceedToInterview();
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Continue with Selected Profile
+                  </Button>
+                ) : (
                   <Button
                     onClick={createCustomProfile}
                     disabled={!customProfileName || !customProfileAlias || !customCompanyId || !customSeniorityId || !customDifficultyId}
