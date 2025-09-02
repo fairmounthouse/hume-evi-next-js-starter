@@ -6,18 +6,23 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit') || '10');
     
-    // Fetch sessions with new combined profile system
+    // Fetch sessions with new combined profile system (use consolidated interviewer_profiles_view)
     const { data: sessions, error } = await supabase
       .from('interview_sessions')
       .select(`
         *,
         interview_cases(title, type, industry, difficulty),
-        interviewer_profiles_new!new_interviewer_profile_id(
+        interviewer_profiles_view:new_interviewer_profile_id (
           alias,
           name,
-          difficulty_profiles!difficulty_profile_id(display_name, level),
-          seniority_profiles!seniority_profile_id(display_name, level),
-          company_profiles!company_profile_id(display_name, name)
+          company_display_name,
+          company_name,
+          seniority_display_name,
+          difficulty_display_name,
+          difficulty_level,
+          company_prompt_content,
+          seniority_prompt_content,
+          difficulty_prompt_content
         )
       `)
       .eq('status', 'completed')
@@ -47,12 +52,12 @@ export async function GET(request: NextRequest) {
         case_industry: session.interview_cases?.industry || 'Unknown',
         case_difficulty: session.interview_cases?.difficulty || 'Unknown',
         
-        interviewer_alias: session.interviewer_profiles_new?.alias || 'Unknown Profile',
-        interviewer_company: session.interviewer_profiles_new?.company_profiles?.display_name || 'Unknown Company',
-        interviewer_seniority: session.interviewer_profiles_new?.seniority_profiles?.display_name || 'Unknown Seniority',
+        interviewer_alias: session.interviewer_profiles_view?.alias || 'Unknown Profile',
+        interviewer_company: session.interviewer_profiles_view?.company_display_name || 'Unknown Company',
+        interviewer_seniority: session.interviewer_profiles_view?.seniority_display_name || 'Unknown Seniority',
         
-        difficulty_level: session.interviewer_profiles_new?.difficulty_profiles?.display_name || 'Unknown',
-        difficulty_code: session.interviewer_profiles_new?.difficulty_profiles?.level || 'unknown',
+        difficulty_level: session.interviewer_profiles_view?.difficulty_display_name || 'Unknown',
+        difficulty_code: session.interviewer_profiles_view?.difficulty_level || 'unknown',
         
         // Use MBB overall_score (5-point scale)
         overall_score: session.overall_score,

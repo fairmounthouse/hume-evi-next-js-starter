@@ -40,6 +40,25 @@ interface CombinedInterviewerProfile {
   company_profiles: Profile;
 }
 
+// Shape returned by /api/profiles/interviewer (rows from interviewer_profiles_view)
+interface InterviewerProfilesViewRow {
+  id: string;
+  alias: string;
+  name: string;
+  user_id?: string | null;
+  active?: boolean;
+  company_display_name?: string;
+  company_name?: string;
+  company_description?: string | null;
+  seniority_display_name?: string;
+  senority_description?: string | null; // Note: field name as provided by the view
+  difficulty_display_name?: string;
+  difficulty_level?: string;
+  company_prompt_content?: string | null;
+  seniority_prompt_content?: string | null;
+  difficulty_prompt_content?: string | null;
+}
+
 export function useInterviewSetupData() {
   // Fetch cases from Supabase directly (this could be moved to API route for consistency)
   const { data: casesData, error: casesError } = useSWR(
@@ -114,10 +133,59 @@ export function useInterviewSetupData() {
   const hasError = casesError || combinedProfilesError || companyProfilesError || 
                    seniorityProfilesError || difficultyProfilesError;
 
+  // Normalize combined profiles into the nested shape expected by the UI
+  const rawCombined: InterviewerProfilesViewRow[] = (combinedProfilesData?.success ? (combinedProfilesData.profiles as unknown as InterviewerProfilesViewRow[]) : []) || [];
+
+  const normalizedCombinedProfiles: CombinedInterviewerProfile[] = rawCombined.map((row) => {
+    const companyMatch = (companyProfilesData?.success ? companyProfilesData.profiles : []).find((c) =>
+      c.display_name === row.company_display_name || (c.name || '') === (row.company_name || '')
+    );
+
+    const seniorityMatch = (seniorityProfilesData?.success ? seniorityProfilesData.profiles : []).find((s) =>
+      s.display_name === row.seniority_display_name || (s.level || '') === (row.seniority_display_name || '')
+    );
+
+    const difficultyMatch = (difficultyProfilesData?.success ? difficultyProfilesData.profiles : []).find((d) =>
+      d.display_name === row.difficulty_display_name || (d.level || '') === (row.difficulty_level || '')
+    );
+
+    const company_profiles: Profile = {
+      id: companyMatch?.id || '',
+      display_name: row.company_display_name || companyMatch?.display_name || '',
+      name: companyMatch?.name || row.company_name,
+      level: companyMatch?.level || '',
+      description: companyMatch?.description || row.company_description || undefined,
+    };
+
+    const seniority_profiles: Profile = {
+      id: seniorityMatch?.id || '',
+      display_name: row.seniority_display_name || seniorityMatch?.display_name || '',
+      level: seniorityMatch?.level || '',
+      description: seniorityMatch?.description || row.senority_description || undefined,
+    };
+
+    const difficulty_profiles: Profile = {
+      id: difficultyMatch?.id || '',
+      display_name: row.difficulty_display_name || difficultyMatch?.display_name || '',
+      level: row.difficulty_level || difficultyMatch?.level || '',
+      description: difficultyMatch?.description || undefined,
+    };
+
+    return {
+      id: row.id,
+      alias: row.alias,
+      name: row.name,
+      user_id: row.user_id,
+      difficulty_profiles,
+      seniority_profiles,
+      company_profiles,
+    };
+  });
+
   return {
     // Data
     cases: (casesData as InterviewCase[]) || [],
-    combinedProfiles: combinedProfilesData?.success ? combinedProfilesData.profiles : [],
+    combinedProfiles: normalizedCombinedProfiles,
     companyProfiles: companyProfilesData?.success ? companyProfilesData.profiles : [],
     seniorityProfiles: seniorityProfilesData?.success ? seniorityProfilesData.profiles : [],
     difficultyProfiles: difficultyProfilesData?.success ? difficultyProfilesData.profiles : [],

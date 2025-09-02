@@ -6,17 +6,23 @@ export async function GET(request: NextRequest) {
   try {
     const { userId } = await auth();
     
-    // Fetch interviewer profiles (default + user's custom profiles)
+    // Fetch interviewer profiles (default + user's custom profiles) from the consolidated view
     let query = supabase
-      .from('interviewer_profiles_new')
+      .from('interviewer_profiles_view')
       .select(`
         id,
         alias,
         name,
         user_id,
-        difficulty_profiles!difficulty_profile_id(id, display_name, level),
-        seniority_profiles!seniority_profile_id(id, display_name, level),
-        company_profiles!company_profile_id(id, display_name, name)
+        active,
+        company_display_name,
+        company_name,
+        seniority_display_name,
+        difficulty_display_name,
+        difficulty_level,
+        company_prompt_content,
+        seniority_prompt_content,
+        difficulty_prompt_content
       `)
       .eq('active', true);
 
