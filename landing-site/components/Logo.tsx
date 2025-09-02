@@ -1,20 +1,21 @@
+import Image from 'next/image'
+import blackLogo from '../../BRANDING/LOGO/[SF] LOGO BLACK.png'
+
 interface LogoProps {
   width?: number
   height?: number
   className?: string
 }
 
-export default function Logo({ width = 40, height = 80, className = "" }: LogoProps) {
+export default function Logo({ width = 160, height = 40, className = "" }: LogoProps) {
   return (
-    <svg 
-      width={width} 
-      height={height} 
-      xmlns="http://www.w3.org/2000/svg"
+    <Image
+      src={blackLogo}
+      alt="Logo"
+      width={width}
+      height={height}
       className={className}
-      viewBox="0 0 100 200"
-    >
-      <circle cx="50" cy="50" r="30" fill="#FFE234"/>
-      <circle cx="50" cy="130" r="30" fill="#FFE234"/>
-    </svg>
+      priority
+    />
   )
 }

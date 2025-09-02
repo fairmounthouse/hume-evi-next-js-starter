@@ -38,8 +38,8 @@ export const Nav = () => {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Don't show nav on landing page since it has its own navigation
-  if (pathname === "/") {
+  // Don't show nav on landing page or billing page (pricing) since they have their own navigation
+  if (pathname === "/" || pathname.startsWith("/pricing")) {
     return null;
   }
 

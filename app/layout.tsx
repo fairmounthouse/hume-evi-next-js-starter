@@ -11,8 +11,8 @@ import {
 } from "@clerk/nextjs";
 
 export const metadata: Metadata = {
-  title: "Hume AI - EVI - Next.js Starter",
-  description: "A Next.js starter using Hume AI's Empathic Voice Interface",
+  title: "Skillflo.AI",
+  description: "AI Powered Interviewing",
 };
 
 export default function RootLayout({

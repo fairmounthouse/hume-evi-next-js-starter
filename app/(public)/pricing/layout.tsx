@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { cn } from '@/utils';
+import Image from 'next/image';
+import blackLogo from '@/BRANDING/LOGO/[SF] LOGO BLACK.png';
 
 const navigation = [
   { 
@@ -64,10 +66,8 @@ function Sidebar({ className }: { className?: string }) {
       {/* Logo */}
       <div className="flex h-14 items-center px-6 border-b">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <MessageSquare className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold text-lg">Interview AI</span>
+          <Image src={blackLogo} alt="Logo" width={120} height={24} style={{ height: 24, width: 'auto' }} />
+          <span className="font-semibold text-lg">skillflo</span>
         </div>
       </div>
       
@@ -145,10 +145,8 @@ export default function PricingLayout({
             </Sheet>
             
             <div className="flex items-center gap-2">
-              <div className="h-6 w-6 rounded bg-primary flex items-center justify-center">
-                <MessageSquare className="h-3 w-3 text-primary-foreground" />
-              </div>
-              <span className="font-semibold">Interview AI</span>
+              <Image src={blackLogo} alt="Logo" width={100} height={20} style={{ height: 20, width: 'auto' }} />
+              <span className="font-semibold">skillflo</span>
             </div>
             
             <UserButton afterSignOutUrl="/" />
