@@ -1189,9 +1189,9 @@ export default function InterviewEndScreen({
                               
                               {/* Messages in this group - CLICKABLE like sessions page */}
                               {group.entries.map((entry: any, entryIndex: number) => {
-                                const timestamp = entry.timestamp ? 
+                                const timestamp = entry.timestamp !== undefined ? 
                                   `${Math.floor(entry.timestamp / 60).toString().padStart(2, '0')}:${(entry.timestamp % 60).toString().padStart(2, '0')}` : 
-                                  '';
+                                  '00:00';
                                 
                                 // Calculate absolute index in the transcript
                                 const absoluteIndex = group.startIndex + entryIndex;
@@ -1233,10 +1233,10 @@ export default function InterviewEndScreen({
                                         }
                                       }
                                     }}
-                                    title={entry.timestamp ? `Click to jump to ${timestamp}` : 'Timestamp not available'}
+                                    title={entry.timestamp !== undefined ? `Click to jump to ${timestamp}` : 'Timestamp not available'}
                                   >
-                                    <div className={`text-xs mb-1 font-mono ${entry.timestamp ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500'}`}>
-                                      {timestamp} {entry.timestamp && '🎬'}
+                                    <div className={`text-xs mb-1 font-mono ${entry.timestamp !== undefined ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500'}`}>
+                                      {timestamp} {entry.timestamp !== undefined && '🎬'}
                                     </div>
                                     <p className="text-sm text-gray-800 leading-relaxed">{entry.text}</p>
                                   </div>

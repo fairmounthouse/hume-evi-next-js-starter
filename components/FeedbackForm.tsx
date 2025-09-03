@@ -178,8 +178,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmit, onPartia
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {currentQ.question}
           </h3>
-          {currentQ.subtitle && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2 mb-3">{currentQ.subtitle}</p>
+          {(currentQ as any).subtitle && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2 mb-3">{(currentQ as any).subtitle}</p>
           )}
 
           {/* NPS Scale - Supports 0-10 */}

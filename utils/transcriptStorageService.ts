@@ -204,7 +204,7 @@ export class TranscriptStorageService {
       
       console.log(`✅ [STORAGE] Successfully backed up ${entries.length} entries to server`);
     } catch (e) {
-      console.warn('⚠️ [STORAGE] Failed to backup to Supabase, continuing with localStorage:', e.message || e);
+      console.warn('⚠️ [STORAGE] Failed to backup to Supabase, continuing with localStorage:', e instanceof Error ? e.message : e);
       // Don't throw - localStorage is primary backup
     }
   }

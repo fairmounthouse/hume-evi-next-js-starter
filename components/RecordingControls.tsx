@@ -314,14 +314,22 @@ export default function RecordingControls({
       mixDestinationRef.current = null;
     };
 
-    const blob = await stopRecording();
+    let blob = await stopRecording();
     startedAtMsRef.current = null;
 
-    console.log("📦 Recording blob:", blob ? `${blob.size} bytes, type: ${blob.type}` : "null");
+    console.log("📦 Recording blob (first attempt):", blob ? `${blob.size} bytes, type: ${blob.type}` : "null");
+    
+    // If no blob initially, wait a bit and try again (recording might need time to finalize)
+    if (!blob) {
+      console.log("⏳ No recording data on first attempt, waiting 2 seconds and retrying...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      blob = await stopRecording();
+      console.log("📦 Recording blob (second attempt):", blob ? `${blob.size} bytes, type: ${blob.type}` : "null");
+    }
     
     if (!blob) {
-      console.error("❌ No recording data available");
-      toast.error("No recording data available");
+      console.error("❌ No recording data available after retry");
+      toast.error("No recording data available - the recording may have been too short");
       cleanupAudio();
       return;
     }

@@ -147,7 +147,7 @@ export class GlobalTranscriptManager {
           }
         }
         
-        const entry: TranscriptEntry = {
+        const entry: TranscriptEntry & { [key: string]: any } = {
           id: msg.__stableId || generateStableId(msg, actualTimestamp),
           speaker: msg.type === "user_message" ? "user" : "assistant",
           text: msg.message.content,

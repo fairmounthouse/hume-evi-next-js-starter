@@ -170,6 +170,7 @@ export function useRecording(options: RecordingOptions = {}): UseRecordingReturn
         // Small timeout to ensure the final dataavailable has fired
         setTimeout(() => {
           if (chunksRef.current.length === 0) {
+            console.warn("⚠️ [RECORDING] No chunks available after stop - recording may have been too short");
             resolve(null);
             return;
           }

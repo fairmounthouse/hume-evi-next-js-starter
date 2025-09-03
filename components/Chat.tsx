@@ -244,6 +244,10 @@ function ChatInterface({
   const [firstSurveyCompletedAt, setFirstSurveyCompletedAt] = useState<number | null>(null);
   const [analysisCompletedAt, setAnalysisCompletedAt] = useState<number | null>(null);
   
+  // Track MBB analysis completion
+  const [mbbReportCompleted, setMbbReportCompleted] = useState(false);
+  const [mbbAssessmentCompleted, setMbbAssessmentCompleted] = useState(false);
+  
   // Exhibit Manager state
   const [exhibitManagerState, setExhibitManagerState] = useState<ExhibitManagerState>({
     isActive: false,
@@ -325,50 +329,70 @@ function ChatInterface({
   // Build transcript from messages for evaluation - ENHANCED for complete preservation
   // 
   // CRITICAL: This function builds the MASTER TRANSCRIPT that is NEVER truncated.
-  // Build LIVE transcript including interim messages for drawer display
+  // Build LIVE transcript with interim text updates (no box insertion/removal)
   const buildLiveTranscriptFromMessages = (messages: any[]): any[] => {
-    console.log("📋 [LIVE TRANSCRIPT] Building live transcript from", messages.length, "total messages (includes interim for UI)");
+    console.log("📋 [LIVE TRANSCRIPT] Building live transcript from", messages.length, "total messages");
     
-    // Filter for actual conversation messages with content - INCLUDE INTERIM MESSAGES FOR LIVE UI
-    const conversationMessages = messages.filter(msg => {
-      // Safety checks for message structure
-      if (!msg || typeof msg !== 'object') {
-        return false;
-      }
-
-      const hasContent = msg.message?.content && 
-                        typeof msg.message.content === 'string' && 
-                        msg.message.content.trim().length > 0;
+    // Group messages by speaker and approximate timestamp to merge interim/final
+    const messageGroups: { [key: string]: any[] } = {};
+    
+    messages.forEach(msg => {
+      if (!msg || !msg.message?.content) return;
+      
+      const hasContent = msg.message.content.trim().length > 0;
       const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
-      const isInterim = (msg as any).interim === true;
       
-      // Include interim messages for live UI display
-      if (isInterim && isConversation && hasContent) {
-        console.log("📝 [LIVE TRANSCRIPT] Including interim message for live UI:", msg.type, msg.message?.content?.substring(0, 30) + "...");
-        return true;
-      }
+      if (!isConversation || !hasContent) return;
       
-      return isConversation && hasContent;
-    });
-    
-    // Build transcript entries with interim flag for UI styling
-    const transcript = conversationMessages.map((msg, index) => {
       const absoluteTimestamp = msg.receivedAt?.getTime() || Date.now();
       const relativeSeconds = getRelativeTime(absoluteTimestamp);
       const isInterim = (msg as any).interim === true;
       
-      // For user messages, handle interim timestamp logic
-      let actualTimestamp = relativeSeconds;
-      let startSpeakingTimestamp = relativeSeconds;
+      // Create a group key based on speaker and rough timestamp (to group interim/final together)
+      const groupKey = `${msg.type}-${Math.floor(relativeSeconds / 2)}`; // Group within 2-second windows
       
-      if (msg.type === "user_message" && msg.message?.content) {
-        if (isInterim) {
+      if (!messageGroups[groupKey]) {
+        messageGroups[groupKey] = [];
+      }
+      
+      messageGroups[groupKey].push({
+        ...msg,
+        relativeSeconds,
+        absoluteTimestamp,
+        isInterim
+      });
+    });
+    
+    // Process each group to get the latest message (interim or final)
+    const transcript: any[] = [];
+    
+    Object.values(messageGroups).forEach(group => {
+      if (group.length === 0) return;
+      
+      // Sort by timestamp, final messages come after interim
+      group.sort((a, b) => {
+        if (a.absoluteTimestamp !== b.absoluteTimestamp) {
+          return a.absoluteTimestamp - b.absoluteTimestamp;
+        }
+        // If same timestamp, final comes after interim
+        return a.isInterim ? -1 : 1;
+      });
+      
+      // Use the latest message (final if available, otherwise interim)
+      const latestMsg = group[group.length - 1];
+      
+      // Handle interim timestamp logic for user messages
+      let actualTimestamp = latestMsg.relativeSeconds;
+      let startSpeakingTimestamp = latestMsg.relativeSeconds;
+      
+      if (latestMsg.type === "user_message") {
+        if (latestMsg.isInterim) {
           // For interim messages, use current timestamp
-          actualTimestamp = relativeSeconds;
+          actualTimestamp = latestMsg.relativeSeconds;
         } else {
           // For final messages, check for cached first interim
           const interimCache = getInterimCache(sessionId);
-          const cachedFirst = interimCache[absoluteTimestamp];
+          const cachedFirst = interimCache[latestMsg.absoluteTimestamp];
           
           if (typeof cachedFirst === 'number') {
             startSpeakingTimestamp = cachedFirst;
@@ -378,23 +402,22 @@ function ChatInterface({
       }
       
       const entry = {
-        id: generateStableId(msg, actualTimestamp),
-        speaker: msg.type === "user_message" ? "user" : "assistant",
-        text: msg.message?.content || "",
+        id: generateStableId(latestMsg, actualTimestamp),
+        speaker: latestMsg.type === "user_message" ? "user" : "assistant",
+        text: latestMsg.message?.content || "",
         timestamp: actualTimestamp,
         startSpeakingTimestamp,
-        emotions: msg.models?.prosody?.scores || undefined,
-        confidence: msg.models?.language?.confidence || undefined,
-        isInterim, // Keep interim flag for UI styling
-        _originalType: msg.type,
-        _originalTimestamp: msg.receivedAt?.toISOString(),
-        _absoluteTimestamp: Math.floor(absoluteTimestamp / 1000),
-        _messageIndex: index,
-        _finalTimestamp: relativeSeconds,
-        _receivedAt: msg.receivedAt,
+        emotions: latestMsg.models?.prosody?.scores || undefined,
+        confidence: latestMsg.models?.language?.confidence || undefined,
+        isInterim: latestMsg.isInterim, // Keep interim flag for subtle styling
+        _originalType: latestMsg.type,
+        _originalTimestamp: latestMsg.receivedAt?.toISOString(),
+        _absoluteTimestamp: Math.floor(latestMsg.absoluteTimestamp / 1000),
+        _finalTimestamp: latestMsg.relativeSeconds,
+        _receivedAt: latestMsg.receivedAt,
       };
       
-      return entry;
+      transcript.push(entry);
     });
     
     // Sort by timestamp
@@ -402,7 +425,7 @@ function ChatInterface({
     
     console.log("📋 [LIVE TRANSCRIPT] Live transcript build complete:", {
       totalMessages: messages.length,
-      conversationMessages: conversationMessages.length,
+      messageGroups: Object.keys(messageGroups).length,
       transcriptEntries: transcript.length,
       interimEntries: transcript.filter(e => e.isInterim).length,
       finalEntries: transcript.filter(e => !e.isInterim).length,
@@ -866,14 +889,26 @@ function ChatInterface({
           
           // Use sendBeacon for guaranteed server delivery
           if (navigator.sendBeacon) {
-            const blob = new Blob([JSON.stringify({
+            const transcriptBlob = new Blob([JSON.stringify({
               sessionId,
               entries: transcript,
               timestamp: Date.now(),
               reason: 'page_unload'
             })], {type: 'application/json'});
             
-            navigator.sendBeacon('/api/transcript/emergency-save', blob);
+            navigator.sendBeacon('/api/transcript/emergency-save', transcriptBlob);
+            
+            // Also end the session in the database with duration
+            const sessionDuration = transcript.length > 0 ? 
+              Math.max(...transcript.map(e => e.timestamp)) : 0;
+            
+            const sessionBlob = new Blob([JSON.stringify({
+              sessionId,
+              duration: sessionDuration,
+              reason: 'page_unload'
+            })], {type: 'application/json'});
+            
+            navigator.sendBeacon('/api/sessions/emergency-end', sessionBlob);
           }
           
           console.log(`🚨 [PAGE UNLOAD] Emergency save completed for ${transcript.length} entries`);
@@ -899,6 +934,20 @@ function ChatInterface({
             reason: 'pagehide'
           };
           sessionStorage.setItem(`emergency_hide_${sessionId}`, JSON.stringify(emergencyData));
+          
+          // Also try to end the session
+          const sessionDuration = transcript.length > 0 ? 
+            Math.max(...transcript.map(e => e.timestamp)) : 0;
+          
+          if (navigator.sendBeacon) {
+            const sessionBlob = new Blob([JSON.stringify({
+              sessionId,
+              duration: sessionDuration,
+              reason: 'page_hide'
+            })], {type: 'application/json'});
+            
+            navigator.sendBeacon('/api/sessions/emergency-end', sessionBlob);
+          }
         } catch (error) {
           console.error('🚨 [PAGE HIDE] Emergency save failed:', error);
         }
@@ -1048,6 +1097,15 @@ function ChatInterface({
   
     // Note: Detailed analysis is now called immediately on interview end
     // No need for useEffect since we start it right away
+
+  // Set analysisCompletedAt when both MBB analyses are complete
+  useEffect(() => {
+    if (mbbReportCompleted && mbbAssessmentCompleted && !analysisCompletedAt) {
+      const completionTime = Date.now();
+      setAnalysisCompletedAt(completionTime);
+      console.log("📊 [ANALYSIS] Both MBB analyses completed at:", new Date(completionTime).toISOString());
+    }
+  }, [mbbReportCompleted, mbbAssessmentCompleted, analysisCompletedAt]);
 
   // Smart timing: Show analysis feedback 1 minute after BOTH survey completion AND analysis completion
   useEffect(() => {
@@ -1417,11 +1475,19 @@ function ChatInterface({
             
             // Trigger custom event to notify InterviewEndScreen
             window.dispatchEvent(new CustomEvent('mbb-report-ready', { detail: { sessionId, data: mbbReport } }));
+            
+            // Mark MBB report as completed for feedback form timing
+            setMbbReportCompleted(true);
+            console.log("📊 [ANALYSIS] MBB Report completed successfully");
           } else {
             console.warn("⚠️ [BACKGROUND] MBB Report generation failed");
+            // Still mark as completed even if failed, to avoid blocking feedback form
+            setMbbReportCompleted(true);
           }
         }).catch(error => {
           console.warn("⚠️ [BACKGROUND] MBB Report error:", error);
+          // Mark as completed even on error to avoid blocking feedback form
+          setMbbReportCompleted(true);
         });
 
         // 2. MBB Assessment (Quick Scores)
@@ -1467,11 +1533,19 @@ function ChatInterface({
             
             // Trigger custom event to notify InterviewEndScreen
             window.dispatchEvent(new CustomEvent('mbb-assessment-ready', { detail: { sessionId, data: mbbAssessment } }));
+            
+            // Mark MBB assessment as completed for feedback form timing
+            setMbbAssessmentCompleted(true);
+            console.log("📊 [ANALYSIS] MBB Assessment completed successfully");
           } else {
             console.warn("⚠️ [BACKGROUND] MBB Assessment generation failed");
+            // Still mark as completed even if failed, to avoid blocking feedback form
+            setMbbAssessmentCompleted(true);
           }
         }).catch(error => {
           console.warn("⚠️ [BACKGROUND] MBB Assessment error:", error);
+          // Mark as completed even on error to avoid blocking feedback form
+          setMbbAssessmentCompleted(true);
         });
       }
       

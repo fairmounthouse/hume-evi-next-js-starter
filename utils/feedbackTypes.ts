@@ -6,6 +6,7 @@ export interface TranscriptEntry {
   startSpeakingTimestamp?: number; // For user messages: when they started speaking (from first interim)
   emotions?: any;
   confidence?: number;
+  isInterim?: boolean; // Flag for interim messages (used for UI styling)
 }
 
 export interface InInterviewFeedback {

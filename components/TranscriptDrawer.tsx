@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, FileText, Download, User } from "lucide-react";
 import { Button } from "./ui/button";
@@ -38,6 +38,16 @@ export default function TranscriptDrawer({
   onSeekVideo,
 }: TranscriptDrawerProps) {
   const { formatRelativeTime } = useRecordingAnchor();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Auto-scroll to bottom when drawer opens or transcript updates
+  useEffect(() => {
+    if (isOpen && scrollContainerRef.current) {
+      const container = scrollContainerRef.current;
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [isOpen, transcript]);
+  
   // Close drawer when clicking backdrop
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
@@ -247,7 +257,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
             )}
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-4">
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4">
               {hintsContent && activeTab === "hints" ? (
                 <div className="space-y-3">
                   {hintsContent}
@@ -273,7 +283,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                             entry.speaker === "user" 
                               ? "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 ml-4"
                               : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 mr-4",
-                            entry.isInterim && "opacity-75 border-dashed bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/50"
+                            entry.isInterim && "opacity-80"
                           )}
                         >
                           <div className="flex items-center gap-2 mb-2">
@@ -330,7 +340,6 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                           
                           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                             {entry.text}
-                            {entry.isInterim && <span className="ml-1 text-blue-500 font-mono">●</span>}
                           </p>
                           
                           {entry.confidence && (
