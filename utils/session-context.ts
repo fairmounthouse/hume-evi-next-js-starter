@@ -87,22 +87,42 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
   console.log("📋 Session ID:", sessionId);
   
   // Fetch session data with new combined interviewer profile system
-  const { data, error } = await supabase
-    .from("interview_sessions")
-    .select(
-      `case_id,
-       new_interviewer_profile_id,
-       interviewer_profiles_new!new_interviewer_profile_id(
-         alias,
-         name,
-         difficulty_profiles!difficulty_profile_id(display_name, prompts!prompt_id(prompt_content)),
-         seniority_profiles!seniority_profile_id(display_name, prompts!prompt_id(prompt_content)),
-         company_profiles!company_profile_id(display_name, prompts!prompt_id(prompt_content))
-       ),
-       interview_cases(phases, additional_metadata, exhibits, prompts!prompt_id(prompt_content))`
-    )
-    .eq("session_id", sessionId)
-    .single<RawSessionRow>();
+  // Using raw SQL for more reliable nested data retrieval
+  const { data: rawData, error } = await supabase.rpc('get_session_with_profiles', {
+    session_id_param: sessionId
+  });
+
+  let data: RawSessionRow | null = null;
+  
+  if (rawData && rawData.length > 0) {
+    const row = rawData[0];
+    data = {
+      case_id: row.case_id,
+      new_interviewer_profile_id: row.new_interviewer_profile_id,
+      interviewer_profiles_new: row.alias ? {
+        alias: row.alias,
+        name: row.name,
+        difficulty_profiles: row.diff_display_name ? {
+          display_name: row.diff_display_name,
+          prompt_id: row.diff_prompt_content ? { prompt_content: row.diff_prompt_content } : null
+        } : null,
+        seniority_profiles: row.sen_display_name ? {
+          display_name: row.sen_display_name,
+          prompt_id: row.sen_prompt_content ? { prompt_content: row.sen_prompt_content } : null
+        } : null,
+        company_profiles: row.comp_display_name ? {
+          display_name: row.comp_display_name,
+          prompt_id: row.comp_prompt_content ? { prompt_content: row.comp_prompt_content } : null
+        } : null
+      } : null,
+      interview_cases: row.case_prompt_content ? {
+        phases: row.phases,
+        additional_metadata: row.additional_metadata,
+        exhibits: row.exhibits,
+        prompt_id: { prompt_content: row.case_prompt_content }
+      } : null
+    };
+  }
 
   console.log("📊 Raw session data fetched (new combined profile system):", {
     hasData: !!data,
