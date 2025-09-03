@@ -18,7 +18,7 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Real-Time Coaching (Beta)</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            <strong>Beta</strong>
+            <span className="badge badge-beta">Beta</span>
           </p>
           <p className="text-base text-black opacity-80 italic">
             Want to perfect your pitch in real time? Coach mode guides you step-by-step through cases and behavioral questions, explaining fundamentals at your own pace—ideal for building and refining core skills.
@@ -31,7 +31,7 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Life-like Mock Case Interviews (Beta)</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            <strong>Beta</strong>
+            <span className="badge badge-beta">Beta</span>
           </p>
           <p className="text-base text-black opacity-80 italic">
             Experience realistic MBB-inspired case studies, just like in actual interviews. Choose from multiple difficulty levels, with video and voice support. Our library refreshes regularly with fresh materials for ongoing relevance.
@@ -44,7 +44,7 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Personalized Mock Behavioral Interviews (Beta)</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            <strong>Beta</strong>
+            <span className="badge badge-beta">Beta</span>
           </p>
           <p className="text-base text-black opacity-80 italic">
             Craft and refine your personal story to shine in fit questions. Get tailored practice that helps you articulate experiences effectively and ace behavioral rounds.
@@ -57,7 +57,7 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Actionable Feedback and Reports (Beta)</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            <strong>Beta</strong>
+            <span className="badge badge-beta">Beta</span>
           </p>
           <p className="text-base text-black opacity-80 italic">
             Receive professional-level assessments with targeted insights to improve. Spot habits like filler words or low energy, track progress over time, and get tips to avoid common pitfalls.
@@ -70,7 +70,7 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Personalized Learning Plan (Coming Soon)</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            <strong>Coming Soon</strong>
+            <span className="badge badge-soon">Coming Soon</span>
           </p>
           <p className="text-base text-black opacity-80 italic">
             Build a custom roadmap based on your deadlines and skill level—complete with schedules, goals, and integrated training resources.
@@ -83,7 +83,7 @@ export default function WhatWeOffer() {
           </div>
           <h3 className="text-2xl font-bold mb-4 text-black">Training Materials (Coming Soon)</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
-            <strong>Coming Soon</strong>
+            <span className="badge badge-soon">Coming Soon</span>
           </p>
           <p className="text-base text-black opacity-80 italic">
             Access up-to-date frameworks, drills, exercises, and guides to master case strategies and techniques.

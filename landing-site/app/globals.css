@@ -207,6 +207,27 @@ html {
   transform: rotate(5deg);
 }
 
+/* Badges */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 9999px;
+  border: 2px solid var(--black);
+  font-weight: 700;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.badge-beta {
+  background: var(--yellow-light);
+  color: var(--black);
+}
+
+.badge-soon {
+  background: var(--green-light);
+  color: var(--black);
+}
+
 /* Responsive design */
 @media (max-width: 768px) {
   .section-padding {
