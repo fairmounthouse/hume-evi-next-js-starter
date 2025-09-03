@@ -10,9 +10,9 @@ export default function Hero() {
       <div className="pt-32 md:pt-48 pb-16 md:pb-24 px-4 md:px-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 items-center relative w-full">
         <div className="z-10">
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[0.95] mb-6 md:mb-8 tracking-tight animate-[slideUp_0.8s_ease-out]">
-            Case Coach.<br/>
-            <span className="text-gradient-blue">Job Offers.</span><br/>
-            That Simple.
+            Get Coached.<br/>
+            <span className="text-gradient-blue">Master Interviews.</span><br/>
+            Get Offers.
           </h1>
           
           <p className="text-lg sm:text-xl lg:text-2xl text-black opacity-80 mb-8 md:mb-12 leading-relaxed animate-[slideUp_0.9s_ease-out]">
