@@ -14,58 +14,64 @@ interface FeedbackFormProps {
 const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmit, onPartialSubmit, sessionData }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [formData, setFormData] = useState({
-    npsScore: null as number | null,
-    realisticScore: null as number | null,
-    challenges: '',
-    motivation: '',
-    features: [] as string[],
-    otherFeature: '',
-    followUpInterest: null as string | null
+    // New survey fields
+    satisfactionScore: null as number | null, // 1-5
+    satisfactionFeedback: '', // follow-up
+    improvements: '', // open-ended
+    coachHelpfulnessScore: null as number | null, // 1-5
+    coachHelpfulnessFeedback: '', // follow-up
+    technicalIssues: null as string | null, // 'yes' | 'no'
+    technicalIssuesDescription: '', // open-ended if yes
+    featureRequests: '', // open-ended
+    npsScore: null as number | null, // 0-10
+    npsReason: '', // follow-up
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const questions = [
     {
-      id: 'nps',
-      type: 'nps',
-      question: 'On a scale of 1-10, how likely are you to recommend this AI mock interview tool to a friend preparing for interviews?',
-      required: true
-    },
-    {
-      id: 'realistic',
+      id: 'satisfactionScore',
       type: 'rating',
-      question: 'How realistic did the AI coach feel compared to a real MBB consultant interviewer?',
+      question: 'On a scale of 1-5, how satisfied were you with this mock interview session?',
       options: ['1', '2', '3', '4', '5'],
-      labels: ['Not Realistic', '', '', '', 'Very Realistic'],
+      labels: ['Very Dissatisfied', '', '', '', 'Very Satisfied'],
       required: true
     },
     {
-      id: 'challenges',
+      id: 'improvements',
       type: 'text',
-      question: 'What challenges did you face during the session that we could address in future updates?',
-      placeholder: 'Share any difficulties or areas for improvement...',
+      question: 'What could we improve about the session (e.g., questions, pacing, features)?',
+      placeholder: 'Share any suggestions or areas for improvement...',
       required: false
     },
     {
-      id: 'motivation',
-      type: 'text',
-      question: 'What motivated you to use this tool today, and did it meet your expectations?',
-      placeholder: 'Tell us about your goals and experience...',
-      required: false
+      id: 'coachHelpfulnessScore',
+      type: 'rating',
+      question: 'How helpful and useful was the AI coach?',
+      options: ['1', '2', '3', '4', '5'],
+      labels: ['Not Helpful', '', '', '', 'Very Helpful'],
+      required: true
     },
     {
-      id: 'features',
-      type: 'chips',
-      question: 'What new features would make this tool even better?',
-      subtitle: 'Select up to 3',
-      options: ['More case types', 'Behavioral mocks', 'Video integration', 'Custom plans', 'Other'],
-      required: false
-    },
-    {
-      id: 'followup',
+      id: 'technicalIssues',
       type: 'binary',
-      question: 'Would you be open to a 15-min follow-up call for more feedback in exchange for more mock interview credits?',
+      question: 'Did you encounter any technical issues (e.g., audio, video, loading)?',
+      required: true
+    },
+    {
+      id: 'featureRequests',
+      type: 'text',
+      question: 'What other features and services should Skillflo include to improve your overall interview preparation experience?',
+      placeholder: 'Your ideas and suggestions...',
       required: false
+    },
+    {
+      id: 'npsScore',
+      type: 'nps',
+      question: 'On a scale of 0-10, how likely are you to recommend Skillflo to a peer preparing for interviews?',
+      scaleMin: 0,
+      scaleMax: 10,
+      required: true
     }
   ];
 
@@ -88,9 +94,10 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmit, onPartia
   const canProceed = () => {
     if (!currentQ.required) return true;
     switch (currentQ.id) {
-      case 'nps': return formData.npsScore !== null;
-      case 'realistic': return formData.realisticScore !== null;
-      case 'followup': return formData.followUpInterest !== null;
+      case 'npsScore': return formData.npsScore !== null;
+      case 'satisfactionScore': return formData.satisfactionScore !== null;
+      case 'coachHelpfulnessScore': return formData.coachHelpfulnessScore !== null;
+      case 'technicalIssues': return formData.technicalIssues !== null;
       default: return true;
     }
   };
@@ -175,25 +182,40 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmit, onPartia
             <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2 mb-3">{currentQ.subtitle}</p>
           )}
 
-          {/* NPS Scale - Compact */}
+          {/* NPS Scale - Supports 0-10 */}
           {currentQ.type === 'nps' && (
-            <div className="flex gap-1">
-              {[...Array(10)].map((_, i) => {
-                const score = i + 1;
-                const isSelected = formData.npsScore === score;
-                return (
-                  <button
-                    key={score}
-                    onClick={() => setFormData(prev => ({ ...prev, npsScore: score }))}
-                    className={`flex-1 h-10 rounded text-sm font-medium transition-all
-                      ${isSelected 
-                        ? 'bg-blue-500 text-white' 
-                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
-                  >
-                    {score}
-                  </button>
-                );
-              })}
+            <div>
+              <div className="flex gap-1">
+                {Array.from({ length: ((currentQ as any).scaleMax ?? 10) - ((currentQ as any).scaleMin ?? 0) + 1 }).map((_, i) => {
+                  const min = (currentQ as any).scaleMin ?? 0;
+                  const score = min + i;
+                  const isSelected = formData.npsScore === score;
+                  return (
+                    <button
+                      key={score}
+                      onClick={() => setFormData(prev => ({ ...prev, npsScore: score }))}
+                      className={`flex-1 h-10 rounded text-sm font-medium transition-all
+                        ${isSelected 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
+                    >
+                      {score}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* NPS follow-up */}
+              {formData.npsScore !== null && (
+                <div className="mt-3">
+                  <textarea
+                    value={formData.npsReason}
+                    onChange={(e) => setFormData(prev => ({ ...prev, npsReason: e.target.value }))}
+                    className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    rows={3}
+                    placeholder={"Why that score?"}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -202,11 +224,12 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmit, onPartia
             <div>
               <div className="flex gap-2">
                 {currentQ.options?.map((option, index) => {
-                  const isSelected = formData.realisticScore === index + 1;
+                  const selectedValue = (formData as any)[currentQ.id] as number | null;
+                  const isSelected = selectedValue === index + 1;
                   return (
                     <button
                       key={option}
-                      onClick={() => setFormData(prev => ({ ...prev, realisticScore: index + 1 }))}
+                      onClick={() => setFormData(prev => ({ ...prev, [currentQ.id]: index + 1 }))}
                       className={`flex-1 py-3 px-3 rounded-lg text-sm font-medium transition-all
                         ${isSelected 
                           ? 'bg-blue-500 text-white' 
@@ -221,84 +244,82 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmit, onPartia
                 <span className="text-xs text-gray-500 dark:text-gray-400">{currentQ.labels?.[0]}</span>
                 <span className="text-xs text-gray-500 dark:text-gray-400">{currentQ.labels?.[4]}</span>
               </div>
+
+              {/* Follow-ups for rating questions */}
+              {currentQ.id === 'satisfactionScore' && (formData.satisfactionScore !== null) && (
+                <div className="mt-3">
+                  <textarea
+                    value={formData.satisfactionFeedback}
+                    onChange={(e) => setFormData(prev => ({ ...prev, satisfactionFeedback: e.target.value }))}
+                    className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    rows={3}
+                    placeholder={"What influenced your rating?"}
+                  />
+                </div>
+              )}
+
+              {currentQ.id === 'coachHelpfulnessScore' && (formData.coachHelpfulnessScore !== null) && (
+                <div className="mt-3">
+                  <textarea
+                    value={formData.coachHelpfulnessFeedback}
+                    onChange={(e) => setFormData(prev => ({ ...prev, coachHelpfulnessFeedback: e.target.value }))}
+                    className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    rows={3}
+                    placeholder={"Tell us more about the AI coach's usefulness"}
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* Text Input - Compact */}
           {currentQ.type === 'text' && (
             <textarea
-              value={formData[currentQ.id as keyof typeof formData] as string}
+              value={(formData as any)[currentQ.id] as string}
               onChange={(e) => setFormData(prev => ({ ...prev, [currentQ.id]: e.target.value }))}
               className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
               rows={3}
-              placeholder={currentQ.placeholder}
+              placeholder={(currentQ as any).placeholder}
               autoFocus
             />
           )}
 
-          {/* Feature chips with "Other" text input */}
-          {currentQ.type === 'chips' && (
-            <div>
-              <div className="flex flex-wrap gap-2">
-                {currentQ.options?.map((option) => {
-                  const isSelected = formData.features.includes(option);
-                  const isDisabled = !isSelected && formData.features.length >= 3;
-                  return (
-                    <button
-                      key={option}
-                      onClick={() => {
-                        if (isDisabled) return;
-                        setFormData(prev => ({
-                          ...prev,
-                          features: isSelected
-                            ? prev.features.filter(f => f !== option)
-                            : [...prev.features, option]
-                        }));
-                      }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all
-                        ${isSelected 
-                          ? 'bg-blue-500 text-white' 
-                          : isDisabled
-                          ? 'bg-gray-100 text-gray-400 opacity-50 dark:bg-gray-700 dark:text-gray-500'
-                          : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
-                    >
-                      {option}
-                    </button>
-                  );
-                })}
-              </div>
-              {formData.features.includes('Other') && (
-                <input
-                  type="text"
-                  placeholder="Please specify..."
-                  className="w-full mt-3 p-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                  onChange={(e) => setFormData(prev => ({ ...prev, otherFeature: e.target.value }))}
-                />
-              )}
-            </div>
-          )}
+          {/* Feature chips UI removed in favor of open-ended input per new survey */}
 
-          {/* Binary - Yes/No */}
+          {/* Binary - Yes/No with conditional description */}
           {currentQ.type === 'binary' && (
-            <div className="flex gap-3">
-              <button
-                onClick={() => setFormData(prev => ({ ...prev, followUpInterest: 'yes' }))}
-                className={`flex-1 py-3 rounded-lg font-medium transition-all
-                  ${formData.followUpInterest === 'yes'
-                    ? 'bg-green-500 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
-              >
-                Yes
-              </button>
-              <button
-                onClick={() => setFormData(prev => ({ ...prev, followUpInterest: 'no' }))}
-                className={`flex-1 py-3 rounded-lg font-medium transition-all
-                  ${formData.followUpInterest === 'no'
-                    ? 'bg-gray-500 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
-              >
-                No
-              </button>
+            <div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setFormData(prev => ({ ...prev, [currentQ.id]: 'yes' }))}
+                  className={`flex-1 py-3 rounded-lg font-medium transition-all
+                    ${(formData as any)[currentQ.id] === 'yes'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
+                >
+                  Yes
+                </button>
+                <button
+                  onClick={() => setFormData(prev => ({ ...prev, [currentQ.id]: 'no' }))}
+                  className={`flex-1 py-3 rounded-lg font-medium transition-all
+                    ${ (formData as any)[currentQ.id] === 'no'
+                      ? 'bg-gray-500 text-white'
+                      : 'bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300'}`}
+                >
+                  No
+                </button>
+              </div>
+              {currentQ.id === 'technicalIssues' && formData.technicalIssues === 'yes' && (
+                <div className="mt-3">
+                  <textarea
+                    value={formData.technicalIssuesDescription}
+                    onChange={(e) => setFormData(prev => ({ ...prev, technicalIssuesDescription: e.target.value }))}
+                    className="w-full p-3 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    rows={3}
+                    placeholder={"Please describe the issue(s)"}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>

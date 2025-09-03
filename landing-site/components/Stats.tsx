@@ -20,6 +20,7 @@ export default function Stats() {
   return (
     <section className="py-16 w-full overflow-x-hidden" style={{backgroundColor: '#ffffff'}}>
       <div className="max-w-6xl mx-auto px-8">
+        {/*
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="text-center p-4 bg-green-light border-3 border-black rounded-2xl transition-all duration-300 hover:translate-y-[-5px] hover:rotate-[-2deg] hover:shadow-[5px_5px_0_#000] hover:bg-yellow-primary">
             <span className="text-5xl font-black text-black block">50K+</span>
@@ -38,6 +39,7 @@ export default function Stats() {
             <span className="text-base font-semibold text-black mt-2">Available</span>
           </div>
         </div>
+        */}
 
         <div className="mt-12">
           <h3 className="text-center text-xl md:text-2xl font-semibold tracking-wide text-black mb-6">
