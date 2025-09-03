@@ -805,9 +805,48 @@ function ChatInterface({
       // IMMEDIATELY set end screen to prevent Start Call button from showing
       console.log("🔚 IMMEDIATELY setting showEndScreen=true to prevent UI flicker");
       setShowEndScreen(true);
+      
+      // 🧹 SINGLE POINT MEDIA CLEANUP: Clean up all media streams when interview ends
       try {
+        console.log("🧹 [END SCREEN] Starting comprehensive media cleanup...");
+        
+        // 1. Stop recording via existing system
         window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
-      } catch {}
+        
+        // 2. Clean up video stream
+        const videoStream = videoRef.current?.getStream();
+        if (videoStream) {
+          videoStream.getTracks().forEach((track: MediaStreamTrack) => {
+            console.log("🎥 [END SCREEN] Stopping video track:", track.label);
+            track.stop();
+          });
+        }
+        
+        // 3. Clean up assistant audio bus
+        if (assistantBus) {
+          console.log("🔊 [END SCREEN] Closing assistant audio bus");
+          assistantBus.close();
+        }
+        
+        // 4. Clean up audio context (suspend to free resources)
+        if (audioCtx && audioCtx.state !== 'closed') {
+          console.log("🎵 [END SCREEN] Suspending audio context");
+          audioCtx.suspend();
+        }
+        
+        // 5. Clear any global video functions
+        if ((window as any).__toggleCamera) {
+          delete (window as any).__toggleCamera;
+        }
+        if ((window as any).__isCameraOn) {
+          delete (window as any).__isCameraOn;
+        }
+        
+        console.log("✅ [END SCREEN] Media cleanup completed - browser indicator should disappear");
+      } catch (cleanupError) {
+        console.warn("⚠️ [END SCREEN] Media cleanup had minor issues:", cleanupError);
+      }
+      
       setIsCallActive(false);
       
       // Immediately close exhibit when call ends
@@ -1403,6 +1442,33 @@ function ChatInterface({
       console.log("🔚 [END] Current finalVideoUrl:", finalVideoUrl);
       setIsCallActive(false); // Ensure it's set (may already be set)
       setForceShowRecording(false);
+      
+      // 🧹 SINGLE POINT MEDIA CLEANUP: Ensure cleanup happens here too (backup location)
+      if (!showEndScreen) { // Only if not already cleaned up
+        try {
+          console.log("🧹 [END BACKUP] Additional media cleanup check...");
+          
+          // Clean up video stream if still active
+          const videoStream = videoRef.current?.getStream();
+          if (videoStream && videoStream.getTracks().some((track: MediaStreamTrack) => track.readyState === 'live')) {
+            videoStream.getTracks().forEach((track: MediaStreamTrack) => {
+              console.log("🎥 [END BACKUP] Stopping remaining video track:", track.label);
+              track.stop();
+            });
+          }
+          
+          // Suspend audio context if still running
+          if (audioCtx && audioCtx.state === 'running') {
+            console.log("🎵 [END BACKUP] Suspending audio context");
+            audioCtx.suspend();
+          }
+          
+          console.log("✅ [END BACKUP] Additional cleanup completed");
+        } catch (cleanupError) {
+          console.warn("⚠️ [END BACKUP] Cleanup had minor issues:", cleanupError);
+        }
+      }
+      
       setShowEndScreen(true); // Ensure it's set (may already be set)
       try {
         window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
