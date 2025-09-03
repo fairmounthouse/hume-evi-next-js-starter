@@ -1203,7 +1203,7 @@ export default function InterviewEndScreen({
                                     key={group.startIndex + entryIndex} 
                                     className={`p-3 rounded-lg cursor-pointer transition-all hover:shadow-sm ${isUser ? 'bg-blue-50 border-l-2 border-blue-300 hover:bg-blue-100' : 'bg-gray-50 border-l-2 border-gray-300 hover:bg-gray-100'}`}
                                     onClick={() => {
-                                      if (entry.timestamp && finalVideoUrl && videoPlayerRef.current) {
+                                      if (entry.timestamp !== undefined && finalVideoUrl && videoPlayerRef.current) {
                                         const originalTimestamp = entry.timestamp;
                                         
                                         // Same buffer logic as sessions page: First = no buffer, User = -2s, AI = +2s

@@ -992,7 +992,7 @@ export default function SessionViewerPage() {
                                     key={group.startIndex + entryIndex} 
                                     className={`p-3 rounded-lg cursor-pointer transition-all hover:shadow-sm ${isUser ? 'bg-blue-50 border-l-2 border-blue-300 hover:bg-blue-100' : 'bg-gray-50 border-l-2 border-gray-300 hover:bg-gray-100'}`}
                                     onClick={() => {
-                                      if (entry.timestamp && videoUrl && videoPlayerRef.current) {
+                                      if (entry.timestamp !== undefined && videoUrl && videoPlayerRef.current) {
                                         const originalTimestamp = entry.timestamp;
                                         const isUserMessage = entry.speaker === 'user';
                                         

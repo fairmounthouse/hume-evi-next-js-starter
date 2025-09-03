@@ -92,7 +92,7 @@ const Messages = forwardRef<
                     >
                       {(() => {
                         const relativeSeconds = getRelativeTime(displayTimestamp);
-                        const formatted = formatRelativeTime(relativeSeconds);
+                        const formatted = formatRelativeTime(relativeSeconds || 0);
                         
                         // Debug logging for first few messages
                         if (index < 3) {
@@ -105,7 +105,8 @@ const Messages = forwardRef<
                           });
                         }
                         
-                        return formatted;
+                        // Ensure we always return a properly formatted timestamp
+                        return formatted || "00:00";
                       })()}
                     </div>
                   </div>
