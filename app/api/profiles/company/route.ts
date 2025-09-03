@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     // Fetch all active company profiles with prompt content
     const { data: companyProfiles, error } = await supabase
       .from('company_profiles')
-      .select('id, name, display_name, description, prompt_id(prompt_content)')
+      .select('id, name, display_name, description, prompts!prompt_id(prompt_content)')
       .eq('active', true)
       .order('display_name');
 

@@ -6,7 +6,7 @@ export async function GET(request: NextRequest) {
     // Fetch all active difficulty profiles with prompt content
     const { data: difficultyProfiles, error } = await supabase
       .from('difficulty_profiles')
-      .select('id, level, display_name, description, prompt_id(prompt_content)')
+      .select('id, level, display_name, description, prompts!prompt_id(prompt_content)')
       .eq('active', true)
       .order('display_name');
 

@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       .select(`
         *,
         interview_cases(title, type, industry, difficulty),
-        interviewer_profiles_view:new_interviewer_profile_id (
+        interviewer_profiles_view!new_interviewer_profile_id (
           alias,
           name,
           company_display_name,

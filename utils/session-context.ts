@@ -95,11 +95,11 @@ export async function initializeSessionSettings(sessionId: string): Promise<void
        interviewer_profiles_new!new_interviewer_profile_id(
          alias,
          name,
-         difficulty_profiles!difficulty_profile_id(display_name, prompt_id(prompt_content)),
-         seniority_profiles!seniority_profile_id(display_name, prompt_id(prompt_content)),
-         company_profiles!company_profile_id(display_name, prompt_id(prompt_content))
+         difficulty_profiles!difficulty_profile_id(display_name, prompts!prompt_id(prompt_content)),
+         seniority_profiles!seniority_profile_id(display_name, prompts!prompt_id(prompt_content)),
+         company_profiles!company_profile_id(display_name, prompts!prompt_id(prompt_content))
        ),
-       interview_cases(phases, additional_metadata, exhibits, prompt_id(prompt_content))`
+       interview_cases(phases, additional_metadata, exhibits, prompts!prompt_id(prompt_content))`
     )
     .eq("session_id", sessionId)
     .single<RawSessionRow>();
