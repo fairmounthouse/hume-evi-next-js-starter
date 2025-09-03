@@ -273,7 +273,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                             entry.speaker === "user" 
                               ? "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 ml-4"
                               : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 mr-4",
-                            entry.isInterim && "opacity-70 border-dashed animate-pulse"
+                            entry.isInterim && "opacity-75 border-dashed bg-gradient-to-r from-blue-50/50 to-transparent dark:from-blue-950/50"
                           )}
                         >
                           <div className="flex items-center gap-2 mb-2">
@@ -330,7 +330,7 @@ Duration: ${transcript.length > 0 ? formatRelativeTime(transcript[transcript.len
                           
                           <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
                             {entry.text}
-                            {entry.isInterim && <span className="animate-pulse ml-1">|</span>}
+                            {entry.isInterim && <span className="ml-1 text-blue-500 font-mono">●</span>}
                           </p>
                           
                           {entry.confidence && (

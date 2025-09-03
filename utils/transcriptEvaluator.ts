@@ -306,6 +306,20 @@ export class TranscriptEvaluator {
     this.sessionId = sessionId;
 
     try {
+      // Try to load from chunked storage first
+      const chunkedEntries = this.loadFromLocalStorageChunks();
+      if (chunkedEntries.length > 0) {
+        // Deduplicate by id while preserving existing entries
+        const existingIds = new Set(this.masterTranscript.map(e => e.id));
+        const newOnes = chunkedEntries.filter(e => !existingIds.has(e.id));
+        if (newOnes.length > 0) {
+          this.masterTranscript.push(...newOnes);
+          console.log(`♻️  [MASTER TRANSCRIPT] Recovered ${newOnes.length}/${chunkedEntries.length} entries from chunked localStorage for session ${sessionId}`);
+        }
+        return;
+      }
+
+      // Fallback to old single-key format for backward compatibility
       const key = `master_transcript_${sessionId}`;
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
       if (raw) {
@@ -316,7 +330,13 @@ export class TranscriptEvaluator {
           const newOnes = parsed.filter(e => !existingIds.has(e.id));
           if (newOnes.length > 0) {
             this.masterTranscript.push(...newOnes);
-            console.log(`♻️  [MASTER TRANSCRIPT] Recovered ${newOnes.length}/${parsed.length} entries from localStorage for session ${sessionId}`);
+            console.log(`♻️  [MASTER TRANSCRIPT] Recovered ${newOnes.length}/${parsed.length} entries from legacy localStorage for session ${sessionId}`);
+            
+            // Migrate to chunked format and remove old key
+            this.persistToLocalStorage();
+            if (typeof window !== 'undefined') {
+              window.localStorage.removeItem(key);
+            }
           }
         }
       }
@@ -325,15 +345,94 @@ export class TranscriptEvaluator {
     }
   }
 
+  private loadFromLocalStorageChunks(): TranscriptEntry[] {
+    if (!this.sessionId || typeof window === 'undefined') return [];
+    
+    try {
+      const chunkCountStr = localStorage.getItem(`master_transcript_${this.sessionId}_chunks`);
+      if (!chunkCountStr) return [];
+      
+      const chunkCount = parseInt(chunkCountStr, 10);
+      if (isNaN(chunkCount) || chunkCount <= 0) return [];
+      
+      const allEntries: TranscriptEntry[] = [];
+      
+      for (let i = 0; i < chunkCount; i++) {
+        const key = `master_transcript_${this.sessionId}_chunk_${i}`;
+        const chunkData = localStorage.getItem(key);
+        
+        if (chunkData) {
+          try {
+            const chunk: TranscriptEntry[] = JSON.parse(chunkData);
+            allEntries.push(...chunk);
+          } catch (e) {
+            console.error(`Failed to parse chunk ${i}:`, e);
+          }
+        }
+      }
+      
+      return allEntries;
+    } catch (e) {
+      console.error('Failed to load from localStorage chunks:', e);
+      return [];
+    }
+  }
+
   private persistToLocalStorage(): void {
     if (!this.sessionId) return;
     try {
-      const key = `master_transcript_${this.sessionId}`;
+      // Use chunking to avoid localStorage limits
+      const CHUNK_SIZE = 100;
+      const chunks = [];
+      
+      for (let i = 0; i < this.masterTranscript.length; i += CHUNK_SIZE) {
+        chunks.push(this.masterTranscript.slice(i, i + CHUNK_SIZE));
+      }
+      
       if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, JSON.stringify(this.masterTranscript));
+        // Clear old chunks first
+        this.clearLocalStorageChunks();
+        
+        // Store chunks separately to avoid localStorage limits
+        chunks.forEach((chunk, index) => {
+          const key = `master_transcript_${this.sessionId}_chunk_${index}`;
+          try {
+            localStorage.setItem(key, JSON.stringify(chunk));
+          } catch (e) {
+            console.error(`Failed to save chunk ${index}:`, e);
+          }
+        });
+        
+        // Store chunk count
+        localStorage.setItem(
+          `master_transcript_${this.sessionId}_chunks`,
+          chunks.length.toString()
+        );
+        
+        console.log(`💾 [MASTER TRANSCRIPT] Persisted ${chunks.length} chunks (${this.masterTranscript.length} entries) to localStorage`);
       }
     } catch (e) {
       console.warn('[MASTER TRANSCRIPT] Failed to persist to localStorage', e);
+    }
+  }
+
+  private clearLocalStorageChunks(): void {
+    if (!this.sessionId || typeof window === 'undefined') return;
+    
+    try {
+      const chunkCountStr = localStorage.getItem(`master_transcript_${this.sessionId}_chunks`);
+      if (chunkCountStr) {
+        const chunkCount = parseInt(chunkCountStr, 10);
+        if (!isNaN(chunkCount) && chunkCount > 0) {
+          for (let i = 0; i < chunkCount; i++) {
+            const key = `master_transcript_${this.sessionId}_chunk_${i}`;
+            localStorage.removeItem(key);
+          }
+        }
+      }
+      localStorage.removeItem(`master_transcript_${this.sessionId}_chunks`);
+    } catch (e) {
+      console.error('Failed to clear localStorage chunks:', e);
     }
   }
 }

@@ -23,6 +23,8 @@ import DeviceSetup from "./DeviceSetup";
 import { cn } from "@/utils";
 import { useSearchParams } from "next/navigation";
 import TranscriptEvaluator from "@/utils/transcriptEvaluator";
+import { GlobalTranscriptManager } from "@/utils/globalTranscriptManager";
+import { generateStableId, getInterimCache, setInterimCache, updateInterimCache } from "@/utils/stableIdGenerator";
 import FeedbackDisplay, { FeedbackDisplayRef } from "./FeedbackDisplay";
 import MBBAssessment from "./MBBAssessment";
 import InterviewEndScreen from "./InterviewEndScreen";
@@ -115,7 +117,10 @@ function ChatInterface({
   }, [coachingMode, getRelativeTime, recordingStartTime]);
 
 
-  const [transcriptEvaluator] = useState(() => new TranscriptEvaluator());
+  // Use global transcript manager for UI-independent processing
+  const globalManager = GlobalTranscriptManager.getInstance();
+  const transcriptEvaluator = globalManager.getEvaluator(sessionId);
+  const storageService = globalManager.getStorageService(sessionId);
 
   // Old evaluation system removed - now using MBB Assessment
   const feedbackDisplayRef = useRef<FeedbackDisplayRef>(null);
@@ -136,12 +141,12 @@ function ChatInterface({
   // Simple interim tracking - just store first interim until AI speaks
   const currentUserStartTime = useRef<number | null>(null);
   
-  // Initialize cache to persist first-interim per FINAL user message (keyed by final absolute ms)
+  // Initialize persistent interim cache in localStorage
   useEffect(() => {
-    if (!(window as any).__firstInterimByFinalMs) {
-      (window as any).__firstInterimByFinalMs = {} as Record<number, number>;
-    }
-  }, []);
+    // Ensure interim cache exists for this session
+    const cache = getInterimCache(sessionId);
+    console.log(`🗂️ [INTERIM CACHE] Initialized for session ${sessionId}, existing entries:`, Object.keys(cache).length);
+  }, [sessionId]);
   
   // Simple instant detection – flash when audio is present
   const assistantLastTriggerMsRef = useRef<number>(0);
@@ -176,8 +181,11 @@ function ChatInterface({
     [sessionId, urlSessionId]
   );
 
-  // MASTER TRANSCRIPT - NEVER TRUNCATED - Contains complete conversation history
+  // DUAL TRANSCRIPT SYSTEM:
+  // 1. storedTranscript: Final transcript for storage/download (no interim messages)
+  // 2. liveTranscript: Live UI transcript with interim messages for drawer display
   const [storedTranscript, setStoredTranscript] = useState<any[]>([]);
+  const [liveTranscript, setLiveTranscript] = useState<any[]>([]);
 
   // Pre-calculate all transcript-related values (always, not conditionally)
   const endScreenDuration = useMemo(() => {
@@ -210,19 +218,19 @@ function ChatInterface({
   }, [storedTranscript, formatRelativeTime]);
 
   const transcriptDrawerData = useMemo(() => {
-    // DRAWER IS JUST A READER - Uses storedTranscript for display only
-    // Storage happens independently via transcriptEvaluator master transcript
-    // Drawer open/close state has ZERO impact on transcript persistence
-    return storedTranscript.map(entry => ({
+    // DRAWER USES LIVE TRANSCRIPT - Shows interim messages for real-time preview
+    // Live transcript includes interim messages for UI display
+    // Storage happens independently via storedTranscript (no interim) and transcriptEvaluator master transcript
+    return liveTranscript.map(entry => ({
       id: entry.id || `${entry.timestamp}-${entry.speaker}`,
       speaker: entry.speaker,
       text: entry.text,
       timestamp: entry.timestamp,
       emotions: entry.emotions,
       confidence: entry.confidence,
-      isInterim: entry.isInterim
+      isInterim: entry.isInterim // This will show interim styling in drawer
     }));
-  }, [storedTranscript]);
+  }, [liveTranscript]);
   const currentMessagesRef = useRef<any[]>([]);
 
   const [endScreenDataStored, setEndScreenDataStored] = useState(false);
@@ -317,6 +325,93 @@ function ChatInterface({
   // Build transcript from messages for evaluation - ENHANCED for complete preservation
   // 
   // CRITICAL: This function builds the MASTER TRANSCRIPT that is NEVER truncated.
+  // Build LIVE transcript including interim messages for drawer display
+  const buildLiveTranscriptFromMessages = (messages: any[]): any[] => {
+    console.log("📋 [LIVE TRANSCRIPT] Building live transcript from", messages.length, "total messages (includes interim for UI)");
+    
+    // Filter for actual conversation messages with content - INCLUDE INTERIM MESSAGES FOR LIVE UI
+    const conversationMessages = messages.filter(msg => {
+      // Safety checks for message structure
+      if (!msg || typeof msg !== 'object') {
+        return false;
+      }
+
+      const hasContent = msg.message?.content && 
+                        typeof msg.message.content === 'string' && 
+                        msg.message.content.trim().length > 0;
+      const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
+      const isInterim = (msg as any).interim === true;
+      
+      // Include interim messages for live UI display
+      if (isInterim && isConversation && hasContent) {
+        console.log("📝 [LIVE TRANSCRIPT] Including interim message for live UI:", msg.type, msg.message?.content?.substring(0, 30) + "...");
+        return true;
+      }
+      
+      return isConversation && hasContent;
+    });
+    
+    // Build transcript entries with interim flag for UI styling
+    const transcript = conversationMessages.map((msg, index) => {
+      const absoluteTimestamp = msg.receivedAt?.getTime() || Date.now();
+      const relativeSeconds = getRelativeTime(absoluteTimestamp);
+      const isInterim = (msg as any).interim === true;
+      
+      // For user messages, handle interim timestamp logic
+      let actualTimestamp = relativeSeconds;
+      let startSpeakingTimestamp = relativeSeconds;
+      
+      if (msg.type === "user_message" && msg.message?.content) {
+        if (isInterim) {
+          // For interim messages, use current timestamp
+          actualTimestamp = relativeSeconds;
+        } else {
+          // For final messages, check for cached first interim
+          const interimCache = getInterimCache(sessionId);
+          const cachedFirst = interimCache[absoluteTimestamp];
+          
+          if (typeof cachedFirst === 'number') {
+            startSpeakingTimestamp = cachedFirst;
+            actualTimestamp = cachedFirst;
+          }
+        }
+      }
+      
+      const entry = {
+        id: generateStableId(msg, actualTimestamp),
+        speaker: msg.type === "user_message" ? "user" : "assistant",
+        text: msg.message?.content || "",
+        timestamp: actualTimestamp,
+        startSpeakingTimestamp,
+        emotions: msg.models?.prosody?.scores || undefined,
+        confidence: msg.models?.language?.confidence || undefined,
+        isInterim, // Keep interim flag for UI styling
+        _originalType: msg.type,
+        _originalTimestamp: msg.receivedAt?.toISOString(),
+        _absoluteTimestamp: Math.floor(absoluteTimestamp / 1000),
+        _messageIndex: index,
+        _finalTimestamp: relativeSeconds,
+        _receivedAt: msg.receivedAt,
+      };
+      
+      return entry;
+    });
+    
+    // Sort by timestamp
+    transcript.sort((a, b) => a.timestamp - b.timestamp);
+    
+    console.log("📋 [LIVE TRANSCRIPT] Live transcript build complete:", {
+      totalMessages: messages.length,
+      conversationMessages: conversationMessages.length,
+      transcriptEntries: transcript.length,
+      interimEntries: transcript.filter(e => e.isInterim).length,
+      finalEntries: transcript.filter(e => !e.isInterim).length,
+    });
+    
+    return transcript;
+  };
+
+  // Build FINAL transcript excluding interim messages for storage/download
   // The transcript evaluator uses a separate 1-minute rolling window for real-time feedback,
   // but this master transcript contains the COMPLETE conversation history for download.
   const buildTranscriptFromMessages = (messages: any[]): any[] => {
@@ -336,10 +431,10 @@ function ChatInterface({
       const isConversation = msg.type === "user_message" || msg.type === "assistant_message";
       const isInterim = (msg as any).interim === true;
       
-      // Include interim messages for live UI, but mark them clearly
+      // EXCLUDE interim messages from final transcript - they're only for timestamp extraction
       if (isInterim) {
-        console.log("📝 [TRANSCRIPT] Including interim message for live UI:", msg.type, msg.message?.content?.substring(0, 30) + "...");
-        return true;
+        console.log("📝 [TRANSCRIPT] Excluding interim message from final transcript (used for timestamps only):", msg.type, msg.message?.content?.substring(0, 30) + "...");
+        return false;
       }
       
       // Log all message types for debugging (but only first few to avoid spam)
@@ -380,8 +475,8 @@ function ChatInterface({
             });
           }
         } else {
-          // For final messages, check cached first interim
-          const interimCache: Record<number, number> = (window as any).__firstInterimByFinalMs || {};
+          // For final messages, check persistent cached first interim
+          const interimCache = getInterimCache(sessionId);
           const cachedFirst = interimCache[absoluteTimestamp];
           
           if (typeof cachedFirst === 'number') {
@@ -396,10 +491,7 @@ function ChatInterface({
             // Use current first-interim and persist it for this final user message
             startSpeakingTimestamp = currentUserStartTime.current;
             actualTimestamp = currentUserStartTime.current; // Use the first interim timestamp as the main timestamp
-            (window as any).__firstInterimByFinalMs = {
-              ...interimCache,
-              [absoluteTimestamp]: currentUserStartTime.current,
-            } as Record<number, number>;
+            updateInterimCache(sessionId, absoluteTimestamp, currentUserStartTime.current);
             console.log('📝 [INTERIM CACHE SET] Stored first interim for final user message', {
               absoluteMs: absoluteTimestamp,
               firstInterim: currentUserStartTime.current
@@ -435,7 +527,7 @@ function ChatInterface({
       }
       
       const entry = {
-        id: `msg-${index}`,
+        id: generateStableId(msg, actualTimestamp),
         speaker: msg.type === "user_message" ? "user" : "assistant",
         text: msg.message?.content || "",
         timestamp: actualTimestamp, // Use interim timestamp for user messages when available
@@ -449,6 +541,7 @@ function ChatInterface({
         _absoluteTimestamp: Math.floor(absoluteTimestamp / 1000),
         _messageIndex: index,
         _finalTimestamp: relativeSeconds, // Keep the original final timestamp for debugging
+        _receivedAt: msg.receivedAt, // Add for stable ID generation
       };
       
       // Validate entry completeness
@@ -545,40 +638,54 @@ function ChatInterface({
       lastMessage: messages[messages.length - 1]?.type || "none"
     });
     
-    // ALWAYS build and store transcript when we have messages, regardless of call state
-    // This ensures we never lose transcript data even if the call ends unexpectedly
+    // Use global manager for message processing with immediate queue processing
     if (messages.length > 0) {
-      const newTranscript = buildTranscriptFromMessages(messages);
-      // Only update state if the reference actually differs to avoid re-render loops
-      const prev = storedTranscript;
-      const prevLen = prev.length;
-      const nextLen = newTranscript.length;
-      const changed = nextLen !== prevLen || (nextLen > 0 && (prev[nextLen - 1]?.id !== newTranscript[nextLen - 1]?.id));
-      if (changed) {
-        setStoredTranscript(newTranscript);
+      const processedEntries = globalManager.processMessages(sessionId, messages);
+      
+      // Build FINAL transcript from messages for storage (no interim)
+      const newStoredTranscript = buildTranscriptFromMessages(messages);
+      
+      // Build LIVE transcript from messages for UI display (includes interim)
+      const newLiveTranscript = buildLiveTranscriptFromMessages(messages);
+      
+      // Update stored transcript if changed
+      const prevStored = storedTranscript;
+      const prevStoredLen = prevStored.length;
+      const nextStoredLen = newStoredTranscript.length;
+      const storedChanged = nextStoredLen !== prevStoredLen || (nextStoredLen > 0 && (prevStored[nextStoredLen - 1]?.id !== newStoredTranscript[nextStoredLen - 1]?.id));
+      if (storedChanged) {
+        setStoredTranscript(newStoredTranscript);
       }
       
-      // APPEND-ONLY: Add new entries to master transcript (filter out interim messages for storage)
-      const finalTranscriptOnly = newTranscript.filter(entry => !entry.isInterim);
-      transcriptEvaluator.appendToMasterTranscript(finalTranscriptOnly);
+      // Update live transcript if changed
+      const prevLive = liveTranscript;
+      const prevLiveLen = prevLive.length;
+      const nextLiveLen = newLiveTranscript.length;
+      const liveChanged = nextLiveLen !== prevLiveLen || (nextLiveLen > 0 && (prevLive[nextLiveLen - 1]?.id !== newLiveTranscript[nextLiveLen - 1]?.id));
+      if (liveChanged) {
+        setLiveTranscript(newLiveTranscript);
+      }
       
-      console.log("💾 Updated stored transcript and appended to master:", {
+      console.log("💾 Updated transcripts via global manager:", {
         messagesProcessed: messages.length,
-        transcriptEntries: newTranscript.length,
+        storedTranscriptEntries: newStoredTranscript.length,
+        liveTranscriptEntries: newLiveTranscript.length,
+        interimInLive: newLiveTranscript.filter(e => e.isInterim).length,
+        processedEntries: processedEntries.length,
         masterTranscriptLength: transcriptEvaluator.getMasterTranscript().length,
         isCallActive,
-        preservationMode: "APPEND_ONLY"
+        preservationMode: "DUAL_TRANSCRIPT_SYSTEM"
       });
       
-      // Store in session storage as additional backup
+      // Store final transcript in session storage as additional backup
       try {
-        sessionStorage.setItem(`transcript_backup_${sessionId}` || 'transcript_backup_default', JSON.stringify(newTranscript));
+        sessionStorage.setItem(`transcript_backup_${sessionId}` || 'transcript_backup_default', JSON.stringify(newStoredTranscript));
         console.log("💾 Backup transcript saved to session storage");
       } catch (error) {
         console.warn("Failed to backup transcript to session storage:", error);
       }
     }
-  }, [messages, isCallActive, sessionId, storedTranscript, transcriptEvaluator]);
+  }, [messages, isCallActive, sessionId, storedTranscript, liveTranscript, globalManager]);
 
   // Periodic transcript backup during active interviews
   useEffect(() => {
@@ -611,7 +718,7 @@ function ChatInterface({
             console.warn("Failed to backup transcript periodically:", error);
           }
         }
-      }, 30000); // Every 30 seconds
+      }, 5000); // Every 5 seconds (was 30000)
     }
     
     return () => {
@@ -686,6 +793,37 @@ function ChatInterface({
         console.log("🔚 Closed exhibit immediately on call end");
       }
       
+      // EMERGENCY SAVE - Immediate sync save before async processing
+      console.log("🚨 [EMERGENCY SAVE] Starting emergency save on disconnect");
+      try {
+        // Force process any queued messages first
+        const finalQueuedEntries = globalManager.flushSession(sessionId);
+        console.log(`🚨 [EMERGENCY SAVE] Flushed ${finalQueuedEntries.length} queued entries`);
+        
+        // Get complete transcript from evaluator
+        const emergencyTranscript = transcriptEvaluator.getMasterTranscript();
+        
+        // Immediate sync save to sessionStorage
+        const emergencyData = {
+          transcript: emergencyTranscript,
+          timestamp: Date.now(),
+          reason: 'disconnect'
+        };
+        sessionStorage.setItem(
+          `emergency_disconnect_${sessionId}`,
+          JSON.stringify(emergencyData)
+        );
+        
+        // Emergency save via storage service
+        globalManager.emergencySave(sessionId).catch(e => {
+          console.error("🚨 [EMERGENCY SAVE] Async save failed:", e);
+        });
+        
+        console.log(`🚨 [EMERGENCY SAVE] Completed sync save of ${emergencyTranscript.length} entries`);
+      } catch (e) {
+        console.error("🚨 [EMERGENCY SAVE] Failed:", e);
+      }
+      
       // Immediately preserve transcript data before anything gets cleared
       const preservedTranscript = storedTranscript.length > 0 
         ? storedTranscript 
@@ -693,12 +831,8 @@ function ChatInterface({
           ? buildTranscriptFromMessages(currentMessagesRef.current)
           : buildTranscriptFromMessages(messages);
       
-      // Ensure master transcript has the final complete transcript (filter out interim)
-      const finalPreservedTranscript = preservedTranscript.filter(entry => !entry.isInterim);
-      transcriptEvaluator.appendToMasterTranscript(finalPreservedTranscript);
-      
       console.log("🔚 Preserved transcript:", preservedTranscript.length, "entries");
-      console.log("🔚 Updated transcript evaluator with final complete transcript");
+      console.log("🔚 Emergency save completed, proceeding with normal end flow");
       
       // Process end interview data immediately (no delay)
       handleEndInterviewWithData(preservedTranscript);
@@ -706,14 +840,87 @@ function ChatInterface({
     }
   }, [status.value, isCallActive, storedTranscript, hasBeenConnected, exhibitManager, isEndingInterview]);
 
+  // Add page unload handler for guaranteed save
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isCallActive) {
+        console.log('🚨 [PAGE UNLOAD] Interview in progress, forcing emergency save');
+        
+        try {
+          // Force synchronous save of any queued data
+          globalManager.flushSession(sessionId);
+          
+          // Get complete transcript
+          const transcript = transcriptEvaluator.getMasterTranscript();
+          
+          // Synchronous localStorage save via storage service
+          storageService.emergencySave(transcript).catch(() => {
+            // If async fails, do sync save to sessionStorage
+            const emergencyData = {
+              transcript,
+              timestamp: Date.now(),
+              reason: 'beforeunload'
+            };
+            sessionStorage.setItem(`emergency_unload_${sessionId}`, JSON.stringify(emergencyData));
+          });
+          
+          // Use sendBeacon for guaranteed server delivery
+          if (navigator.sendBeacon) {
+            const blob = new Blob([JSON.stringify({
+              sessionId,
+              entries: transcript,
+              timestamp: Date.now(),
+              reason: 'page_unload'
+            })], {type: 'application/json'});
+            
+            navigator.sendBeacon('/api/transcript/emergency-save', blob);
+          }
+          
+          console.log(`🚨 [PAGE UNLOAD] Emergency save completed for ${transcript.length} entries`);
+        } catch (error) {
+          console.error('🚨 [PAGE UNLOAD] Emergency save failed:', error);
+        }
+        
+        e.preventDefault();
+        e.returnValue = 'Interview in progress. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+    
+    const handlePageHide = () => {
+      if (isCallActive) {
+        console.log('🚨 [PAGE HIDE] Emergency save on page hide');
+        try {
+          globalManager.flushSession(sessionId);
+          const transcript = transcriptEvaluator.getMasterTranscript();
+          const emergencyData = {
+            transcript,
+            timestamp: Date.now(),
+            reason: 'pagehide'
+          };
+          sessionStorage.setItem(`emergency_hide_${sessionId}`, JSON.stringify(emergencyData));
+        } catch (error) {
+          console.error('🚨 [PAGE HIDE] Emergency save failed:', error);
+        }
+      }
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageHide);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [isCallActive, sessionId, globalManager, transcriptEvaluator, storageService]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (transcriptEvaluator) {
-        transcriptEvaluator.destroy();
-      }
+      // Cleanup global manager session
+      globalManager.cleanupSession(sessionId);
     };
-  }, [transcriptEvaluator]);
+  }, [sessionId, globalManager]);
 
   // Store complete end screen data when all components are ready
   useEffect(() => {
@@ -2463,10 +2670,8 @@ export default function ClientComponent({
               const firstRel = currentRecordingStart ? 
                 Math.max(0, Math.floor((firstAbs - currentRecordingStart) / 1000)) : 
                 0;
-              const interimCache: Record<number, number> = (window as any).__firstInterimByFinalMs || {};
               // Persist mapping of *this* final absolute ms → first interim relative seconds
-              interimCache[finalAbs] = firstRel;
-              (window as any).__firstInterimByFinalMs = interimCache;
+              updateInterimCache(sessionId, finalAbs, firstRel);
 
               console.log("🗂️ [INTERIM→FINAL MAP STORED]", {
                 tag: "HUME_STREAM",
