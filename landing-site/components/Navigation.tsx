@@ -36,13 +36,13 @@ export default function Navigation() {
         ? 'bg-white shadow-[0_4px_0_rgba(0,0,0,0.1)]' 
         : 'bg-transparent'
     }`}>
-      <nav className="max-w-7xl mx-auto px-8 py-5 flex justify-between items-center">
+      <nav className="max-w-7xl mx-auto px-4 sm:px-8 py-5 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-3 text-2xl font-black text-black">
-          <Logo width={32} height={64} />
+          <Logo width={38} height={77} />
           skillflo
         </Link>
         
-        <ul className="hidden md:flex gap-8 list-none">
+        <ul className="hidden md:flex gap-6 lg:gap-8 list-none">
           <li><Link href="#features" onClick={(e) => handleSmoothScroll(e, 'features')} className="text-black font-semibold hover:text-blue-accent transition-colors">Features</Link></li>
           <li><Link href="#built-for-you" onClick={(e) => handleSmoothScroll(e, 'built-for-you')} className="text-black font-semibold hover:text-blue-accent transition-colors">Built for You</Link></li>
           <li><Link href="#testimonials" onClick={(e) => handleSmoothScroll(e, 'testimonials')} className="text-black font-semibold hover:text-blue-accent transition-colors">Testimonials</Link></li>
@@ -82,9 +82,9 @@ export default function Navigation() {
       
       {/* Mobile menu */}
       <div className={`md:hidden bg-white border-t-2 border-black transition-all duration-300 ${
-        isMobileMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+        isMobileMenuOpen ? 'max-h-[70vh] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
       }`}>
-        <nav className="px-8 py-6">
+        <nav className="px-6 sm:px-8 py-6">
           <ul className="space-y-4">
             <li><Link href="#features" onClick={(e) => handleSmoothScroll(e, 'features')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Features</Link></li>
             <li><Link href="#built-for-you" onClick={(e) => handleSmoothScroll(e, 'built-for-you')} className="block text-black font-semibold hover:text-blue-accent transition-colors py-2">Built for You</Link></li>

@@ -32,7 +32,7 @@ export default function Pricing() {
   ]
 
   return (
-    <section id="pricing" className="section-padding" style={{backgroundColor: '#FFF9E6'}}>
+    <section id="pricing" className="section-padding w-full overflow-x-hidden" style={{backgroundColor: '#FFF9E6'}}>
       <div className="max-w-7xl mx-auto px-4 md:px-8">
       <div className="text-center mb-12 md:mb-16">
         <h2 className="text-3xl sm:text-4xl lg:text-6xl font-black mb-6 md:mb-8 tracking-tight font-poppins">Straightforward Pricing</h2>

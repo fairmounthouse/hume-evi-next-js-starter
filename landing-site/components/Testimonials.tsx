@@ -3,25 +3,25 @@
 export default function Testimonials() {
   const testimonials = [
     {
-      quote: "skillflo's case coaching felt lifelike from day one. It boosted my confidence for peer mocks and nailed McKinsey.",
+      quote: "Skillflo's case coaching is impressively detailed and gave me instant insights that helped me improve. Anyone trying to get a consulting role needs to use Skillflo.",
       author: "Tyson C., INSEAD MBA '25"
     },
     {
-      quote: "Shy about practicing with classmates, I started with skillflo. The real interview feel gave me a big head start for Bain.",
+      quote: "Shy about practicing with classmates so I started with Skillflo. It absolutely gave me an edge heading into recruiting season.",
       author: "Jennifer K., UCLA Econ BA '25"
     },
     {
-      quote: "Mocks were spot-on and more useful than peers—cheaper than $400/hr coaches.",
+      quote: "Skillflo sessions were spot-on and more helpful than peer mock interviews, not to mention much more affordable than $400/hr coaches.",
       author: "Josh C., MIT Sloan MBA '25"
     },
     {
-      quote: "As an ex-McKinsey coach, skillflo delivers pro-level cases with precise feedback. Perfect for newbies or experts.",
-      author: "A.C.G., Ex-McKinsey/INSEAD '19"
+      quote: "As an ex-McKinsey coach, Skillflo delivers pro-level cases with precise coaching and feedback. Perfect for newbies or experts.",
+      author: "AC G., Ex-McKinsey/INSEAD '19"
     }
   ]
 
   return (
-    <section id="testimonials" className="section-padding" style={{backgroundColor: '#FEBB69'}}>
+    <section id="testimonials" className="section-padding w-full overflow-x-hidden" style={{backgroundColor: '#FEBB69'}}>
       <div className="max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight font-poppins">From Our Users</h2>

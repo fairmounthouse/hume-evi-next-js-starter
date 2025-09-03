@@ -2,7 +2,7 @@
 
 export default function Team() {
   return (
-    <section id="team" className="section-padding" style={{backgroundColor: '#F7F8FA'}}>
+    <section id="team" className="section-padding w-full overflow-x-hidden" style={{backgroundColor: '#F7F8FA'}}>
       <div className="max-w-7xl mx-auto">
       <div className="text-center mb-16">
         <h2 className="text-4xl lg:text-6xl font-black mb-8 tracking-tight font-poppins">Meet the Team Behind skillflo</h2>

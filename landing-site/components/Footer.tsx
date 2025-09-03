@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 export default function Footer() {
   return (
-    <footer className="py-12" style={{backgroundColor: '#0A0B1E'}}>
+    <footer className="py-12 w-full overflow-x-hidden" style={{backgroundColor: '#0A0B1E'}}>
       <div className="max-w-6xl mx-auto px-8">
         <div className="flex flex-col md:flex-row justify-between items-center gap-8">
           <div className="flex flex-col md:flex-row gap-8 list-none">

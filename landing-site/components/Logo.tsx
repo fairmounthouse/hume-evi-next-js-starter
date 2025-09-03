@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import blackLogo from '../../BRANDING/LOGO/[SF] LOGO BLACK.png'
+import multiColorLogo from '../../BRANDING/LOGO/[SF] LOGO MULTICOLOR.png'
 
 interface LogoProps {
   width?: number
@@ -7,10 +7,10 @@ interface LogoProps {
   className?: string
 }
 
-export default function Logo({ width = 160, height = 40, className = "" }: LogoProps) {
+export default function Logo({ width = 192, height = 48, className = "" }: LogoProps) {
   return (
     <Image
-      src={blackLogo}
+      src={multiColorLogo}
       alt="Logo"
       width={width}
       height={height}

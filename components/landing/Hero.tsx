@@ -2,7 +2,8 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Eye } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ArrowRight, Play, Eye, Menu } from "lucide-react";
 import Link from "next/link";
 import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 
@@ -135,6 +136,44 @@ export function Hero() {
                 </Button>
               </a>
             </SignedOut>
+          </div>
+
+          {/* Mobile Menu */}
+          <div className="md:hidden">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label="Open menu">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80">
+                <SheetHeader>
+                  <SheetTitle>Menu</SheetTitle>
+                </SheetHeader>
+                <div className="mt-6 space-y-2">
+                  <a href="#problem" className="block py-2 text-gray-700 font-medium">The Problem</a>
+                  <a href="#solution" className="block py-2 text-gray-700 font-medium">Our Solution</a>
+                  <a href="#transformation" className="block py-2 text-gray-700 font-medium">Your Journey</a>
+                  <a href="#results" className="block py-2 text-gray-700 font-medium">Success Stories</a>
+                  <Link href="/pricing" className="block py-2 text-gray-700 font-medium">Pricing</Link>
+                  <div className="pt-4 space-y-2">
+                    <SignedOut>
+                      <a href={`${appUrl}/sign-in?redirect=/dashboard`} className="block w-full">
+                        <Button variant="outline" className="w-full">Sign In</Button>
+                      </a>
+                      <a href={`${appUrl}/sign-up?redirect=/dashboard`} className="block w-full">
+                        <Button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white">Sign Up</Button>
+                      </a>
+                    </SignedOut>
+                    <SignedIn>
+                      <a href={`${appUrl}/dashboard`} className="block w-full">
+                        <Button className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white">Go to Dashboard</Button>
+                      </a>
+                    </SignedIn>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </nav>
