@@ -16,7 +16,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <MessageCircle className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Real-Time Coaching (Beta)</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Real-Time Coaching</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             <span className="badge badge-beta">Beta</span>
           </p>
@@ -29,7 +29,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <Puzzle className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Life-like Mock Case Interviews (Beta)</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Life-like Mock Case Interviews</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             <span className="badge badge-beta">Beta</span>
           </p>
@@ -42,7 +42,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <Mic className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Personalized Mock Behavioral Interviews (Beta)</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Personalized Mock Behavioral Interviews</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             <span className="badge badge-beta">Beta</span>
           </p>
@@ -55,7 +55,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <BarChart3 className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Actionable Feedback and Reports (Beta)</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Actionable Feedback</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             <span className="badge badge-beta">Beta</span>
           </p>
@@ -68,7 +68,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <Calendar className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Personalized Learning Plan (Coming Soon)</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Personalized Learning Plan</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             <span className="badge badge-soon">Coming Soon</span>
           </p>
@@ -81,7 +81,7 @@ export default function WhatWeOffer() {
           <div className="icon-neubrutalist">
             <Book className="w-8 h-8" />
           </div>
-          <h3 className="text-2xl font-bold mb-4 text-black">Training Materials (Coming Soon)</h3>
+          <h3 className="text-2xl font-bold mb-4 text-black">Training Materials</h3>
           <p className="text-lg text-black opacity-80 leading-relaxed mb-2">
             <span className="badge badge-soon">Coming Soon</span>
           </p>

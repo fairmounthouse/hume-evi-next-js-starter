@@ -3,30 +3,36 @@
 import { useState } from 'react'
 
 export default function Pricing() {
-  const [selectedPlan, setSelectedPlan] = useState<number | null>(1) // Default to Quarterly (index 1)
+  const [selectedPlan, setSelectedPlan] = useState<number | null>(1)
   const plans = [
     {
-      name: "Monthly",
-      regular: "$50/mo",
-      promo: "$37.50/mo",
-      description: "120 mins (~4 sessions)",
-      subtitle: "For casual preppers",
+      name: "Starter",
+      price: "$30",
+      cadence: "/month",
+      description:
+        "Perfect for casual practice and getting familiar with AI-powered interview prep. Ideal for early-stage job seekers.",
+      billingNote: "Only billed monthly",
+      features: ["120 mins (~5 sessions)", "Detailed Analysis", "Actionable feedback"],
       isPopular: false
     },
     {
-      name: "Quarterly", 
-      regular: "$40/mo ($120)",
-      promo: "$30/mo ($90)",
-      description: "120 mins/mo (~4 sessions)",
-      subtitle: "For seasonal users (3-mo. min.)",
+      name: "Professional",
+      price: "$49",
+      cadence: "/month",
+      description:
+        "For active job seekers who need consistent practice and comprehensive preparation for multiple interviews.",
+      billingNote: "Only billed monthly",
+      features: ["240 mins (~10 sessions)", "Detailed Analysis", "Actionable feedback", "Personalized learning plan"],
       isPopular: true
     },
     {
-      name: "Semi-Annually",
-      regular: "$30/mo ($180)", 
-      promo: "$22.50/mo ($135)",
-      description: "120 mins/mo (~4 sessions)",
-      subtitle: "For long-term builders (6-mo. min.)",
+      name: "Premium",
+      price: "$99",
+      cadence: "/month",
+      description:
+        "Maximum preparation time for intensive interview cycles, multiple opportunities, or high-stakes positions.",
+      billingNote: "Only billed monthly",
+      features: ["600 mins (~24 sessions)", "Detailed Analysis", "Actionable feedback", "Personalized learning plan"],
       isPopular: false
     }
   ]
@@ -40,7 +46,7 @@ export default function Pricing() {
           Not sure? Try one mock interview and coaching session now!
         </p>
         <p className="text-base sm:text-lg text-black opacity-80">
-          All plans include access to tools & modules (coming soon). Sessions avg. 30 mins.
+          All plans include access to tools & modules (coming soon). Sessions avg. 20-30 mins.
         </p>
       </div>
       
@@ -55,20 +61,25 @@ export default function Pricing() {
           >
             {plan.isPopular && (
               <div className="absolute top-0 right-0 w-12 sm:w-16 h-12 sm:h-16">
-                <div className="absolute transform rotate-45 bg-yellow-primary text-center text-black font-bold py-1 text-xs sm:text-sm right-[-25px] sm:right-[-35px] top-[22px] sm:top-[32px] w-[120px] sm:w-[170px] border border-black">
-                  Most Popular
+                <div className="absolute transform rotate-45 bg-yellow-primary text-center text-black font-bold py-1 text-xs sm:text-sm right-[-25px] sm:right-[-35px] top:[22px] sm:top-[32px] w-[120px] sm:w-[170px] border border-black">
+                  Popular
                 </div>
               </div>
             )}
-            <h3 className={`text-2xl font-bold mb-4 text-black leading-tight min-h-[2.5rem]`}>{plan.name}</h3>
-            <div className="mb-4 min-h-[4.5rem]">
-              <p className="text-sm text-gray-600 line-through">Reg: {plan.regular}</p>
-              <p className="text-3xl font-black text-blue-accent">Promo: {plan.promo}</p>
+            <h3 className={`text-2xl font-bold mb-2 text-black leading-tight min-h-[2.5rem]`}>{plan.name}</h3>
+            <p className="text-sm text-black opacity-80 mb-3">{plan.description}</p>
+            <div className="mb-4">
+              <p className="text-4xl font-black text-black">{plan.price}<span className="text-base font-semibold">{plan.cadence}</span></p>
+              <p className="text-sm text-black opacity-80 mt-1">{plan.billingNote}</p>
             </div>
-            <div className="mb-6 min-h-[4.5rem]">
-              <p className="text-lg text-black mb-2">{plan.description}</p>
-              <p className="text-base text-black opacity-80">{plan.subtitle}</p>
-            </div>
+            <ul className="mb-6 space-y-2 text-black">
+              {plan.features.map((feature: string, featureIndex: number) => (
+                <li key={featureIndex} className="flex items-start gap-2">
+                  <span className="mt-[2px]">✓</span>
+                  <span>{feature}</span>
+                </li>
+              ))}
+            </ul>
             <button 
               className={`btn px-6 py-3 rounded-full font-bold text-base cursor-pointer transition-all duration-200 border-[3px] border-black inline-flex items-center gap-2 shadow-[4px_4px_0_#000] hover:translate-x-[-2px] hover:translate-y-[-2px] hover:shadow-[6px_6px_0_#000] mt-auto w-full justify-center
                 ${selectedPlan === index ? 'bg-black text-white hover:bg-gray-800' : 'bg-yellow-primary text-black hover:bg-yellow-bright'}
@@ -82,7 +93,7 @@ export default function Pricing() {
                 }
               }}
             >
-              {selectedPlan === index ? 'Get Started' : 'Select'}
+              {selectedPlan === index ? 'Switch to this plan' : 'Switch to this plan'}
             </button>
           </div>
         ))}
@@ -90,7 +101,7 @@ export default function Pricing() {
 
       <div className="text-center mb-8">
         <p className="text-base sm:text-lg text-black mb-6">
-          <strong>Top up:</strong> $10/60 mins or $100/660 mins.
+          <strong>Top up:</strong> $20/60 mins or $200/700 mins.
         </p>
         <button 
           className="btn-neubrutalist btn-primary text-base sm:text-lg px-6 sm:px-8 py-3 sm:py-4"
