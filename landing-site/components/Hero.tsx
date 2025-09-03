@@ -12,7 +12,7 @@ export default function Hero() {
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[0.95] mb-6 md:mb-8 tracking-tight animate-[slideUp_0.8s_ease-out]">
             Get Coached.<br/>
             <span className="text-gradient-blue">Master Interviews.</span><br/>
-            Get Offers.
+            Land Offers.
           </h1>
           
           <p className="text-lg sm:text-xl lg:text-2xl text-black opacity-80 mb-8 md:mb-12 leading-relaxed animate-[slideUp_0.9s_ease-out]">
