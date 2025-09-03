@@ -2287,10 +2287,13 @@ function ChatInterface({
             <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
               <button
                 onClick={() => handleCoachingToggle(!coachingMode)}
-                className={cn("p-2 rounded-full border shadow bg-white/90 backdrop-blur transition-colors hover:bg-white", coachingMode && "bg-blue-600 text-white hover:bg-blue-700")}
-                title="Hints (Coach)"
+                className={cn(
+                  "px-3 py-1.5 rounded-full border shadow bg-white/90 backdrop-blur text-sm font-medium transition-colors hover:bg-white",
+                  coachingMode && "bg-blue-600 text-white hover:bg-blue-700"
+                )}
+                title="Coaching"
               >
-                <GraduationCap className="w-4 h-4" />
+                Coaching
               </button>
               <button
                 onClick={() => setIsTranscriptDrawerOpen(true)}

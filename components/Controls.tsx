@@ -101,19 +101,26 @@ export default function Controls() {
               <MicFFT fft={micFft} className={"fill-current"} />
             </div>
 
-            {/* Coach toggle next to End Call */}
-            <Toggle
-              className={"rounded-full bg-white transition-colors data-[state=on]:bg-blue-600 data-[state=on]:text-white"}
-              pressed={(window as any).__getCurrentCoachingMode ? (window as any).__getCurrentCoachingMode() : false}
-              onPressedChange={() => {
+            {/* Coaching pill button next to End Call */}
+            <button
+              className={
+                cn(
+                  "px-3 h-8 rounded-full border bg-white transition-colors text-sm font-medium",
+                  (window as any).__getCurrentCoachingMode && (window as any).__getCurrentCoachingMode()
+                    ? "bg-blue-600 text-white hover:bg-blue-700"
+                    : "hover:bg-white"
+                )
+              }
+              onClick={() => {
                 try {
                   const toggle = (window as any).handleGlobalCoachingToggle;
                   if (typeof toggle === 'function') toggle();
                 } catch {}
               }}
+              title="Coaching"
             >
-              <GraduationCap className={"size-4"} />
-            </Toggle>
+              Coaching
+            </button>
 
             <Button
               className={"flex items-center gap-1 rounded-full"}
