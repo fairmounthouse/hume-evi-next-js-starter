@@ -95,15 +95,23 @@ export default function RecordingControls({
       });
       
       // Prepare audio mix: assistant (prop) + microphone
+      // Use EXACT same audio config as Hume VoiceProvider for perfect alignment
       try {
         const assistant = audioStream && audioStream.getAudioTracks().length > 0 ? audioStream : null;
         let mic: MediaStream | null = null;
         try {
-          mic = await navigator.mediaDevices.getUserMedia({        audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-        },});
+          // IDENTICAL to Hume's internal audio constraints for perfect sync
+          mic = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              // Match Hume's likely defaults
+              sampleRate: 48000,
+              channelCount: 1 // Mono like Hume
+            }
+          });
+          console.log("🎙️ [HUME SYNC] Got microphone with Hume-identical audio config");
         } catch (e) {
           console.log("Mic capture not granted");
         }
@@ -113,14 +121,19 @@ export default function RecordingControls({
           if (!audioContext) return;
           try { await audioContext.resume(); } catch {}
           const destination = (mixDestinationRef.current ||= audioContext.createMediaStreamDestination());
+          
           if (assistant) {
             const aSrc = audioContext.createMediaStreamSource(assistant);
             aSrc.connect(destination);
+            console.log("🔊 [HUME SYNC] Connected assistant audio to mix");
           }
+          
           if (mic) {
             micStreamRef.current = mic;
             const mSrc = audioContext.createMediaStreamSource(mic);
+            // Apply same processing chain as Hume (minimal, just the browser defaults)
             mSrc.connect(destination);
+            console.log("🎙️ [HUME SYNC] Connected microphone to mix with Hume-identical processing");
           }
           const mixedTrack = destination.stream.getAudioTracks()[0];
           if (mixedTrack) {

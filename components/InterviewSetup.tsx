@@ -223,6 +223,28 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
   // Scroll handling now managed by ScrollFadeIndicator component
 
+  // Browser back navigation handling
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      event.preventDefault();
+      if (currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+        window.history.pushState(null, '', window.location.pathname);
+      } else {
+        // If on first page, allow navigation to dashboard
+        router.push('/dashboard');
+      }
+    };
+
+    // Push initial state to prevent going back to dashboard immediately
+    window.history.pushState(null, '', window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [currentPage, router]);
+
   // Data is now loaded via SWR hooks - no manual fetching needed
 
   // Create custom interviewer profile
@@ -688,7 +710,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-hidden flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 overflow-hidden flex flex-col min-h-screen">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200 h-16">
         <div className="container mx-auto px-6 h-full flex items-center justify-between">
@@ -762,7 +784,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             {/* Clean Single-Row Filter Bar */}
             <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-6 py-6">
               <div className="container mx-auto">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-h-[40px]">
                 {/* Search */}
                 <div className="relative flex-1 max-w-lg">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -850,8 +872,8 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               fadeColor="white"
               topOffset={96}
             >
-              <div className="px-6 pt-24 pb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              <div className="px-6 pt-32 pb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[400px]">
                   <AnimatePresence>
                     {filteredCases.map((case_, index) => (
                       <motion.div
@@ -868,7 +890,11 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                               ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
                               : "hover:border-blue-200"
                           )}
-                          onClick={() => setSelectedCase(case_.id)}
+                          onClick={() => {
+                            setSelectedCase(case_.id);
+                            // Auto-advance to next step after selection
+                            setTimeout(() => setCurrentPage(2), 300);
+                          }}
                         >
                           <CardContent className="p-6 h-full flex flex-col">
                             {/* Header: Icon + Title */}
@@ -993,23 +1019,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               </div>
             )}
 
-            {/* Floating Action Button - Continue */}
-            {selectedCase && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="fixed bottom-8 right-8 z-50"
-              >
-                <Button
-                  size="lg"
-                  onClick={goToNextPage}
-                  className="rounded-full h-14 px-6 bg-blue-600 hover:bg-blue-700 shadow-lg"
-                >
-                  Continue
-                  <ArrowRight className="w-5 h-5 ml-2" />
-                </Button>
-              </motion.div>
-            )}
+            {/* Removed floating continue button - cards auto-advance */}
 
           </motion.div>
         )}
@@ -1027,13 +1037,13 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
               <div className="container mx-auto px-6 py-6">
                 {/* Header - No duplicate Dashboard button (already in main header) */}
-                <div className="text-center space-y-2 mb-4">
+                <div className="text-center space-y-2 mb-4 min-h-[80px]">
                   <h2 className="text-3xl font-bold text-gray-900">Choose Interview Style</h2>
                   <p className="text-gray-600 text-lg">Select an AI interviewer personality that matches your preparation goals</p>
                 </div>
 
                 {/* Filters and Create Custom Button */}
-                <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex flex-wrap gap-3 items-center min-h-[48px]">
               <Select value={profileTypeFilter} onValueChange={setProfileTypeFilter}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All Types" />
@@ -1123,7 +1133,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
               topOffset={152}
             >
               <div className="container mx-auto px-6 pt-48 pb-24">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[400px]">
                   {filteredProfiles.map((profile) => {
                     const displayName = profile.name || profile.alias;
                     const companyName = profile.company_profiles.display_name;
@@ -1157,7 +1167,19 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                             : "hover:border-blue-200"
                         )}
                         onClick={() => {
-                          setSelectedProfile(prev => (prev === profile.id ? "" : profile.id));
+                          const newSelection = selectedProfile === profile.id ? "" : profile.id;
+                          setSelectedProfile(newSelection);
+                          // Auto-advance to next step after selection (only if selecting, not deselecting)
+                          if (newSelection) {
+                            setTimeout(() => {
+                              // Skip document upload and go directly to interview
+                              onStartInterview({
+                                caseId: selectedCase,
+                                interviewerProfileId: newSelection,
+                                sessionId: undefined
+                              });
+                            }, 300);
+                          }
                         }}
                       >
                         <CardContent className="p-6">
