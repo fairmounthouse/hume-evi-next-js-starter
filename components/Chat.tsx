@@ -810,10 +810,21 @@ function ChatInterface({
       try {
         console.log("🧹 [END SCREEN] Starting comprehensive media cleanup...");
         
-        // 1. Stop recording via existing system
+        // 1. IMMEDIATELY stop all components from creating new streams
+        setForceShowRecording(false);
+        setIsCallActive(false);
+        
+        // 2. Override getUserMedia to prevent new streams
+        const originalGetUserMedia = navigator.mediaDevices.getUserMedia;
+        (navigator.mediaDevices as any).getUserMedia = () => {
+          console.log("🚫 [END SCREEN] Blocked getUserMedia call - interview ended");
+          return Promise.reject(new Error("Interview ended - media access blocked"));
+        };
+        
+        // 3. Stop recording via existing system
         window.dispatchEvent(new CustomEvent("app:force-stop-recording"));
         
-        // 2. Clean up video stream
+        // 4. Clean up video stream
         const videoStream = videoRef.current?.getStream();
         if (videoStream) {
           videoStream.getTracks().forEach((track: MediaStreamTrack) => {
@@ -822,25 +833,108 @@ function ChatInterface({
           });
         }
         
-        // 3. Clean up assistant audio bus
+        // 4. Clean up assistant audio bus
         if (assistantBus) {
           console.log("🔊 [END SCREEN] Closing assistant audio bus");
           assistantBus.close();
         }
         
-        // 4. Clean up audio context (suspend to free resources)
+        // 5. Clean up audio context (suspend to free resources)
         if (audioCtx && audioCtx.state !== 'closed') {
           console.log("🎵 [END SCREEN] Suspending audio context");
           audioCtx.suspend();
         }
         
-        // 5. Clear any global video functions
+        // 6. Clear any global video functions
         if ((window as any).__toggleCamera) {
           delete (window as any).__toggleCamera;
         }
         if ((window as any).__isCameraOn) {
           delete (window as any).__isCameraOn;
         }
+        
+        // 7. Create stream tracker for debugging
+        const trackActiveStreams = () => {
+          const stream = videoRef.current?.getStream();
+          const activeTracks = stream?.getTracks().filter((track: MediaStreamTrack) => track.readyState === 'live') || [];
+          if (activeTracks.length > 0) {
+            console.log("📊 [STREAM TRACKER] Active tracks found:", activeTracks.map((track: MediaStreamTrack) => ({
+              label: track.label,
+              kind: track.kind,
+              readyState: track.readyState,
+              enabled: track.enabled
+            })));
+            return activeTracks;
+          }
+          return [];
+        };
+        
+        // 8. Wait a moment then clean up any remaining streams (multiple sweeps)
+        setTimeout(() => {
+          console.log("🧹 [END SCREEN] Final cleanup sweep...");
+          
+          const activeTracks = trackActiveStreams();
+          if (activeTracks.length > 0) {
+            activeTracks.forEach((track: MediaStreamTrack) => {
+              console.log("🎥 [FINAL SWEEP] Stopping remaining track:", track.label);
+              track.stop();
+            });
+          }
+          
+          // Force stop video component
+          try {
+            videoRef.current?.stopVideo();
+            console.log("🎥 [FINAL SWEEP] Forced video component stop");
+          } catch (e) {
+            console.log("🎥 [FINAL SWEEP] Video already stopped");
+          }
+          
+          console.log("✅ [FINAL SWEEP] All media cleanup completed");
+        }, 100); // First sweep at 100ms
+        
+        // Second sweep to catch any stragglers
+        setTimeout(() => {
+          console.log("🧹 [END SCREEN] Second cleanup sweep...");
+          
+          const activeTracks = trackActiveStreams();
+          if (activeTracks.length > 0) {
+            console.log("⚠️ [SECOND SWEEP] Found new streams created after cleanup!");
+            activeTracks.forEach((track: MediaStreamTrack) => {
+              console.log("🎥 [SECOND SWEEP] Stopping late track:", track.label);
+              track.stop();
+            });
+          }
+          
+          // Force stop video component again
+          try {
+            videoRef.current?.stopVideo();
+            console.log("🎥 [SECOND SWEEP] Forced video stop again");
+          } catch (e) {
+            console.log("🎥 [SECOND SWEEP] Video already stopped");
+          }
+          
+          console.log("✅ [SECOND SWEEP] Final media cleanup completed");
+        }, 1000); // Second sweep at 1 second
+        
+        // Third sweep with getUserMedia restoration
+        setTimeout(() => {
+          console.log("🧹 [END SCREEN] Third cleanup sweep with getUserMedia restoration...");
+          
+          const activeTracks = trackActiveStreams();
+          if (activeTracks.length > 0) {
+            console.log("🚨 [THIRD SWEEP] STILL found active tracks after 2 seconds!");
+            activeTracks.forEach((track: MediaStreamTrack) => {
+              console.log("🎥 [THIRD SWEEP] Force stopping persistent track:", track.label);
+              track.stop();
+            });
+          }
+          
+          // Restore getUserMedia for potential future use (if user navigates back)
+          navigator.mediaDevices.getUserMedia = originalGetUserMedia;
+          console.log("🔓 [THIRD SWEEP] Restored getUserMedia for future navigation");
+          
+          console.log("✅ [THIRD SWEEP] Complete cleanup cycle finished");
+        }, 2000); // Third sweep at 2 seconds
         
         console.log("✅ [END SCREEN] Media cleanup completed - browser indicator should disappear");
       } catch (cleanupError) {
@@ -1945,16 +2039,22 @@ function ChatInterface({
     };
   }, []);
 
-  // Stop camera when interview ends or call becomes inactive
+  // Stop camera when interview ends, call becomes inactive, or Hume disconnects
   useEffect(() => {
-    if (showEndScreen || !isCallActive) {
+    if (showEndScreen || !isCallActive || status.value === "disconnected") {
       try {
+        console.log("🎥 [CAMERA STOP] Stopping camera due to:", {
+          showEndScreen,
+          isCallActive,
+          humeStatus: status.value,
+          reason: showEndScreen ? "end_screen" : !isCallActive ? "call_inactive" : "hume_disconnected"
+        });
         videoRef.current?.stopVideo();
       } catch (e) {
         console.warn("Camera stop failed (non-critical)", e);
       }
     }
-  }, [showEndScreen, isCallActive]);
+  }, [showEndScreen, isCallActive, status.value]);
 
   // Belt-and-suspenders: force-stop recording when end screen appears
   useEffect(() => {
@@ -2146,7 +2246,7 @@ function ChatInterface({
                   "w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl",
                   !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
                 )}>
-                  <VideoInput ref={videoRef} autoStart={isCallActive} preferredDeviceId={selectedDevices?.cameraId} />
+                  <VideoInput ref={videoRef} autoStart={isCallActive && !showEndScreen && status.value !== "disconnected"} preferredDeviceId={selectedDevices?.cameraId} />
                 </div>
               </div>
             </>
@@ -2174,7 +2274,7 @@ function ChatInterface({
             "relative rounded-xl overflow-hidden shadow-2xl bg-black aspect-video",
             !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
           )}>
-            <VideoInput ref={videoRef} autoStart={isCallActive} preferredDeviceId={selectedDevices?.cameraId} />
+            <VideoInput ref={videoRef} autoStart={isCallActive && !showEndScreen && status.value !== "disconnected"} preferredDeviceId={selectedDevices?.cameraId} />
             </div>
 
           {/* Collapsible sidebar trigger handled by top-right icon */}
@@ -2265,7 +2365,7 @@ function ChatInterface({
       )}
 
       {/* Hidden Recording System - No UI, just functionality */}
-      {(isCallActive || forceShowRecording) && (
+      {(isCallActive || forceShowRecording) && !showEndScreen && status.value !== "disconnected" && (
         <div style={{ display: 'none' }}>
           <RecordingControls
             videoStream={videoRef.current?.getStream() || null}
