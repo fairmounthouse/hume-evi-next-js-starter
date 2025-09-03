@@ -2,12 +2,12 @@
 
 export default function Hero() {
   return (
-    <section className="relative">
+    <section className="relative w-full overflow-x-hidden">
       {/* Floating decorative elements */}
       <div className="float-shape shape-yellow absolute top-[10%] left-[-100px]"></div>
       <div className="float-shape shape-blue absolute bottom-[20%] right-[-75px]"></div>
       
-      <div className="pt-32 md:pt-48 pb-16 md:pb-24 px-4 md:px-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 items-center relative">
+      <div className="pt-32 md:pt-48 pb-16 md:pb-24 px-4 md:px-8 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 items-center relative w-full">
         <div className="z-10">
           <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black leading-[0.95] mb-6 md:mb-8 tracking-tight animate-[slideUp_0.8s_ease-out]">
             Case Coach.<br/>

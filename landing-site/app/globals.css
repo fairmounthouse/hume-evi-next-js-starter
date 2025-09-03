@@ -171,12 +171,15 @@ body {
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 100px; /* Account for fixed header height */
+  overflow-x: hidden;
 }
 
 /* Section spacing */
 .section-padding {
   padding: 5rem 2rem;
   scroll-margin-top: 100px; /* Account for fixed header when scrolling to sections */
+  width: 100%;
+  overflow-x: hidden;
 }
 
 /* Text gradient */

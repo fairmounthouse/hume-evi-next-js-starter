@@ -18,7 +18,7 @@ function getSchoolLogos(): string[] {
 export default function Stats() {
   const logos = getSchoolLogos()
   return (
-    <section className="py-16" style={{backgroundColor: '#ffffff'}}>
+    <section className="py-16 w-full overflow-x-hidden" style={{backgroundColor: '#ffffff'}}>
       <div className="max-w-6xl mx-auto px-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
           <div className="text-center p-4 bg-green-light border-3 border-black rounded-2xl transition-all duration-300 hover:translate-y-[-5px] hover:rotate-[-2deg] hover:shadow-[5px_5px_0_#000] hover:bg-yellow-primary">
