@@ -131,15 +131,15 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex h-screen">
+      <div className="flex h-screen flex-col lg:flex-row">
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex lg:w-72 lg:flex-col lg:border-r">
           <Sidebar />
         </div>
         
         {/* Mobile Navigation */}
-        <div className="lg:hidden">
-          <div className="flex h-14 items-center justify-between px-4 border-b bg-card">
+        <div className="w-full lg:hidden">
+          <div className="flex h-14 items-center justify-between px-4 border-b bg-card w-full">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
@@ -163,7 +163,7 @@ export default function DashboardLayout({
         {/* Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <main className="flex-1 overflow-y-auto">
-            <div className="container mx-auto p-6 lg:p-8 max-w-7xl">
+            <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
               {children}
             </div>
           </main>

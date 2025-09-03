@@ -101,7 +101,7 @@ export default function DashboardPage() {
   const warningUsage = usageData.find(usage => usage.percentage_used >= 70 && usage.percentage_used < 90);
 
   return (
-    <div className="space-y-8 px-4 sm:px-6 md:px-8">
+    <div className="space-y-8 px-4 sm:px-6 md:px-8 pt-16 max-w-7xl mx-auto">
       {/* Welcome Header */}
       <div className="space-y-4">
         <div className="space-y-2">
@@ -216,11 +216,13 @@ export default function DashboardPage() {
 
       {/* Main Content Tabs */}
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 text-xs sm:text-sm">
+        <div className="-mx-4 sm:mx-0 overflow-x-auto">
+          <TabsList className="grid min-w-[420px] w-full grid-cols-3 text-xs sm:text-sm">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="usage">Usage</TabsTrigger>
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
-        </TabsList>
+          </TabsList>
+        </div>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">

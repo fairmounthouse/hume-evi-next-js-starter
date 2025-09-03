@@ -124,15 +124,15 @@ export default function SessionsLayout({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex h-screen">
+      <div className="flex h-screen flex-col lg:flex-row">
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex lg:w-72 lg:flex-col lg:border-r">
           <Sidebar />
         </div>
         
         {/* Mobile Navigation */}
-        <div className="lg:hidden">
-          <div className="flex h-14 items-center justify-between px-4 border-b bg-card">
+        <div className="w-full lg:hidden">
+          <div className="flex h-14 items-center justify-between px-4 border-b bg-card w-full">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
