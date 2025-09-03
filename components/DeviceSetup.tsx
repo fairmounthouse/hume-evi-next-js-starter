@@ -19,7 +19,7 @@ import {
   X,
   Home
 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { cn } from "@/utils";
 import { toast } from "sonner";
 import { Progress } from "./ui/progress";
@@ -42,6 +42,8 @@ interface DeviceSetupProps {
 
 export default function DeviceSetup({ onContinue, onClose, isModal = false }: DeviceSetupProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  
   // Device lists
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
@@ -70,12 +72,122 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const peakRef = useRef<number>(0);
+  
+  // Track the initial pathname to detect URL changes
+  const initialPathnameRef = useRef<string>(pathname);
+  
+  // Use refs to store current streams for reliable cleanup
+  const videoStreamRef = useRef<MediaStream | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
+
+  // Update refs whenever streams change
+  useEffect(() => {
+    videoStreamRef.current = videoStream;
+  }, [videoStream]);
+
+  useEffect(() => {
+    audioStreamRef.current = audioStream;
+  }, [audioStream]);
+
+  // SYNCHRONOUS immediate cleanup when pathname changes
+  const currentPathname = pathname;
+  if (currentPathname !== initialPathnameRef.current && (videoStreamRef.current || audioStreamRef.current)) {
+    console.log("🧹 DeviceSetup: URL changed - SYNCHRONOUS immediate cleanup", {
+      from: initialPathnameRef.current,
+      to: currentPathname
+    });
+    
+    // Stop video tracks immediately (synchronous)
+    if (videoStreamRef.current) {
+      console.log("🎥 Stopping video tracks synchronously");
+      videoStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`🛑 Stopped video track: ${track.label || track.kind}`);
+      });
+      videoStreamRef.current = null;
+    }
+    
+    // Stop audio tracks immediately (synchronous)
+    if (audioStreamRef.current) {
+      console.log("🎤 Stopping audio tracks synchronously");
+      audioStreamRef.current.getTracks().forEach(track => {
+        track.stop();
+        console.log(`🛑 Stopped audio track: ${track.label || track.kind}`);
+      });
+      audioStreamRef.current = null;
+    }
+    
+    console.log("✅ SYNCHRONOUS cleanup completed - browser indicator should disappear NOW");
+  }
 
   // Initialize devices and permissions
   useEffect(() => {
     initializeDevices();
     return () => {
       cleanup();
+    };
+  }, []);
+
+  // Cleanup on component unmount - this is the most important one
+  useEffect(() => {
+    return () => {
+      console.log("🧹 DeviceSetup: Component unmounting, cleaning up media streams");
+      cleanup();
+    };
+  }, []);
+
+  // Add multiple event listeners for immediate cleanup
+  useEffect(() => {
+    const immediateCleanup = () => {
+      console.log("🧹 DeviceSetup: immediate media cleanup triggered");
+      // Immediate track stopping without state updates
+      if (videoStreamRef.current) {
+        videoStreamRef.current.getTracks().forEach(track => track.stop());
+        videoStreamRef.current = null;
+      }
+      if (audioStreamRef.current) {
+        audioStreamRef.current.getTracks().forEach(track => track.stop());
+        audioStreamRef.current = null;
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      console.log("🧹 DeviceSetup: beforeunload event");
+      immediateCleanup();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        console.log("🧹 DeviceSetup: page hidden");
+        immediateCleanup();
+      }
+    };
+
+    // Router navigation detection for immediate cleanup
+    const handleRouteChange = () => {
+      console.log("🧹 DeviceSetup: router navigation detected - immediate cleanup");
+      immediateCleanup();
+    };
+
+    // Add multiple listeners to catch navigation as early as possible
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Listen for any click that might cause navigation
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'A' || target.closest('a') || target.closest('button')) {
+        console.log("🧹 DeviceSetup: potential navigation click - preemptive cleanup");
+        immediateCleanup();
+      }
+    };
+    
+    document.addEventListener('click', handleClick, true); // Use capture phase
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('click', handleClick, true);
     };
   }, []);
 
@@ -98,19 +210,53 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   });
 
   const cleanup = () => {
-    if (videoStream) {
-      videoStream.getTracks().forEach(track => track.stop());
+    console.log("🧹 DeviceSetup: Starting cleanup of media resources");
+    
+    // Stop video stream tracks - check both state and ref
+    const currentVideoStream = videoStreamRef.current || videoStream;
+    if (currentVideoStream) {
+      const videoTracks = currentVideoStream.getTracks();
+      console.log(`🎥 Stopping ${videoTracks.length} video tracks`);
+      videoTracks.forEach(track => {
+        track.stop();
+        console.log(`🛑 Stopped video track: ${track.label || track.kind}`);
+      });
+      videoStreamRef.current = null;
     }
-    if (audioStream) {
-      audioStream.getTracks().forEach(track => track.stop());
+    
+    // Stop audio stream tracks - check both state and ref
+    const currentAudioStream = audioStreamRef.current || audioStream;
+    if (currentAudioStream) {
+      const audioTracks = currentAudioStream.getTracks();
+      console.log(`🎤 Stopping ${audioTracks.length} audio tracks`);
+      audioTracks.forEach(track => {
+        track.stop();
+        console.log(`🛑 Stopped audio track: ${track.label || track.kind}`);
+      });
+      audioStreamRef.current = null;
     }
+    
+    // Close audio context
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      console.log("🔇 Closing AudioContext");
       audioContextRef.current.close().catch(e => console.warn("AudioContext close failed:", e));
       audioContextRef.current = null;
     }
+    
+    // Cancel animation frame
     if (animationFrameRef.current) {
+      console.log("🎬 Canceling audio monitoring animation frame");
       cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
+    
+    // Clear video element source
+    if (videoRef.current) {
+      console.log("📺 Clearing video element source");
+      videoRef.current.srcObject = null;
+    }
+    
+    console.log("✅ DeviceSetup: Media cleanup completed - browser indicator should disappear");
   };
 
   const initializeDevices = async () => {
@@ -385,12 +531,21 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
   };
 
   const handleContinue = () => {
+    console.log("🚀 DeviceSetup: User continuing to interview, cleaning up media first");
     cleanup();
     onContinue({
       cameraId: selectedCamera,
       microphoneId: selectedMicrophone,
       speakerId: selectedSpeaker
     });
+  };
+
+  const handleClose = () => {
+    console.log("🚪 DeviceSetup: User closing, cleaning up media");
+    cleanup();
+    if (onClose) {
+      onClose();
+    }
   };
 
   const handleRefresh = () => {
@@ -635,7 +790,7 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
 
         <div className="flex items-center gap-3">
           {isModal && onClose && (
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={handleClose}>
               Cancel
             </Button>
           )}
@@ -665,7 +820,7 @@ export default function DeviceSetup({ onContinue, onClose, isModal = false }: De
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={onClose}
+                onClick={handleClose}
                 className="absolute top-4 right-4"
               >
                 <X className="w-4 h-4" />
