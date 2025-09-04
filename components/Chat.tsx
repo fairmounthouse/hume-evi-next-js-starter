@@ -2209,10 +2209,10 @@ function ChatInterface({
         <div className={cn("relative grow h-full min-h-0", primaryExhibit ? "" : "flex items-center justify-center p-4")}>        
           {primaryExhibit ? (
             <>
-              {/* Exhibit-first layout */}
-              <div className="h-full w-full flex items-center justify-center p-4">
+              {/* Exhibit-first layout with optimized sizing */}
+              <div className="h-full w-full flex items-center justify-center p-6 pb-32 pr-64">
                 {primaryExhibit?.image_url ? (
-                  <div className="w-full max-w-[1400px] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl">
+                  <div className="w-full max-w-[1200px] h-[80vh] bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
                     <img
                       src={primaryExhibit.image_url}
                       alt={primaryExhibit.description || primaryExhibit.display_name || "Exhibit"}
@@ -2221,14 +2221,14 @@ function ChatInterface({
                     />
                   </div>
                 ) : (
-                  <div className="w-full max-w-[1400px] aspect-video bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
+                  <div className="w-full max-w-[1200px] h-[80vh] bg-black rounded-xl overflow-hidden shadow-2xl flex items-center justify-center">
                     <span className="text-white/80 text-sm">Exhibit asset missing (no image_url)</span>
                   </div>
                 )}
               </div>
 
-              {/* Videos stack (top-right) */}
-              <div className="absolute top-4 right-4 flex flex-col gap-3 z-20">
+              {/* Videos stack (top-right) - Below coaching buttons */}
+              <div className="absolute top-20 right-4 flex flex-col gap-3 z-20">
                 {/* Interviewer tile */}
                 <div ref={stageRef} className={cn(
                   "w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl",
@@ -2242,11 +2242,55 @@ function ChatInterface({
               </div>
               
                 {/* User tile */}
-                <div ref={pipRef} className={cn(
-                  "w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl",
-                  !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
-                )}>
-                  <VideoInput ref={videoRef} autoStart={isCallActive && !showEndScreen && status.value !== "disconnected"} preferredDeviceId={selectedDevices?.cameraId} />
+                <div className="relative">
+                  <div ref={pipRef} className={cn(
+                    "w-48 aspect-video bg-black rounded-xl overflow-hidden shadow-2xl",
+                    !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
+                  )}>
+                    <VideoInput ref={videoRef} autoStart={isCallActive && !showEndScreen && status.value !== "disconnected"} preferredDeviceId={selectedDevices?.cameraId} />
+                  </div>
+                  
+                  {/* Exhibit List - Below user video when exhibit is active */}
+                  {unlockedExhibits && unlockedExhibits.length > 0 && (
+                    <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 z-40 bg-black/85 backdrop-blur-md rounded-lg p-2 shadow-2xl border border-white/10 w-[180px]">
+                      <div className="text-white/70 text-[10px] font-semibold mb-1 px-1 uppercase tracking-wide">
+                        Exhibits
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        {unlockedExhibits.slice(0, 4).map((exhibit: any, index: number) => (
+                          <button
+                            key={exhibit.id}
+                            onClick={() => {
+                              // Toggle logic: if current exhibit is active, turn it off; otherwise turn it on
+                              if (primaryExhibit?.id === exhibit.id) {
+                                onClosePrimaryExhibit(); // Turn off current exhibit
+                              } else {
+                                onShowExhibitFromSidebar(exhibit.id); // Turn on this exhibit (will auto turn off others)
+                              }
+                            }}
+                            className={`px-2 py-1 rounded text-[11px] font-medium transition-all text-left leading-tight group relative ${
+                              primaryExhibit?.id === exhibit.id
+                                ? 'bg-blue-500 text-white shadow-md ring-1 ring-blue-400/50'
+                                : 'text-white/90 hover:text-white hover:bg-white/15'
+                            }`}
+                          >
+                            <div className="truncate">
+                              {exhibit.display_name || exhibit.exhibit_name}
+                            </div>
+                            {/* Tooltip positioned above to avoid going off-screen */}
+                            <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-75 z-50">
+                              {exhibit.display_name || exhibit.exhibit_name}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                      {unlockedExhibits.length > 4 && (
+                        <div className="text-white/50 text-[9px] mt-1 px-1">
+                          +{unlockedExhibits.length - 4} more
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </>
@@ -2275,13 +2319,56 @@ function ChatInterface({
             !assistantSpeaking && isSpeaking ? "ring-4 ring-blue-400" : "ring-0"
           )}>
             <VideoInput ref={videoRef} autoStart={isCallActive && !showEndScreen && status.value !== "disconnected"} preferredDeviceId={selectedDevices?.cameraId} />
-            </div>
+          </div>
 
           {/* Collapsible sidebar trigger handled by top-right icon */}
           {/* Gear (devices) next to transcript button */}
           {/* Controls moved to page-level fixed container (see below) */}
           </div>
           )}
+          
+          {/* Exhibit List - Next to coaching buttons */}
+          {!primaryExhibit && !showEndScreen && unlockedExhibits && unlockedExhibits.length > 0 && (
+            <div className="fixed top-4 right-[200px] z-40 bg-black/85 backdrop-blur-md rounded-xl p-2.5 shadow-2xl border border-white/10 w-[220px]">
+              <div className="text-white/70 text-[11px] font-semibold mb-1.5 px-1 uppercase tracking-wide">
+                Case Exhibits
+              </div>
+              <div className="flex flex-col gap-1">
+                {unlockedExhibits.slice(0, 4).map((exhibit: any, index: number) => (
+                  <button
+                    key={exhibit.id}
+                    onClick={() => {
+                      // Toggle logic: if current exhibit is active, turn it off; otherwise turn it on
+                      if (primaryExhibit?.id === exhibit.id) {
+                        onClosePrimaryExhibit(); // Turn off current exhibit
+                      } else {
+                        onShowExhibitFromSidebar(exhibit.id); // Turn on this exhibit (will auto turn off others)
+                      }
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-left leading-tight group relative ${
+                      primaryExhibit?.id === exhibit.id
+                        ? 'bg-blue-500 text-white shadow-lg ring-1 ring-blue-400/50'
+                        : 'text-white/90 hover:text-white hover:bg-white/15 hover:shadow-md'
+                    }`}
+                  >
+                    <div className="truncate">
+                      {exhibit.display_name || exhibit.exhibit_name}
+                    </div>
+                    {/* Tooltip positioned above to avoid going off-screen */}
+                    <div className="absolute bottom-full mb-2 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-75 z-50">
+                      {exhibit.display_name || exhibit.exhibit_name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {unlockedExhibits.length > 4 && (
+                <div className="text-white/50 text-[10px] mt-1.5 px-1">
+                  +{unlockedExhibits.length - 4} more exhibits
+                </div>
+              )}
+            </div>
+          )}
+          
           {/* Page-level controls: Top-right of the page, not inside video window */}
           {!showEndScreen && (
             <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
@@ -2431,6 +2518,7 @@ function ChatInterface({
           />
         </div>
       )}
+
 
       {/* Exhibit Modal - Only show during active interview, not on end screen */}
       {!showEndScreen && (
@@ -2671,22 +2759,37 @@ export default function ClientComponent({
             auto_displayed: true
           };
           
-          // Add to unlocked exhibits if not already there
+          // BOT OVERRIDE LOGIC: Close any currently shown exhibit first
+          if (primaryExhibit) {
+            console.log("🔄 Bot override: Closing current exhibit:", primaryExhibit.display_name || primaryExhibit.exhibit_name);
+            setPrimaryExhibit(null);
+          }
+          
+          // Close any expanded modal exhibit
+          if (expandedExhibit) {
+            console.log("🔄 Bot override: Closing expanded exhibit modal");
+            setExpandedExhibit(null);
+          }
+          
+          // Add to unlocked exhibits if not already there (for sidebar history)
           setUnlockedExhibits(prev => {
             const exists = prev.find(e => e.exhibit_name === exhibit_name);
             if (exists) {
-              // Update existing with new unlock time
+              // Update existing with new unlock time and mark for auto-display
               return prev.map(e => 
                 e.exhibit_name === exhibit_name 
                   ? { ...e, unlocked_at: new Date(), auto_displayed: true }
-                  : e
+                  : { ...e, auto_displayed: false } // Clear auto_displayed from others
               );
             } else {
-              return [...prev, newExhibit];
+              // Add new exhibit and clear auto_displayed from others
+              return [...prev.map(e => ({ ...e, auto_displayed: false })), newExhibit];
             }
           });
           
-          // Trigger exhibit display via ExhibitManager (will be handled by useEffect below)
+          // Immediately show the new exhibit (override any current display)
+          console.log("🎬 Bot override: Immediately displaying new exhibit:", newExhibit.display_name || newExhibit.exhibit_name);
+          setPrimaryExhibit(newExhibit);
           
           console.log("✅ Exhibit unlocked and displayed:", newExhibit.display_name);
           toast.success(`📸 Exhibit displayed: ${newExhibit.display_name || newExhibit.exhibit_name}`);
@@ -2750,15 +2853,9 @@ export default function ClientComponent({
     setExpandedExhibit(null);
   }, []);
   
-  // Auto-embed newly unlocked exhibits (parent level)
-  useEffect(() => {
-    if (!unlockedExhibits || unlockedExhibits.length === 0) return;
-    const newestAuto = unlockedExhibits.find((e: any) => e?.auto_displayed);
-    if (newestAuto && (!primaryExhibit || primaryExhibit.id !== newestAuto.id)) {
-      console.log("🎬 Embedding unlocked exhibit:", newestAuto.display_name || newestAuto.exhibit_name);
-      setPrimaryExhibit({ ...newestAuto, auto_displayed: false });
-    }
-  }, [unlockedExhibits, primaryExhibit]);
+  // Auto-embed newly unlocked exhibits (parent level) - REMOVED
+  // Bot override logic now handles display directly in handleToolCall
+  // This ensures immediate override without waiting for useEffect cycles
   
   // Monitor video stream availability (less frequently to reduce spam)
   useEffect(() => {
