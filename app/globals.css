@@ -716,3 +716,45 @@
     transform: none;
   }
 }
+
+/* ================================
+   INTERVIEW SETUP STYLES
+   ================================ */
+
+@layer utilities {
+  /* Smooth scroll behavior */
+  .scroll-smooth-subtle {
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+  }
+  
+  /* Better card hover states */
+  .card-hover-lift {
+    @apply transition-all duration-200 ease-out;
+  }
+  
+  .card-hover-lift:hover {
+    @apply -translate-y-1 shadow-lg;
+  }
+  
+  /* Consistent badge styling */
+  .badge-consistent {
+    @apply inline-flex items-center justify-center min-w-[60px] h-6;
+  }
+  
+  /* Line clamp utilities for consistent text truncation */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}

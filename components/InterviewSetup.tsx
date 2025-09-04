@@ -774,234 +774,253 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
       <div className="flex-1 overflow-hidden">
         <AnimatePresence mode="wait">
         {currentPage === 1 && (
-          <motion.div
+          <div
             key="page1"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
             className="h-full flex flex-col"
           >
-            {/* Clean Single-Row Filter Bar */}
-            <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-6 py-6">
-              <div className="container mx-auto">
-              <div className="flex items-center gap-4 min-h-[40px]">
-                {/* Search */}
-                <div className="relative flex-1 max-w-lg">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                  <Input
-                    placeholder="Search cases, industries, skills..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 border-gray-200 focus:border-blue-300 focus:ring-blue-100"
-                  />
+            {/* Header and Filters - consistent with page 2 */}
+            <div 
+              className="fixed left-0 right-0 z-40 bg-white backdrop-blur-sm border-b border-gray-100"
+              style={{ 
+                top: '64px',
+                height: '180px'
+              }}
+            >
+              <div className="container mx-auto px-6 py-6">
+                {/* Header - always visible */}
+                <div className="text-center space-y-2 mb-4">
+                  <h2 className="text-3xl font-bold text-gray-900">Choose Your Case</h2>
+                  <p className="text-gray-600 text-lg">
+                    Select an interview case that matches your preparation goals
+                  </p>
                 </div>
 
-                {/* All Filters in One Row */}
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-32 border-gray-200">
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {typeOptions.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {/* Filters */}
+                <div className="flex flex-wrap gap-3 items-center min-h-[48px]">
+                  {/* Search - responsive width */}
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Search cases..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10 h-10 border-gray-200 focus:border-blue-300 focus:ring-1 focus:ring-blue-100"
+                    />
+                  </div>
 
-                <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-                  <SelectTrigger className="w-32 border-gray-200">
-                    <SelectValue placeholder="Level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    {difficultyOptions.map(difficulty => (
-                      <SelectItem key={difficulty} value={difficulty}>{difficulty}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {/* Filters - consistent widths */}
+                  <div className="hidden lg:flex items-center gap-2">
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                      <SelectTrigger className="w-[140px] h-10 border-gray-200">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        {typeOptions.map(type => (
+                          <SelectItem key={type} value={type}>{type}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                <Select value={industryFilter} onValueChange={setIndustryFilter}>
-                  <SelectTrigger className="w-36 border-gray-200">
-                    <SelectValue placeholder="Industry" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Industries</SelectItem>
-                    {industryOptions.map(industry => (
-                      <SelectItem key={industry} value={industry}>{industry}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                      <SelectTrigger className="w-[140px] h-10 border-gray-200">
+                        <SelectValue placeholder="All Levels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Levels</SelectItem>
+                        {difficultyOptions.map(difficulty => (
+                          <SelectItem key={difficulty} value={difficulty}>{difficulty}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                <Select value={formatFilter} onValueChange={setFormatFilter}>
-                  <SelectTrigger className="w-36 border-gray-200">
-                    <SelectValue placeholder="Format" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Formats</SelectItem>
-                    {formatOptions.map(format => (
-                      <SelectItem key={format} value={format}>{format}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                    <Select value={industryFilter} onValueChange={setIndustryFilter}>
+                      <SelectTrigger className="w-[160px] h-10 border-gray-200">
+                        <SelectValue placeholder="All Industries" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Industries</SelectItem>
+                        {industryOptions.map(industry => (
+                          <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-                {/* Clear & Results */}
-                <div className="flex items-center gap-3 ml-auto">
-                  {hasActiveFilters && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearFilters}
-                      className="text-gray-500 hover:text-gray-700"
-                    >
-                      Clear
-                    </Button>
-                  )}
-                  <div className="text-sm text-gray-500 font-medium">
-                    {filteredCases.length} cases
+                    <Select value={formatFilter} onValueChange={setFormatFilter}>
+                      <SelectTrigger className="w-[160px] h-10 border-gray-200">
+                        <SelectValue placeholder="All Formats" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Formats</SelectItem>
+                        {formatOptions.map(format => (
+                          <SelectItem key={format} value={format}>{format}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Results count and clear - always visible */}
+                  <div className="flex items-center gap-3 ml-auto">
+                    {hasActiveFilters && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={clearFilters}
+                        className="text-gray-500 hover:text-gray-700 h-8"
+                      >
+                        Clear
+                      </Button>
+                    )}
+                    <div className="text-sm text-gray-600 font-medium whitespace-nowrap">
+                      {filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}
+                    </div>
                   </div>
                 </div>
               </div>
-              </div>
             </div>
 
-            {/* Scrollable Content Area with Fade Indicators */}
-            <ScrollFadeIndicator 
-              className="h-[calc(100vh-8rem)]"
-              fadeHeight={80}
-              fadeColor="white"
-              topOffset={96}
-            >
-              <div className="px-6 pt-32 pb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[400px]">
-                  <AnimatePresence>
-                    {filteredCases.map((case_, index) => (
-                      <motion.div
-                        key={case_.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <Card
-                          className={cn(
-                            "h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
-                            selectedCase === case_.id
-                              ? "ring-2 ring-blue-500 bg-blue-50 border-blue-200"
-                              : "hover:border-blue-200"
-                          )}
-                          onClick={() => {
-                            setSelectedCase(case_.id);
-                            // Auto-advance to next step after selection
-                            setTimeout(() => setCurrentPage(2), 300);
-                          }}
+            {/* Content Area - consistent padding to match new header height */}
+            <div className="h-full" style={{ paddingTop: '180px' }}>
+              <ScrollFadeIndicator 
+                className="h-full"
+                fadeHeight={60}
+                fadeColor="rgb(255, 255, 255)"
+              >
+                <div className="px-6 pb-24 pt-6">
+                  {/* Grid content */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    <AnimatePresence>
+                      {filteredCases.map((case_, index) => (
+                        <motion.div
+                          key={case_.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          transition={{ delay: Math.min(index * 0.03, 0.3) }}
+                          layout
                         >
-                          <CardContent className="p-6 h-full flex flex-col">
-                            {/* Header: Icon + Title */}
-                            <div className="flex items-start gap-4 mb-2">
-                              <div className={cn(
-                                "w-12 h-12 rounded-md border flex items-center justify-center",
-                                getCategoryColor(case_.type).bg,
-                                getCategoryColor(case_.type).border,
-                                getCategoryColor(case_.type).text
-                              )}>
-                                {(() => {
-                                  const Icon = getCaseTypeIcon(case_.type);
-                                  return <Icon className="w-5 h-5" />;
-                                })()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-lg leading-tight line-clamp-2 text-gray-900">
-                                  {case_.title}
-                                </h3>
-                                <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
-                                  {case_.industry && <span>{case_.industry}</span>}
-                                  <span>•</span>
-                                  <span>{case_.total_time || "30 min"}</span>
+                          <Card
+                            className={cn(
+                              "h-full cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-lg",
+                              "flex flex-col",
+                              selectedCase === case_.id
+                                ? "ring-2 ring-blue-500 bg-blue-50/50 border-blue-200"
+                                : "hover:border-blue-200"
+                            )}
+                            onClick={() => {
+                              setSelectedCase(case_.id);
+                              setTimeout(() => setCurrentPage(2), 300);
+                            }}
+                          >
+                            <CardContent className="p-6 flex flex-col h-full">
+                              {/* Header section - fixed height */}
+                              <div className="flex items-start gap-4 mb-4 min-h-[60px]">
+                                <div className={cn(
+                                  "w-12 h-12 rounded-lg border flex items-center justify-center flex-shrink-0",
+                                  getCategoryColor(case_.type).bg,
+                                  getCategoryColor(case_.type).border,
+                                  getCategoryColor(case_.type).text
+                                )}>
+                                  {(() => {
+                                    const Icon = getCaseTypeIcon(case_.type);
+                                    return <Icon className="w-5 h-5" />;
+                                  })()}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-lg leading-tight line-clamp-2 text-gray-900 mb-1">
+                                    {case_.title}
+                                  </h3>
+                                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                                    {case_.industry && (
+                                      <>
+                                        <span className="truncate max-w-[150px]">{case_.industry}</span>
+                                        <span className="text-gray-300">•</span>
+                                      </>
+                                    )}
+                                    <span className="whitespace-nowrap">{case_.total_time || "30 min"}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
 
-                            {/* Type + Format (swapped) */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                {case_.type && (
+                              {/* Badges section - fixed height */}
+                              <div className="flex items-center justify-between mb-4 min-h-[32px]">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {case_.type && (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        "text-xs",
+                                        getCategoryColor(case_.type).text,
+                                        getCategoryColor(case_.type).border,
+                                        getCategoryColor(case_.type).bg,
+                                        getCategoryColor(case_.type).hoverBg
+                                      )}
+                                    >
+                                      {case_.type}
+                                    </Badge>
+                                  )}
+                                  {case_.requires_documents && (
+                                    <Badge variant="outline" className="text-xs text-purple-700 border-purple-200 bg-purple-50">
+                                      📄
+                                    </Badge>
+                                  )}
+                                </div>
+                                {case_.format && (
                                   <Badge
                                     variant="outline"
-                                    className={cn(
-                                      "text-xs",
-                                      getCategoryColor(case_.type).text,
-                                      getCategoryColor(case_.type).border,
-                                      getCategoryColor(case_.type).bg,
-                                      getCategoryColor(case_.type).hoverBg
-                                    )}
+                                    className="text-xs text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
                                   >
-                                    {case_.type}
-                                  </Badge>
-                                )}
-                                {case_.requires_documents && (
-                                  <Badge variant="outline" className="text-xs text-purple-700 border-purple-200 bg-purple-50">
-                                    📄
+                                    {case_.format}
                                   </Badge>
                                 )}
                               </div>
-                              {case_.format && (
-                                <Badge
-                                  variant="outline"
-                                  className="text-xs text-blue-700 border-blue-200 bg-blue-50 hover:bg-blue-100"
-                                >
-                                  {case_.format}
-                                </Badge>
-                              )}
-                            </div>
 
-                            {/* Overview with fixed min height for alignment */}
-                            <p className="text-sm text-gray-600 leading-relaxed mb-4 line-clamp-2 min-h-[48px]">
-                              {case_.overview}
-                            </p>
+                              {/* Overview - fixed height with proper line clamping */}
+                              <p className="text-sm text-gray-600 leading-relaxed flex-1 line-clamp-3 min-h-[60px]">
+                                {case_.overview}
+                              </p>
 
-                            {/* Bottom-aligned section for consistent layout */}
-                            <div className="mt-auto">
-                              {/* Divider */}
-                              <div className="border-t border-gray-200 my-2" />
+                              {/* Footer section - always at bottom */}
+                              <div className="mt-4 pt-4 border-t border-gray-100">
+                                {/* Difficulty */}
+                                <div className="flex items-center justify-between mb-3">
+                                  <span className="text-sm font-medium text-gray-600">Difficulty</span>
+                                  <div className="flex items-center gap-0.5">
+                                    {[1, 2, 3].map((i) => (
+                                      <Star
+                                        key={i}
+                                        className={cn(
+                                          "w-4 h-4 transition-colors",
+                                          i <= getDifficultyStars(case_.difficulty)
+                                            ? "fill-indigo-500 text-indigo-500"
+                                            : "fill-gray-200 text-gray-200"
+                                        )}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
 
-                              {/* Difficulty stars */}
-                              <div className="flex items-center justify-between py-2">
-                                <div className="text-sm text-gray-600">Difficulty</div>
-                                <div className="flex items-center gap-1">
-                                  {[1,2,3].map((i) => (
-                                    <Star
-                                      key={i}
-                                      className={cn(
-                                        "w-4 h-4",
-                                        i <= getDifficultyStars(case_.difficulty) ? "fill-current text-indigo-600" : "text-indigo-200"
-                                      )}
-                                    />
-                                  ))}
+                                {/* Stretch area - always present for consistent height */}
+                                <div className="flex items-center gap-2 text-gray-600 min-h-[24px]">
+                                  {case_.stretch_area ? (
+                                    <>
+                                      <Target className="w-4 h-4 text-gray-400" />
+                                      <span className="text-sm truncate">{case_.stretch_area}</span>
+                                    </>
+                                  ) : (
+                                    <span className="text-sm text-gray-400">General skills</span>
+                                  )}
                                 </div>
                               </div>
-
-                              {/* Divider */}
-                              <div className="border-t border-gray-200 my-2" />
-
-                              {/* Stretch area or spacer for alignment */}
-                              {case_.stretch_area ? (
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <Target className="w-4 h-4 text-gray-400" />
-                                  <span className="text-sm">{case_.stretch_area}</span>
-                                </div>
-                              ) : (
-                                <div className="h-6" />
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                  </div>
                 </div>
-              </div>
-            </ScrollFadeIndicator>
+              </ScrollFadeIndicator>
+            </div>
 
             {/* No Results */}
             {filteredCases.length === 0 && (
@@ -1021,118 +1040,123 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
 
             {/* Removed floating continue button - cards auto-advance */}
 
-          </motion.div>
+          </div>
         )}
 
-                {/* Page 2: Configuration */}
+                {/* Page 2: Profile Selection - Same approach */}
         {currentPage === 2 && (
-          <motion.div
+          <div
             key="page2"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
             className="h-full flex flex-col"
           >
-            {/* Fixed Header + Filters */}
-            <div className="fixed top-16 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+            {/* Header and Filters - NO ANIMATION, immediate positioning */}
+            <div 
+              className="fixed left-0 right-0 z-40 bg-white backdrop-blur-sm border-b border-gray-100" 
+              style={{ 
+                top: '64px',
+                height: '180px'
+              }}
+            >
               <div className="container mx-auto px-6 py-6">
-                {/* Header - No duplicate Dashboard button (already in main header) */}
-                <div className="text-center space-y-2 mb-4 min-h-[80px]">
+                {/* Header - always visible */}
+                <div className="text-center space-y-2 mb-4">
                   <h2 className="text-3xl font-bold text-gray-900">Choose Interview Style</h2>
-                  <p className="text-gray-600 text-lg">Select an AI interviewer personality that matches your preparation goals</p>
+                  <p className="text-gray-600 text-lg">
+                    Select an AI interviewer personality that matches your preparation goals
+                  </p>
                 </div>
 
-                {/* Filters and Create Custom Button */}
+                {/* Filters - no animation to prevent jumping */}
                 <div className="flex flex-wrap gap-3 items-center min-h-[48px]">
-              <Select value={profileTypeFilter} onValueChange={setProfileTypeFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="custom">Custom</SelectItem>
-                </SelectContent>
-              </Select>
+                    <Select value={profileTypeFilter} onValueChange={setProfileTypeFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All Types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Types</SelectItem>
+                        <SelectItem value="default">Default</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-              <Select value={profileCompanyFilter} onValueChange={setProfileCompanyFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Companies" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Companies</SelectItem>
-                  {companyProfiles.map(company => (
-                    <SelectItem key={company.id} value={company.name || company.display_name}>{company.display_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    <Select value={profileCompanyFilter} onValueChange={setProfileCompanyFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All Companies" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Companies</SelectItem>
+                        {companyProfiles.map(company => (
+                          <SelectItem key={company.id} value={company.name || company.display_name}>{company.display_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-              <Select value={profileSeniorityFilter} onValueChange={setProfileSeniorityFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Levels" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Levels</SelectItem>
-                  {seniorityProfiles.map(seniority => (
-                    <SelectItem key={seniority.id} value={seniority.level}>{seniority.display_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    <Select value={profileSeniorityFilter} onValueChange={setProfileSeniorityFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All Levels" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Levels</SelectItem>
+                        {seniorityProfiles.map(seniority => (
+                          <SelectItem key={seniority.id} value={seniority.level}>{seniority.display_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
 
-              <Select value={profileDifficultyFilter} onValueChange={setProfileDifficultyFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="All Difficulties" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Difficulties</SelectItem>
-                  {difficultyProfiles.map(difficulty => (
-                    <SelectItem key={difficulty.id} value={difficulty.level}>{difficulty.display_name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              
-              {(profileTypeFilter !== "all" || profileCompanyFilter !== "all" || profileSeniorityFilter !== "all" || profileDifficultyFilter !== "all") && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setProfileTypeFilter("all");
-                    setProfileCompanyFilter("all");
-                    setProfileSeniorityFilter("all");
-                    setProfileDifficultyFilter("all");
-                  }}
-                  className="text-gray-500 hover:text-gray-700"
-                >
-                  <X className="w-4 h-4 mr-1" />
-                  Clear
-                </Button>
-              )}
+                    <Select value={profileDifficultyFilter} onValueChange={setProfileDifficultyFilter}>
+                      <SelectTrigger className="w-40">
+                        <SelectValue placeholder="All Difficulties" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Difficulties</SelectItem>
+                        {difficultyProfiles.map(difficulty => (
+                          <SelectItem key={difficulty.id} value={difficulty.level}>{difficulty.display_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    
+                    {(profileTypeFilter !== "all" || profileCompanyFilter !== "all" || profileSeniorityFilter !== "all" || profileDifficultyFilter !== "all") && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setProfileTypeFilter("all");
+                          setProfileCompanyFilter("all");
+                          setProfileSeniorityFilter("all");
+                          setProfileDifficultyFilter("all");
+                        }}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Clear
+                      </Button>
+                    )}
 
-              {/* Create Custom Button - Same Height as Filters */}
-              <Button
-                variant="outline"
-                onClick={goToCustomProfilePage}
-                className="border-2 border-dashed border-blue-300 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 hover:border-blue-400 text-blue-700 font-medium"
-              >
-                <Settings className="w-4 h-4 mr-2" />
-                Create Custom
-              </Button>
-              
-              <div className="text-sm text-gray-500 flex items-center ml-auto">
-                {filteredProfiles.length} profiles available
-              </div>
-                </div>
+                    {/* Create Custom Button - Same Height as Filters */}
+                    <Button
+                      variant="outline"
+                      onClick={goToCustomProfilePage}
+                      className="border-2 border-dashed border-blue-300 bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 hover:border-blue-400 text-blue-700 font-medium"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Create Custom
+                    </Button>
+                    
+                    <div className="text-sm text-gray-500 flex items-center ml-auto">
+                      {filteredProfiles.length} profiles available
+                    </div>
+                  </div>
               </div>
             </div>
 
-            {/* Profiles Grid (scrolls under fixed header) */}
-            <ScrollFadeIndicator 
-              className="h-[calc(100vh-9rem)]"
-              fadeHeight={80}
-              fadeColor="white"
-              topOffset={152}
-            >
-              <div className="container mx-auto px-6 pt-48 pb-24">
+            {/* Content - consistent padding */}
+            <div className="h-full" style={{ paddingTop: '180px' }}>
+              <ScrollFadeIndicator 
+                className="h-full"
+                fadeHeight={60}
+                fadeColor="rgb(255, 255, 255)"
+              >
+                <div className="container mx-auto px-6 pb-24 pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 min-h-[400px]">
                   {filteredProfiles.map((profile) => {
                     const displayName = profile.name || profile.alias;
@@ -1282,55 +1306,14 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
                 </div>
               </div>
             </ScrollFadeIndicator>
-
-            {/* Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 z-40">
-              <div className="container mx-auto flex items-center justify-between">
-                {/* Left: Summary Pills */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                    <CheckCircle className="w-4 h-4" />
-                    Case Selected
-                  </div>
-                  {selectedProfileData && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm">
-                      <CheckCircle className="w-4 h-4" />
-                      {selectedProfileData.name || selectedProfileData.alias}
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: Action Buttons */}
-                <div className="flex items-center gap-4">
-                  <Button
-                    variant="outline"
-                    onClick={goToPreviousPage}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    onClick={goToNextPage}
-                    disabled={!canProceedFromPage2}
-                    className="bg-blue-600 hover:bg-blue-700 px-8"
-                  >
-                    Start Interview
-                  </Button>
-                </div>
-              </div>
             </div>
-
-            {/* No spacer needed - scroller overlaps footer */}
-          </motion.div>
+          </div>
         )}
 
         {/* Page 3: Custom Profile Creation */}
         {currentPage === 3 && (
-          <motion.div
+          <div
             key="page3"
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.3 }}
             className="h-full flex flex-col overflow-hidden"
           >
             {/* Page Header (not fixed) */}
@@ -1814,7 +1797,7 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
             
             {/* Spacer for fixed footer */}
             <div className="h-20"></div>
-          </motion.div>
+          </div>
         )}
         </AnimatePresence>
       </div>
