@@ -38,6 +38,16 @@ interface Session {
   overall_score?: number;
 }
 
+interface AvailableMinutes {
+  monthly_used: number;
+  monthly_limit: number;
+  monthly_remaining: number;
+  topup_balance: number;
+  total_available: number;
+  topup_total_purchased: number;
+  topup_used: number;
+}
+
 export function useDashboardData() {
   // Fetch all dashboard data with SWR
   const { data: usageData, error: usageError } = useSWR<UsageSummary[]>(
@@ -81,16 +91,27 @@ export function useDashboardData() {
       revalidateOnReconnect: true,
       refreshInterval: 10000, // 10 seconds for testing
       dedupingInterval: 1000,  // Reduced deduping for testing
+    }
+  );
 
+  const { data: availableMinutesData, error: availableMinutesError } = useSWR<{success: boolean, data: AvailableMinutes}>(
+    '/api/dashboard/available-minutes',
+    fetcher,
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      refreshInterval: 300000, // 5 minutes
+      dedupingInterval: 60000,
     }
   );
 
   // Derive loading state
   const isLoading = !usageData && !usageError && !subscriptionInfo && !subscriptionError && 
-                   !sessionsData && !sessionsError && !quickStatsData && !quickStatsError;
+                   !sessionsData && !sessionsError && !quickStatsData && !quickStatsError &&
+                   !availableMinutesData && !availableMinutesError;
 
   // Derive error state
-  const hasError = usageError || subscriptionError || sessionsError || quickStatsError;
+  const hasError = usageError || subscriptionError || sessionsError || quickStatsError || availableMinutesError;
 
 
 
@@ -100,6 +121,7 @@ export function useDashboardData() {
     subscriptionInfo: subscriptionInfo || null,
     recentSessions: sessionsData?.sessions?.slice(0, 3) || [],
     quickStats: quickStatsData?.success ? quickStatsData.stats : null,
+    availableMinutes: availableMinutesData?.success ? availableMinutesData.data : null,
     
     // States
     isLoading,
@@ -111,6 +133,7 @@ export function useDashboardData() {
       subscription: subscriptionError,
       sessions: sessionsError,
       quickStats: quickStatsError,
+      availableMinutes: availableMinutesError,
     }
   };
 }

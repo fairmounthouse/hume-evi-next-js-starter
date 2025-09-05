@@ -6,16 +6,19 @@ export interface UsageCheck {
   limit_value: number;
   remaining: number;
   is_unlimited: boolean;
+  topup_balance?: number;  // NEW: top-up minutes balance
+  total_available?: number; // NEW: total minutes available (monthly + top-up)
 }
 
 // SubscriptionInfo interface removed - use Clerk directly for plan info
 
 export interface UsageSummary {
-  limit_type: string;
-  limit_value: number;
+  usage_type: string;
   current_usage: number;
-  remaining: number;
+  limit_value: number;
   percentage_used: number;
+  period_start: string;
+  period_end: string;
 }
 
 /**
@@ -58,13 +61,15 @@ export async function ensureUserExists(clerkId: string, email: string): Promise<
 export async function checkUsageLimit(
   clerkId: string, 
   usageType: string, 
-  amount: number = 1
+  amount: number = 1,
+  planKey?: string
 ): Promise<UsageCheck> {
   const { data, error } = await supabase
     .rpc('check_usage_limit', {
       p_clerk_id: clerkId,
       p_usage_type: usageType,
-      p_amount: amount
+      p_amount: amount,
+      p_plan_key: planKey || 'free'
     });
 
   if (error) {
@@ -72,7 +77,8 @@ export async function checkUsageLimit(
     throw new Error(`Failed to check usage limit: ${error.message}`);
   }
 
-  return data as UsageCheck;
+  // RPC returns an array for table functions, get the first element
+  return (Array.isArray(data) ? data[0] : data) as UsageCheck;
 }
 
 /**
@@ -138,6 +144,8 @@ export async function getUserUsageSummary(clerkId: string, monthlyMinuteLimit: n
  * This uses the new Supabase-based plan configuration
  */
 export async function getUserUsageSummaryFromSupabase(clerkId: string, planKey: string = 'free'): Promise<UsageSummary[]> {
+  console.log('🔍 Calling get_user_usage_summary_with_plan RPC:', { clerkId, planKey });
+  
   const { data, error } = await supabase
     .rpc('get_user_usage_summary_with_plan', {
       p_clerk_id: clerkId,
@@ -145,11 +153,28 @@ export async function getUserUsageSummaryFromSupabase(clerkId: string, planKey: 
     });
 
   if (error) {
-    console.error('Error getting usage summary from Supabase:', error);
+    console.error('❌ RPC get_user_usage_summary_with_plan failed - DETAILED ERROR:', {
+      error,
+      errorMessage: error.message,
+      errorCode: error.code,
+      errorDetails: error.details,
+      errorHint: error.hint,
+      clerkId,
+      planKey
+    });
     throw new Error(`Failed to get usage summary: ${error.message}`);
   }
 
-  return data as UsageSummary[];
+  console.log("✅ RPC get_user_usage_summary_with_plan succeeded:", {
+    data,
+    dataType: typeof data,
+    dataLength: Array.isArray(data) ? data.length : 'not array',
+    clerkId,
+    planKey
+  });
+
+  // Ensure we always return an array
+  return Array.isArray(data) ? data : [];
 }
 
 /**
@@ -200,6 +225,84 @@ export async function initializeUserBilling(clerkId: string, email: string): Pro
     console.error('Error initializing user:', error);
     throw error;
   }
+}
+
+// =====================================================
+// TOP-UP MINUTES FUNCTIONS
+// =====================================================
+
+/**
+ * Get user's available minutes (monthly + top-up)
+ */
+export async function getUserAvailableMinutes(clerkId: string) {
+  const { data, error } = await supabase
+    .rpc('get_user_available_minutes', {
+      p_clerk_id: clerkId
+    });
+
+  if (error) {
+    console.error('Error getting available minutes:', error);
+    throw new Error(`Failed to get available minutes: ${error.message}`);
+  }
+
+  // RPC returns an array for table functions
+  return (Array.isArray(data) ? data[0] : data) as {
+    monthly_used: number;
+    monthly_limit: number;
+    monthly_remaining: number;
+    topup_balance: number;
+    total_available: number;
+    topup_total_purchased: number;
+    topup_used: number;
+  };
+}
+
+/**
+ * Deduct minutes after session ends
+ */
+export async function deductSessionMinutes(sessionId: string) {
+  const { data, error } = await supabase
+    .rpc('deduct_session_minutes', {
+      p_session_id: sessionId
+    });
+
+  if (error) {
+    console.error('Error deducting session minutes:', error);
+    throw new Error(`Failed to deduct minutes: ${error.message}`);
+  }
+
+  // RPC returns an array for table functions
+  return (Array.isArray(data) ? data[0] : data) as {
+    success: boolean;
+    minutes_used: number;
+    from_monthly: number;
+    from_topup: number;
+    topup_remaining: number;
+  };
+}
+
+/**
+ * Redeem a coupon code for top-up minutes
+ */
+export async function redeemCoupon(clerkId: string, code: string) {
+  const { data, error } = await supabase
+    .rpc('redeem_coupon', {
+      p_clerk_id: clerkId,
+      p_code: code.trim()
+    });
+
+  if (error) {
+    console.error('Error redeeming coupon:', error);
+    throw new Error(`Failed to redeem coupon: ${error.message}`);
+  }
+
+  // RPC returns an array for table functions
+  return (Array.isArray(data) ? data[0] : data) as {
+    success: boolean;
+    minutes_added: number;
+    message: string;
+    new_balance: number;
+  };
 }
 
 // =====================================================

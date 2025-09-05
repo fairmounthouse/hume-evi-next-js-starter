@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabase-client';
+import { auth } from '@clerk/nextjs/server';
 
 export async function GET(request: NextRequest) {
   try {
+    // Check authentication and get current user
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const url = new URL(request.url);
     const limit = parseInt(url.searchParams.get('limit') || '10');
     
     // Fetch sessions with new combined profile system (use consolidated interviewer_profiles_view)
+    // IMPORTANT: Filter by user_id to only show current user's sessions
     const { data: sessions, error } = await supabase
       .from('interview_sessions')
       .select(`
@@ -25,6 +36,7 @@ export async function GET(request: NextRequest) {
           difficulty_prompt_content
         )
       `)
+      .eq('user_id', userId)  // SECURITY FIX: Only show current user's sessions
       .eq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(limit);

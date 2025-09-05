@@ -18,7 +18,8 @@ import {
   Users,
   Target,
   Zap,
-  Star
+  Star,
+  Coins
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,7 @@ export default function DashboardPage() {
     subscriptionInfo, 
     recentSessions, 
     quickStats, 
+    availableMinutes,
     isLoading: loading, 
     hasError 
   } = useDashboardData();
@@ -97,8 +99,12 @@ export default function DashboardPage() {
     return <DashboardSkeleton />;
   }
 
-  const criticalUsage = usageData.find(usage => usage.percentage_used >= 90);
-  const warningUsage = usageData.find(usage => usage.percentage_used >= 70 && usage.percentage_used < 90);
+  const criticalUsage = usageData && Array.isArray(usageData) ? usageData.find(usage => usage.percentage_used >= 90) : null;
+  
+  // Check if user has exhausted monthly but has top-up minutes
+  const hasTopupMinutes = availableMinutes && availableMinutes.topup_balance > 0;
+  const monthlyExhausted = availableMinutes && availableMinutes.monthly_remaining === 0;
+  const warningUsage = usageData && Array.isArray(usageData) ? usageData.find(usage => usage.percentage_used >= 70 && usage.percentage_used < 90) : null;
 
   return (
     <div className="space-y-8 px-4 sm:px-6 md:px-8 pt-16 max-w-7xl mx-auto">
@@ -114,7 +120,17 @@ export default function DashboardPage() {
         </div>
 
         {/* Usage Alerts */}
-        {criticalUsage && (
+        {monthlyExhausted && hasTopupMinutes && (
+          <Alert>
+            <Clock className="h-4 w-4" />
+            <AlertTitle>Monthly Limit Reached</AlertTitle>
+            <AlertDescription>
+              You've reached your monthly minutes limit. You're now using top-up minutes ({availableMinutes?.topup_balance} remaining).
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {criticalUsage && !hasTopupMinutes && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertTitle>Usage Limit Reached</AlertTitle>
@@ -397,30 +413,60 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {usageData.length > 0 ? (
+              {availableMinutes ? (
                 <div className="space-y-6">
-                  {usageData.map((usage) => {
-                    const status = getUsageStatus(usage.percentage_used);
-                    const StatusIcon = status.icon;
-                    
-                    return (
-                      <div key={usage.usage_type} className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <StatusIcon className="h-4 w-4" />
-                            <span className="font-medium">{formatUsageType(usage.usage_type)}</span>
-                          </div>
-                          <Badge variant={usage.percentage_used >= 90 ? 'destructive' : 'secondary'}>
-                            {usage.current_usage} / {usage.limit_value}
-                          </Badge>
-                        </div>
-                        <Progress value={usage.percentage_used} className="h-2 sm:h-3" />
-                        <p className="text-xs text-muted-foreground">
-                          {usage.percentage_used.toFixed(1)}% used this period
-                        </p>
+                  {/* Monthly Minutes */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        <span className="font-medium">Monthly Minutes</span>
                       </div>
-                    );
-                  })}
+                      <Badge variant={availableMinutes.monthly_remaining === 0 ? 'outline' : 'secondary'} 
+                             className={availableMinutes.monthly_remaining === 0 ? 'border-red-200 text-red-700' : ''}>
+                        {Math.min(availableMinutes.monthly_used, availableMinutes.monthly_limit)} / {availableMinutes.monthly_limit}
+                      </Badge>
+                    </div>
+                    <Progress 
+                      value={availableMinutes.monthly_limit > 0 ? Math.min((availableMinutes.monthly_used / availableMinutes.monthly_limit) * 100, 100) : 0} 
+                      className="h-2 sm:h-3" 
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {availableMinutes.monthly_limit > 0 
+                        ? Math.min(Math.round((availableMinutes.monthly_used / availableMinutes.monthly_limit) * 100), 100)
+                        : 0
+                      }% used this period
+                      {availableMinutes.monthly_used > availableMinutes.monthly_limit && 
+                        ` (${availableMinutes.monthly_used - availableMinutes.monthly_limit} min overage)`
+                      }
+                    </p>
+                  </div>
+
+                  {/* Top-up Minutes (show if user has any) */}
+                  {availableMinutes.topup_total_purchased > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Coins className="h-4 w-4 text-blue-600" />
+                          <span className="font-medium">Top-up Minutes</span>
+                          <Badge variant="outline" className="text-xs">Never Expires</Badge>
+                        </div>
+                        <Badge variant="outline" className="text-blue-600">
+                          {availableMinutes.topup_balance} / {availableMinutes.topup_total_purchased}
+                        </Badge>
+                      </div>
+                      <Progress 
+                        value={availableMinutes.topup_total_purchased > 0 ? (availableMinutes.topup_used / availableMinutes.topup_total_purchased) * 100 : 0} 
+                        className="h-2 sm:h-3" 
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {availableMinutes.topup_total_purchased > 0 
+                          ? Math.round((availableMinutes.topup_used / availableMinutes.topup_total_purchased) * 100)
+                          : 0
+                        }% used lifetime
+                      </p>
+                    </div>
+                  )}
                   
                   <Separator />
                   
@@ -436,8 +482,8 @@ export default function DashboardPage() {
               ) : (
                 <div className="text-center py-8">
                   <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">No usage data yet</p>
-                  <p className="text-sm text-muted-foreground">Start your first interview to see stats</p>
+                  <p className="text-muted-foreground">Loading usage data...</p>
+                  <p className="text-sm text-muted-foreground">Fetching your minutes balance</p>
                 </div>
               )}
             </CardContent>

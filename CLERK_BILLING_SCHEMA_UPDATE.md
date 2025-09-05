@@ -8,7 +8,7 @@ Based on your Clerk dashboard, the plans are:
 
 | Plan | Plan Key | Monthly Price | Clerk Feature Access |
 |------|----------|---------------|---------------------|
-| Free | `free_user` | $0.00 | Basic access |
+| Free | `free` | $0.00 | Basic access |
 | Starter | `starter` | $30.00 | Starter features |
 | Professional | `professional` | $50.00 | Professional features |
 | Premium | `premium` | $99.00 | All premium features |
@@ -28,7 +28,7 @@ ALTER TABLE public.plans ADD COLUMN IF NOT EXISTS plan_key TEXT UNIQUE;
 ```sql
 -- New plans matching Clerk structure
 INSERT INTO public.plans (name, plan_key, price_cents) VALUES 
-('Free', 'free_user', 0),
+('Free', 'free', 0),
 ('Starter', 'starter', 3000),        -- $30.00
 ('Professional', 'professional', 5000), -- $50.00
 ('Premium', 'premium', 9900);        -- $99.00
@@ -107,7 +107,7 @@ export interface SubscriptionInfo {
 ```typescript
 // Updated to use plan_key hierarchy
 const planHierarchy = { 
-  free_user: 0,      // ✅ Added free_user
+  free: 0,      // ✅ Added free_user
   starter: 1, 
   professional: 2, 
   premium: 3 

@@ -4,32 +4,31 @@ import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 import { 
-  Activity,
   Clock,
-  Calendar,
-  TrendingUp,
-  AlertTriangle,
-  CheckCircle,
   Crown,
-  ArrowRight,
   RefreshCw,
-  BarChart3,
-  Target,
-  Zap,
   PlayCircle,
   Timer,
-  CalendarDays
+  CalendarDays,
+  Gift,
+  Coins,
+  CreditCard,
+  TrendingUp,
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle,
+  Activity,
+  Info
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { getSessionBreakdown } from '@/utils/billing-client';
+import { Input } from '@/components/ui/input';
+import { getSessionBreakdown, getUserAvailableMinutes } from '@/utils/billing-client';
 
 interface UsageSummary {
   usage_type: string;
@@ -65,6 +64,18 @@ export default function UsagePage() {
   const [sessionBreakdown, setSessionBreakdown] = useState<SessionBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [redeemingCoupon, setRedeemingCoupon] = useState(false);
+  const [couponMessage, setCouponMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [availableMinutes, setAvailableMinutes] = useState<{
+    monthly_used: number;
+    monthly_limit: number;
+    monthly_remaining: number;
+    topup_balance: number;
+    total_available: number;
+    topup_total_purchased: number;
+    topup_used: number;
+  } | null>(null);
 
   const fetchUsageData = async () => {
     try {
@@ -88,6 +99,10 @@ export default function UsagePage() {
       if (user?.id) {
         const sessions = await getSessionBreakdown(user.id, 15);
         setSessionBreakdown(sessions);
+        
+        // Fetch available minutes (including top-up)
+        const minutes = await getUserAvailableMinutes(user.id);
+        setAvailableMinutes(minutes);
       }
     } catch (error) {
       console.error('Error fetching usage data:', error);
@@ -102,6 +117,37 @@ export default function UsagePage() {
       fetchUsageData();
     }
   }, [user]);
+
+  const handleCouponRedeem = async () => {
+    if (!couponCode.trim() || !user?.id) return;
+    
+    try {
+      setRedeemingCoupon(true);
+      setCouponMessage(null);
+      
+      const response = await fetch('/api/coupon/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: couponCode })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setCouponMessage({ type: 'success', text: data.message });
+        setCouponCode('');
+        // Refresh usage data to show new balance
+        await fetchUsageData();
+      } else {
+        setCouponMessage({ type: 'error', text: data.error || 'Failed to redeem coupon' });
+      }
+    } catch (error) {
+      console.error('Error redeeming coupon:', error);
+      setCouponMessage({ type: 'error', text: 'Failed to redeem coupon' });
+    } finally {
+      setRedeemingCoupon(false);
+    }
+  };
 
   const getUsageStatus = (percentage: number) => {
     if (percentage >= 90) return { 
@@ -150,7 +196,7 @@ export default function UsagePage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Completed</Badge>;
       case 'in_progress':
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">In Progress</Badge>;
       default:
@@ -158,438 +204,311 @@ export default function UsagePage() {
     }
   };
 
+  const getNextResetDate = () => {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return nextMonth.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  const getCurrentPeriod = () => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      start: start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      end: end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    };
+  };
+
   if (loading) {
     return (
-      <div className="space-y-8">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-96" />
-        </div>
-        
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {[...Array(3)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-8 w-24" />
-                  <Skeleton className="h-2 w-full" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      <div className="container mx-auto p-6 space-y-6">
+        <Skeleton className="h-32 w-full" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Skeleton className="h-96 w-full" />
+          </div>
+          <Skeleton className="h-96 w-full" />
         </div>
       </div>
     );
   }
 
-  const criticalUsage = usageData.filter(usage => usage.percentage_used >= 90);
-  const warningUsage = usageData.filter(usage => usage.percentage_used >= 70 && usage.percentage_used < 90);
+  const currentPeriod = getCurrentPeriod();
+  const nextReset = getNextResetDate();
 
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Usage & Limits</h1>
-          <p className="text-muted-foreground">
-            Monitor your usage and track your interview sessions
-          </p>
-        </div>
-        
-        <Button 
-          onClick={fetchUsageData} 
-          disabled={refreshing}
-          variant="outline"
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
-
-      {/* Usage Alerts */}
-      {criticalUsage.length > 0 && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Usage Limits Reached</AlertTitle>
-          <AlertDescription>
-            You've reached the limit for {criticalUsage.length} feature(s). 
-            <Link href="/pricing" className="underline ml-1">Upgrade your plan</Link> to continue using these features.
-          </AlertDescription>
-        </Alert>
-      )}
-      
-      {warningUsage.length > 0 && criticalUsage.length === 0 && (
-        <Alert>
-          <Clock className="h-4 w-4" />
-          <AlertTitle>Usage Warning</AlertTitle>
-          <AlertDescription>
-            You're approaching the limit for {warningUsage.length} feature(s). Consider upgrading to avoid interruptions.
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Current Plan Overview */}
-      <Card className="border-2">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Crown className="h-5 w-5" />
-            Current Plan: {subscriptionInfo?.plan_name || 'Loading...'}
-          </CardTitle>
-          <CardDescription>
-            Your subscription details and billing information
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {subscriptionInfo ? (
-            <div className="grid gap-6 md:grid-cols-3">
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Plan</p>
-                <div className="flex items-center gap-2">
-                  <Badge variant={subscriptionInfo.plan_key === 'free' ? 'secondary' : 'default'} className="text-sm">
-                    {subscriptionInfo.plan_name}
-                  </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    ({subscriptionInfo.subscription_status})
-                  </span>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Monthly Cost</p>
-                <p className="text-2xl font-bold">
-                  ${(subscriptionInfo.plan_price_cents / 100).toFixed(2)}
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-muted-foreground">Next Billing</p>
-                <p className="text-sm">
-                  {new Date(subscriptionInfo.current_period_end).toLocaleDateString()}
-                </p>
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold">Usage & Billing 
+                <Badge className="ml-2 bg-blue-50 text-blue-700 hover:bg-blue-100">
+                  {subscriptionInfo?.plan_name || 'Free'} Plan
+                </Badge>
+              </h1>
+              <div className="flex flex-col sm:flex-row gap-4 mt-4 text-sm text-muted-foreground">
+                <div><strong>Monthly Cost:</strong> ${subscriptionInfo ? (subscriptionInfo.plan_price_cents / 100).toFixed(2) : '0.00'}</div>
+                <div><strong>Next Reset:</strong> {nextReset}</div>
+                <div><strong>Billing Period:</strong> {currentPeriod.start} - {currentPeriod.end}</div>
               </div>
             </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-3">
-              <Skeleton className="h-16" />
-              <Skeleton className="h-16" />
-              <Skeleton className="h-16" />
-            </div>
-          )}
-          
-          <Separator className="my-6" />
-          
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link href="/pricing">
-                View All Plans
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
+            <Button 
+              onClick={fetchUsageData} 
+              disabled={refreshing}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-            {subscriptionInfo?.plan_key === 'free' && (
-              <Button asChild>
-                <Link href="/pricing">
-                  Upgrade Now
-                  <Crown className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Usage Details */}
-      <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Usage Overview</TabsTrigger>
-          <TabsTrigger value="sessions">Session Breakdown</TabsTrigger>
-          <TabsTrigger value="detailed">Monthly Minutes</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          {usageData.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {usageData.map((usage) => {
-                const status = getUsageStatus(usage.percentage_used);
-                const StatusIcon = status.icon;
-                const UsageIcon = getUsageIcon(usage.usage_type);
-                
-                return (
-                  <Card key={`${usage.usage_type}-${usage.period_start}`} className={`${status.bg} border-2`}>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="flex items-center justify-between text-lg">
-                        <div className="flex items-center gap-2">
-                          <UsageIcon className="h-5 w-5" />
-                          {formatUsageType(usage.usage_type)}
-                        </div>
-                        <StatusIcon className={`h-5 w-5 ${status.color}`} />
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Used</span>
-                          <span className="font-medium">
-                            {usage.current_usage} / {usage.limit_value === 999999 ? '∞' : usage.limit_value}
-                          </span>
-                        </div>
-                        <Progress 
-                          value={usage.percentage_used} 
-                          className="h-3"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {usage.percentage_used.toFixed(1)}% of limit used
-                        </p>
-                      </div>
-                      
-                      <div className="text-xs text-muted-foreground">
-                        <p>Period: {new Date(usage.period_start).toLocaleDateString()} - {new Date(usage.period_end).toLocaleDateString()}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Activity className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No Usage Data</h3>
-                <p className="text-muted-foreground mb-4">
-                  Start using Interview AI to see your usage statistics here.
-                </p>
-                <Button asChild>
-                  <Link href="/interview/setup">
-                    Start Your First Interview
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        <TabsContent value="sessions" className="space-y-6">
+      {/* Main Minutes Overview */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <PlayCircle className="h-5 w-5" />
-                Session Breakdown
+                <Timer className="h-5 w-5" />
+                Minutes Balance
               </CardTitle>
-              <CardDescription>
-                Detailed breakdown of your recent interview sessions and time usage
-              </CardDescription>
             </CardHeader>
-            <CardContent>
-              {sessionBreakdown.length > 0 ? (
-                <div className="space-y-4">
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
-                    <div className="bg-primary/5 rounded-lg p-4">
+            <CardContent className="space-y-6">
+              {availableMinutes ? (
+                <>
+                  {/* Monthly Minutes */}
+                  <div className="p-5 bg-muted/30 rounded-lg border-l-4 border-green-500">
+                    <div className="flex justify-between items-center mb-3">
                       <div className="flex items-center gap-2">
-                        <Timer className="h-4 w-4 text-primary" />
-                        <span className="text-sm font-medium">Total Minutes</span>
+                        <span className="font-semibold">Monthly Minutes</span>
+                        <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700">
+                          Resets Monthly
+                        </Badge>
                       </div>
-                      <p className="text-2xl font-bold mt-1">
-                        {sessionBreakdown.reduce((acc, session) => acc + session.duration_minutes, 0)}
-                      </p>
+                      <div className={`text-2xl font-bold ${availableMinutes.monthly_remaining === 0 ? 'text-red-600' : 'text-foreground'}`}>
+                        {availableMinutes.monthly_remaining} / {availableMinutes.monthly_limit}
+                      </div>
                     </div>
-                    <div className="bg-secondary/5 rounded-lg p-4">
-                      <div className="flex items-center gap-2">
-                        <PlayCircle className="h-4 w-4 text-secondary-foreground" />
-                        <span className="text-sm font-medium">Total Sessions</span>
-                      </div>
-                      <p className="text-2xl font-bold mt-1">
-                        {sessionBreakdown.length}
-                      </p>
-                    </div>
-                    <div className="bg-accent/5 rounded-lg p-4">
-                      <div className="flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4 text-accent-foreground" />
-                        <span className="text-sm font-medium">Avg Duration</span>
-                      </div>
-                      <p className="text-2xl font-bold mt-1">
-                        {sessionBreakdown.length > 0 
-                          ? Math.round(sessionBreakdown.reduce((acc, session) => acc + session.duration_minutes, 0) / sessionBreakdown.length)
-                          : 0} min
-                      </p>
+                    <Progress 
+                      value={availableMinutes.monthly_limit > 0 ? (availableMinutes.monthly_used / availableMinutes.monthly_limit) * 100 : 0} 
+                      className="h-2 mb-2"
+                    />
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>
+                        {availableMinutes.monthly_remaining === 0 
+                          ? `Used ${availableMinutes.monthly_used} min (${Math.max(0, availableMinutes.monthly_used - availableMinutes.monthly_limit)} min overage covered by top-up)`
+                          : `${availableMinutes.monthly_used} of ${availableMinutes.monthly_limit} minutes used`
+                        }
+                      </span>
+                      <span>
+                        {availableMinutes.monthly_limit > 0 
+                          ? Math.round((availableMinutes.monthly_used / availableMinutes.monthly_limit) * 100)
+                          : 0
+                        }% used
+                      </span>
                     </div>
                   </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Session</TableHead>
-                        <TableHead>Case</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Date</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sessionBreakdown.map((session) => (
-                        <TableRow key={session.session_id}>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                              <PlayCircle className="h-4 w-4 text-muted-foreground" />
-                              <span className="font-mono text-xs">
-                                {session.session_id.slice(-8)}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{session.case_title}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Timer className="h-3 w-3 text-muted-foreground" />
-                              <span className="font-medium">{session.duration_minutes} min</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(session.status)}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <CalendarDays className="h-3 w-3" />
-                              {formatDate(session.started_at)}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                  {/* Top-up Minutes */}
+                  <div className="p-5 bg-muted/30 rounded-lg border-l-4 border-blue-500">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold">Top-up Minutes</span>
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                          Never Expires
+                        </Badge>
+                      </div>
+                      <div className="text-2xl font-bold text-blue-600">
+                        {availableMinutes.topup_balance} / {availableMinutes.topup_total_purchased} min
+                      </div>
+                    </div>
+                    <Progress 
+                      value={availableMinutes.topup_total_purchased > 0 ? (availableMinutes.topup_used / availableMinutes.topup_total_purchased) * 100 : 0}
+                      className="h-2 mb-2"
+                    />
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>
+                        {availableMinutes.topup_used > 0 
+                          ? `${availableMinutes.topup_used} of ${availableMinutes.topup_total_purchased} minutes used lifetime`
+                          : 'Available for unlimited use'
+                        }
+                      </span>
+                      <span>
+                        {availableMinutes.topup_total_purchased > 0 
+                          ? `${Math.round((availableMinutes.topup_used / availableMinutes.topup_total_purchased) * 100)}% used`
+                          : 'Never expires'
+                        }
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Total Available */}
+                  <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg text-center">
+                    <div className="text-sm opacity-90 mb-2">Total Available</div>
+                    <div className="text-5xl font-bold">
+                      {availableMinutes.total_available}
+                      <span className="text-xl font-normal ml-2">minutes</span>
+                    </div>
+                  </div>
+
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      <strong>💡 How minutes work:</strong> Monthly minutes are always used first. When they run out, top-up minutes are automatically used. Top-up minutes never expire and carry over forever.
+                    </AlertDescription>
+                  </Alert>
+                </>
               ) : (
-                <div className="text-center py-8">
-                  <PlayCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Sessions Yet</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Start your first interview session to see detailed breakdowns here.
-                  </p>
-                  <Button asChild>
-                    <Link href="/interview/setup">
-                      Start Your First Interview
-                    </Link>
-                  </Button>
-                </div>
+                <Skeleton className="h-64 w-full" />
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
 
-        <TabsContent value="detailed" className="space-y-6">
+        {/* Quick Actions */}
+        <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Monthly Minutes Usage</CardTitle>
-              <CardDescription>
-                Detailed breakdown of your monthly minutes usage and limits
-              </CardDescription>
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
-            <CardContent>
-              {usageData.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Feature</TableHead>
-                      <TableHead>Current Usage</TableHead>
-                      <TableHead>Limit</TableHead>
-                      <TableHead>Percentage</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Period</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {usageData.map((usage) => {
-                      const status = getUsageStatus(usage.percentage_used);
-                      const StatusIcon = status.icon;
-                      
-                      return (
-                        <TableRow key={`${usage.usage_type}-${usage.period_start}`}>
-                          <TableCell className="font-medium">
-                            {formatUsageType(usage.usage_type)}
-                          </TableCell>
-                          <TableCell>{usage.current_usage}</TableCell>
-                          <TableCell>{usage.limit_value === 999999 ? '∞' : usage.limit_value}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress 
-                                value={usage.percentage_used} 
-                                className="h-2 w-16"
-                              />
-                              <span className="text-sm">
-                                {usage.percentage_used.toFixed(1)}%
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <StatusIcon className={`h-4 w-4 ${status.color}`} />
-                              <Badge variant={status.variant}>
-                                {usage.percentage_used >= 90 ? 'At Limit' : 
-                                 usage.percentage_used >= 70 ? 'Warning' : 'Good'}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {new Date(usage.period_start).toLocaleDateString()} - {new Date(usage.period_end).toLocaleDateString()}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No detailed usage data available</p>
+            <CardContent className="space-y-3">
+              <Button className="w-full justify-start" asChild>
+                <Link href="/pricing">
+                  <CreditCard className="mr-2 h-4 w-4" />
+                  Buy Top-up Minutes
+                </Link>
+              </Button>
+              
+              <Button variant="outline" className="w-full justify-start" asChild>
+                <Link href="/pricing">
+                  <TrendingUp className="mr-2 h-4 w-4" />
+                  Upgrade Plan
+                </Link>
+              </Button>
+              
+              <div className="pt-4 border-t">
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Have a coupon?</h4>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Enter coupon code"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !redeemingCoupon) {
+                        handleCouponRedeem();
+                      }
+                    }}
+                    disabled={redeemingCoupon}
+                  />
+                  <Button 
+                    className="w-full"
+                    onClick={handleCouponRedeem}
+                    disabled={redeemingCoupon || !couponCode.trim()}
+                    variant="outline"
+                  >
+                    {redeemingCoupon ? (
+                      <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Gift className="h-4 w-4 mr-2" />
+                    )}
+                    Redeem Code
+                  </Button>
                 </div>
-              )}
+                
+                {couponMessage && (
+                  <Alert variant={couponMessage.type === 'error' ? 'destructive' : 'default'} className="mt-3">
+                    <AlertDescription>
+                      {couponMessage.text}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
 
-      {/* Usage Tips */}
+      {/* Session History */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="h-5 w-5" />
-            Usage Tips
-          </CardTitle>
+          <CardTitle className="text-xl font-semibold">Recent Sessions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="flex gap-3">
-              <Zap className="h-5 w-5 text-blue-600 mt-0.5" />
-              <div>
-                <h4 className="font-medium">Optimize Your Sessions</h4>
-                <p className="text-sm text-muted-foreground">
-                  Focus on shorter, targeted practice sessions to maximize your monthly minutes.
-                </p>
-              </div>
+        <CardContent>
+          {sessionBreakdown.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Session</TableHead>
+                  <TableHead>Case</TableHead>
+                  <TableHead>Duration & Source</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sessionBreakdown.map((session) => (
+                  <TableRow key={session.session_id}>
+                    <TableCell>
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {session.session_id.slice(-8)}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-sm">{session.case_title}</span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{session.duration_minutes} min</span>
+                        {/* Mock breakdown - in real app would come from session metadata */}
+                        {session.duration_minutes > 0 && availableMinutes && (
+                          <div className="flex gap-1">
+                            {availableMinutes.monthly_remaining > 0 && (
+                              <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                                {Math.min(session.duration_minutes, availableMinutes.monthly_limit)} monthly
+                              </Badge>
+                            )}
+                            {session.duration_minutes > availableMinutes.monthly_limit && (
+                              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                                {session.duration_minutes - availableMinutes.monthly_limit} top-up
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(session.status)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(session.started_at)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8">
+              <PlayCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No Sessions Yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Start your first interview session to see your session history here.
+              </p>
+              <Button asChild>
+                <Link href="/interview/setup">
+                  Start Your First Interview
+                </Link>
+              </Button>
             </div>
-            
-            <div className="flex gap-3">
-              <TrendingUp className="h-5 w-5 text-green-600 mt-0.5" />
-              <div>
-                <h4 className="font-medium">Track Progress</h4>
-                <p className="text-sm text-muted-foreground">
-                  Use detailed analysis sparingly on your best sessions for maximum insight.
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <Separator />
-          
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Need more resources? Upgrade your plan for higher limits and additional features.
-            </p>
-            <Button asChild variant="outline" size="sm">
-              <Link href="/pricing">
-                View Plans
-              </Link>
-            </Button>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>

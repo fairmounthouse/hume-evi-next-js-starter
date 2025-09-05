@@ -4,8 +4,8 @@ import { checkUsageLimit } from "@/utils/billing-client";
 
 export async function POST(request: NextRequest) {
   try {
-    // Check authentication
-    const { userId } = await auth();
+    // Check authentication and get plan info
+    const { userId, has } = await auth();
     if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -22,8 +22,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check usage limit
-    const usageCheck = await checkUsageLimit(userId, usageType, amount);
+    // Determine user's plan key from Clerk
+    let planKey = 'free'; // default
+    if (has?.({ plan: 'premium' })) {
+      planKey = 'premium';
+    } else if (has?.({ plan: 'professional' })) {
+      planKey = 'professional';
+    } else if (has?.({ plan: 'starter' })) {
+      planKey = 'starter';
+    }
+
+    // Check usage limit with plan key
+    const usageCheck = await checkUsageLimit(userId, usageType, amount, planKey);
 
     return NextResponse.json(usageCheck);
 
@@ -38,8 +48,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Check authentication
-    const { userId } = await auth();
+    // Check authentication and get plan info
+    const { userId, has } = await auth();
     if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized" },
@@ -58,8 +68,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Check usage limit
-    const usageCheck = await checkUsageLimit(userId, usageType, amount);
+    // Determine user's plan key from Clerk
+    let planKey = 'free'; // default
+    if (has?.({ plan: 'premium' })) {
+      planKey = 'premium';
+    } else if (has?.({ plan: 'professional' })) {
+      planKey = 'professional';
+    } else if (has?.({ plan: 'starter' })) {
+      planKey = 'starter';
+    }
+
+    // Check usage limit with plan key
+    const usageCheck = await checkUsageLimit(userId, usageType, amount, planKey);
 
     return NextResponse.json(usageCheck);
 

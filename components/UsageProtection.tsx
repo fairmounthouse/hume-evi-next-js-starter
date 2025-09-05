@@ -176,7 +176,7 @@ export default function UsageProtection({
                 </span>
               </div>
               <p className="text-sm text-red-700 dark:text-red-200">
-                You've used {usageCheck.current_usage} of {usageCheck.limit_value === -1 ? '∞' : usageCheck.limit_value} 
+                You've used {usageCheck?.current_usage || 0} of {usageCheck?.limit_value === -1 ? '∞' : (usageCheck?.limit_value || 0)} 
                 {' '}{usageType?.replace(/_/g, ' ')} this period.
               </p>
               {usageCheck.message && (

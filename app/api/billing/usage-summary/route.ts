@@ -13,8 +13,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Determine user's plan key from Clerk
-    let planKey = 'free'; // default
+    // Determine user's plan key from Clerk (mapped to Supabase plan keys)
+    let planKey = 'free'; // default - matches database
     if (has?.({ plan: 'premium' })) {
       planKey = 'premium';
     } else if (has?.({ plan: 'professional' })) {

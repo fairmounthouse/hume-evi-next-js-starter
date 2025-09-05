@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/utils/supabase-client';
+import { deductSessionMinutes } from '@/utils/billing-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,12 +37,26 @@ export async function POST(request: NextRequest) {
     
     console.log(`✅ [EMERGENCY END] Successfully ended session ${sessionId} with duration ${duration}s`);
     
+    // Deduct minutes from user's balance (monthly first, then top-up)
+    let minutesDeducted = null;
+    try {
+      if (duration && duration > 0) {
+        console.log(`💰 [EMERGENCY END] Deducting minutes for session ${sessionId}`);
+        minutesDeducted = await deductSessionMinutes(sessionId);
+        console.log(`💰 [EMERGENCY END] Minutes deducted:`, minutesDeducted);
+      }
+    } catch (deductError) {
+      // Log error but don't fail the request - session is already ended
+      console.error('⚠️ [EMERGENCY END] Error deducting minutes:', deductError);
+    }
+    
     return NextResponse.json({ 
       success: true, 
       sessionId,
       duration,
       reason,
-      message: 'Session ended successfully'
+      message: 'Session ended successfully',
+      minutesDeducted
     });
     
   } catch (error) {
