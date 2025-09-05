@@ -210,7 +210,12 @@ export default function InterviewSetup({ onStartInterview }: InterviewSetupProps
   // Get selected case data to determine if documents are required
   const selectedCaseData = cases.find(c => c.id === selectedCase);
   const requiresDocuments = selectedCaseData?.requires_documents || false;
-  const totalSteps = requiresDocuments ? 5 : 4; // Case -> Profile -> [Custom Profile] -> [Documents] -> Device
+  
+  // Determine total steps based on current flow
+  // Basic flow: Case (1) -> Profile (2)
+  // If creating custom profile: Case (1) -> Profile (2) -> Custom Profile (3)
+  const isInCustomProfileFlow = currentPage === 3;
+  const totalSteps = isInCustomProfileFlow ? 3 : 2;
   
   // Removed scroll detection state - now handled by ScrollFadeIndicator
 
