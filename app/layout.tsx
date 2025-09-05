@@ -9,6 +9,7 @@ import { RecordingAnchorProvider } from "@/hooks/useRecordingAnchor";
 import {
   ClerkProvider,
 } from "@clerk/nextjs";
+import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 export const metadata: Metadata = {
   title: "Skillflo.AI",
@@ -38,6 +39,9 @@ export default function RootLayout({
             "flex flex-col min-h-screen"
           )}
         >
+          {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+            <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+          )}
           <ThemeProvider
             attribute="class"
             defaultTheme="light"

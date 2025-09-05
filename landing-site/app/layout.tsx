@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import GoogleAnalytics from '../components/GoogleAnalytics'
 
 export const metadata: Metadata = {
   title: 'Skillflo.ai - AI-Powered Mock Interviews',
@@ -21,7 +22,12 @@ export default function RootLayout({
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </head>
-      <body>{children}</body>
+      <body>
+        {process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID && (
+          <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
+        )}
+        {children}
+      </body>
     </html>
   )
 }
